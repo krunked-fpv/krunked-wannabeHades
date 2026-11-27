@@ -687,12 +687,15 @@ export function resolveEnemyWallSlam(
       });
     }
 
+    const hasMoreBossPhases = enemy.isBoss && enemy.phase < enemy.maxPhases;
     const finalInRoom =
+      !hasMoreBossPhases &&
       enemy.archetype !== 'rattlebones_dummy' &&
-      state.room.waveIndex >= state.room.totalWaves &&
+      state.room.waveIndex + 1 >= state.room.totalWaves &&
       state.enemies.every((e) => e.hp <= 0 || e.aiState === 'dead');
 
     if (finalInRoom) {
+      state.hitstopTimer = 0;
       state.run.finalKillSlowTimer =
         COMBAT_CONSTANTS.finalKillSlowDuration + COMBAT_CONSTANTS.finalKillSlowLerpOut;
       state.timeScale = COMBAT_CONSTANTS.finalKillSlowScale;

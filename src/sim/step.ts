@@ -313,7 +313,7 @@ export function createDefaultSimState(seed: number, meta?: MetaSaveState): SimSt
         minY: -420,
         maxY: 420,
       },
-      waveIndex: 1,
+      waveIndex: 0,
       totalWaves: 1,
       cleared: false,
       combatStarted: false,
@@ -623,7 +623,7 @@ export function stepSim(
       !state.room.cleared &&
       state.room.combatStarted &&
       state.room.encounterKind !== 'hub' &&
-      state.room.waveIndex >= state.room.totalWaves
+      state.room.waveIndex + 1 >= state.room.totalWaves
     ) {
       const anyLiving = state.enemies.some(
         (e) => e.hp > 0 && e.aiState !== 'dead' && e.archetype !== 'rattlebones_dummy',
