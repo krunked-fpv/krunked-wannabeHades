@@ -87,6 +87,24 @@ export function clearOwnerTelegraphs(state: SimState, ownerId: string): void {
   }
 }
 
+export function pruneOrphanedTelegraphs(state: SimState): void {
+  const list = state.room.telegraphs;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const tg = list[i];
+    if (tg.ownerId) {
+      const owner = state.enemies.find((e) => e.id === tg.ownerId);
+      if (
+        !owner ||
+        owner.aiState === 'dead' ||
+        owner.hp <= 0 ||
+        owner.aiState === 'stunned'
+      ) {
+        list.splice(i, 1);
+      }
+    }
+  }
+}
+
 export function tickTelegraphs(state: SimState, dt: number): void {
   const list = state.room.telegraphs;
   for (let i = list.length - 1; i >= 0; i--) {
@@ -677,7 +695,9 @@ export function tickEnemies(
   dt: number,
   ctx: SimCombatContext
 ): void {
-  tickTelegraphs(state, dt);
+  // src/sim/step.ts is the sole 1x owner of telegraph elapsed/progress ticks;
+  // here we only prune telegraphs whose owner died or became stunned.
+  pruneOrphanedTelegraphs(state);
 
   const player = state.player;
   const enemies = state.enemies;
