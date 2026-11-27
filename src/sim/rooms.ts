@@ -570,7 +570,8 @@ export function loadRoom(
   depth: number,
   encounterKind: EncounterKind,
   rewardHint?: RewardPreview,
-  ctx?: RngProvider
+  ctx?: RngProvider,
+  opts?: { bossIdOverride?: BossId; templateIdOverride?: string }
 ): void {
   const nextRoomIndex = state.room.roomIndex + 1;
   const cm = getCampaignMeta(state);
@@ -645,6 +646,7 @@ export function loadRoom(
       styxWingsCleared: cm.styxWingsCleared,
       satyrSackFound: cm.satyrSackFound,
       hasLoyaltyCard: cm.hasFerrymanLoyaltyCard,
+      templateIdOverride: opts?.templateIdOverride,
     },
     ctx
   );
@@ -783,7 +785,11 @@ export function loadRoom(
       colorHex: '#ffd942',
     });
   } else if (encounterKind === 'boss' || encounterKind === 'surface_boss') {
-    if (biome === 'obsidian_pit') {
+    if (opts?.bossIdOverride === 'colosseum_spearlord') {
+      spawnDualColosseumChampions(state, ctx);
+    } else if (opts?.bossIdOverride) {
+      spawnBoss(state, opts.bossIdOverride, undefined, ctx);
+    } else if (biome === 'obsidian_pit') {
       spawnBoss(state, resolveObsidianPitBoss(state), undefined, ctx);
     } else if (biome === 'verdant_colosseum') {
       spawnDualColosseumChampions(state, ctx);
@@ -942,32 +948,20 @@ export function warpToBoss(
     applyMetaToPlayer(state, { resetVitals: true });
   }
 
-  const orderIdx = BIOME_PROGRESSION_ORDER.indexOf(def.biome);
+  // The Ferryman fights in his dedicated Crypt Ferryman Dock (never spawning Obsidian Pit Warden Malice!)
+  const targetBiome: BiomeId =
+    bossId === 'the_ferryman' ? 'crypt_of_bile' : def.biome;
+  const orderIdx = BIOME_PROGRESSION_ORDER.indexOf(targetBiome);
   state.run.biomeOrderIndex = orderIdx >= 0 ? orderIdx : 0;
 
   const encounterKind: EncounterKind =
-    def.biome === 'frozen_summit' ? 'surface_boss' : 'boss';
-  const bossDepth = Math.max(1, BIOME_CONSTANTS[def.biome].bossDepth);
+    targetBiome === 'frozen_summit' ? 'surface_boss' : 'boss';
+  const bossDepth = Math.max(1, BIOME_CONSTANTS[targetBiome].bossDepth);
 
-  loadRoom(state, def.biome, bossDepth, encounterKind, undefined, ctx);
-
-  // Replace default biome boss if a specific BossId was requested
-  if (bossId === 'colosseum_spearlord') {
-    // Ensure BOTH Champions are present for Spearlord arena
-    const hasBull = state.enemies.some((e) => e.bossId === 'colosseum_bull');
-    const hasSpear = state.enemies.some((e) => e.bossId === 'colosseum_spearlord');
-    if (!hasBull || !hasSpear) {
-      state.enemies = [];
-      spawnDualColosseumChampions(state, ctx);
-    }
-  } else {
-    const alreadyExact =
-      state.enemies.length === 1 && state.enemies[0].bossId === bossId;
-    if (!alreadyExact) {
-      state.enemies = [];
-      spawnBoss(state, bossId, undefined, ctx);
-    }
-  }
+  loadRoom(state, targetBiome, bossDepth, encounterKind, undefined, ctx, {
+    bossIdOverride: bossId,
+    templateIdOverride: bossId === 'the_ferryman' ? 'ferryman_dock' : undefined,
+  });
 }
 
 // ============================================================================
