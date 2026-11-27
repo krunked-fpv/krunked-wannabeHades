@@ -41,6 +41,7 @@ uniform vec3 uDeepColor;
 uniform vec3 uMidColor;
 uniform vec3 uMistColor;
 uniform vec3 uAccentColor;
+uniform float uBiomeMode; // 0=obsidian/hub, 1=cinder lava rivers, 2=verdant marble/petals, 3=crypt toxic, 4=frozen aurora
 
 float hash21(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
@@ -115,14 +116,29 @@ void main() {
   float mistBand = smoothstep(0.38, 0.82, m2) * (0.45 + 0.55 * (1.0 - vUv.y));
   col = mix(col, uMistColor, mistBand * 0.48);
 
-  // Subtle chasm bottom glow + rising underworld ember motes
+  // Biome-bespoke atmospheric spectacle beneath the floating chamber!
+  if (uBiomeMode > 0.5 && uBiomeMode < 1.5) {
+    // Cinder Mire: glowing molten magma rivers winding across obsidian fissures
+    float lavaRidge = 1.0 - abs(m2 * 2.0 - 1.0);
+    float lavaRiver = smoothstep(0.72, 0.96, lavaRidge);
+    col += mix(vec3(1.0, 0.34, 0.06), vec3(1.0, 0.85, 0.25), lavaRiver) * lavaRiver * 0.75;
+  } else if (uBiomeMode > 3.5) {
+    // Frozen Summit: shimmering emerald-violet Aurora Borealis curtains across midnight sky!
+    float curtain = sin(centered.x * 4.5 + uTime * 0.45 + m1 * 3.0) * 0.5 + 0.5;
+    float auroraBand = smoothstep(0.32, 0.95, vUv.y) * smoothstep(0.35, 0.92, curtain * m2);
+    vec3 auroraCol = mix(vec3(0.28, 0.95, 0.76), vec3(0.58, 0.44, 1.0), sin(centered.x * 2.2 + uTime * 0.3) * 0.5 + 0.5);
+    col += auroraCol * auroraBand * 0.62;
+  }
+
+  // Subtle chasm bottom glow + rising underworld ember / snow motes
   float lowerGlow = smoothstep(0.65, 0.0, vUv.y) * (0.28 + 0.14 * sin(uTime * 1.1 + centered.x * 3.0));
   col += uAccentColor * lowerGlow * 0.24;
 
-  vec2 sparkCell = floor((centered * 11.0 + uCamPos * 0.0009 + vec2(0.0, -uTime * 0.35)));
-  vec2 sparkLocal = fract((centered * 11.0 + uCamPos * 0.0009 + vec2(0.0, -uTime * 0.35))) - 0.5;
+  float moteDir = (uBiomeMode > 3.5) ? 0.28 : -0.35; // snow falls down in Frozen Summit; embers rise elsewhere!
+  vec2 sparkCell = floor((centered * 11.0 + uCamPos * 0.0009 + vec2(0.0, uTime * moteDir)));
+  vec2 sparkLocal = fract((centered * 11.0 + uCamPos * 0.0009 + vec2(0.0, uTime * moteDir))) - 0.5;
   float sparkSeed = hash21(sparkCell);
-  float sparkVis = step(0.93, sparkSeed);
+  float sparkVis = step(0.92, sparkSeed);
   float sparkDist = length(sparkLocal - vec2(sin(uTime * 2.0 + sparkSeed * 12.0) * 0.15, 0.0));
   float spark = sparkVis * smoothstep(0.11, 0.015, sparkDist) * (0.55 + 0.45 * sin(uTime * 5.0 + sparkSeed * 40.0));
   col += mix(uAccentColor, vec3(1.0, 0.95, 0.78), 0.55) * spark * 0.95;

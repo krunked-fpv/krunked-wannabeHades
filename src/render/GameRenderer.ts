@@ -5,12 +5,17 @@
  * gracefully falls back to Canvas2DInkCelRenderer if WebGL2 is unavailable.
  * Guarantees exact inverse camera/isometric math for laser-precise `screenToWorld`
  * aiming, smooth `interpAlpha` interpolation (with `classicSnap60Hz` toggle),
+ * live `BUILTIN <-> CUSTOM_PACK` sprite override swapping (`attachCustomPack`),
  * cached comic-ink Patron portrait URLs, and live `RenderStats`.
  */
 
 import type { PatronId, RenderSettings, SimEvent, SimState, Vec2 } from '../contracts/index.js';
 import { SIM_CONSTANTS } from '../contracts/index.js';
-import { bakeProceduralInkCelAtlas } from '../assets/ProceduralInkCelAtlas.js';
+import type { BakedAtlas } from '../assets/ProceduralInkCelAtlas.js';
+import {
+  bakeProceduralInkCelAtlas,
+  buildCompositeCustomAtlas,
+} from '../assets/ProceduralInkCelAtlas.js';
 import { bakeProceduralFontAtlas } from '../assets/ProceduralFonts.js';
 import { getPatronPortraitDataUrl as getCachedPatronPortraitDataUrl } from '../assets/ProceduralPortraits.js';
 import { ParticlesAndDecals } from './ParticlesAndDecals.js';
@@ -22,6 +27,27 @@ export interface RenderStats {
   fps: number;
   drawCalls: number;
   particleCount: number;
+}
+
+export interface CustomPackSpriteRef {
+  readonly image: CanvasImageSource;
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/**
+ * Clean structural interface accepted by `GameRenderer.attachCustomPack(registry)`.
+ * Keeps renderer 100% decoupled from AssetRegistry internals while enabling live
+ * BUILTIN <-> CUSTOM_PACK sprite and portrait swapping!
+ */
+export interface CustomPackProvider {
+  getPackMode(): 'BUILTIN' | 'CUSTOM_PACK';
+  hasCustomPack(): boolean;
+  getCustomSprite(cleanId: string): CustomPackSpriteRef | null;
+  getCustomPortraitDataUrl?(patronId: PatronId): string | null;
+  getCustomPortraitUrl?(patronId: PatronId): string | null;
 }
 
 export interface CameraView {
@@ -40,6 +66,7 @@ export interface CameraView {
 export interface RenderBackend {
   readonly kind: 'webgl2' | 'canvas2d';
   resize(width: number, height: number, dpr: number): void;
+  setAtlasCanvas?(canvas: HTMLCanvasElement): void;
   render(
     state: SimState,
     prevState: SimState | null,
@@ -54,6 +81,12 @@ export interface RenderBackend {
 export class GameRenderer {
   private canvas: HTMLCanvasElement | null = null;
   private backend: RenderBackend | null = null;
+  private baseAtlas: BakedAtlas | null = null;
+  private customPack: CustomPackProvider | null = null;
+  private customCompositeCanvas: HTMLCanvasElement | null = null;
+  private activePackMode: 'BUILTIN' | 'CUSTOM_PACK' = 'BUILTIN';
+  private customPackDirty = false;
+
   private readonly vfx = new ParticlesAndDecals();
 
   private viewW = 1280;
@@ -85,6 +118,7 @@ export class GameRenderer {
 
     const atlas = bakeProceduralInkCelAtlas();
     const fontAtlas = bakeProceduralFontAtlas();
+    this.baseAtlas = atlas;
 
     const glBackend = WebGL2InkCelRenderer.tryCreate(canvas, atlas, fontAtlas);
     if (glBackend) {
@@ -93,11 +127,57 @@ export class GameRenderer {
       this.backend = new Canvas2DInkCelRenderer(canvas, atlas);
     }
 
+    if (this.customPack) {
+      this.customPackDirty = true;
+      this.syncAtlasPackMode(this.customPack.getPackMode());
+    }
+
     const rect = canvas.getBoundingClientRect();
     const initW = rect.width > 0 ? rect.width : window.innerWidth || 1280;
     const initH = rect.height > 0 ? rect.height : window.innerHeight || 720;
     const initDpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
     this.resize(initW, initH, initDpr);
+  }
+
+  /**
+   * Attaches (or clears) an optional Custom Pack AssetRegistry so toggling
+   * `BUILTIN` <-> `CUSTOM_PACK` hot-swaps sprites live without breaking Built-In fallback!
+   */
+  public attachCustomPack(registry: CustomPackProvider | null): void {
+    this.customPack = registry;
+    this.customCompositeCanvas = null;
+    this.customPackDirty = true;
+    if (registry) {
+      this.syncAtlasPackMode(registry.getPackMode());
+    } else {
+      this.syncAtlasPackMode('BUILTIN');
+    }
+  }
+
+  private syncAtlasPackMode(desiredMode: 'BUILTIN' | 'CUSTOM_PACK'): void {
+    if (!this.backend || !this.baseAtlas) return;
+    const useCustom =
+      desiredMode === 'CUSTOM_PACK' &&
+      this.customPack !== null &&
+      this.customPack.hasCustomPack();
+    const targetMode: 'BUILTIN' | 'CUSTOM_PACK' = useCustom ? 'CUSTOM_PACK' : 'BUILTIN';
+
+    if (targetMode === this.activePackMode && !this.customPackDirty) {
+      return;
+    }
+
+    this.activePackMode = targetMode;
+    this.customPackDirty = false;
+
+    if (targetMode === 'CUSTOM_PACK' && this.customPack) {
+      if (!this.customCompositeCanvas) {
+        const res = buildCompositeCustomAtlas(this.baseAtlas, this.customPack);
+        this.customCompositeCanvas = res.canvas;
+      }
+      this.backend.setAtlasCanvas?.(this.customCompositeCanvas);
+    } else {
+      this.backend.setAtlasCanvas?.(this.baseAtlas.canvas);
+    }
   }
 
   public resize(width: number, height: number, dpr: number): void {
@@ -118,9 +198,9 @@ export class GameRenderer {
   }
 
   private computeEffectiveZoom(state: SimState, prevState: SimState | null, alpha: number): number {
-    const curZoom = state.camera.zoom > 0.05 ? state.camera.zoom : state.room.zoom > 0.05 ? state.room.zoom : 0.85;
-    const prevZoom =
-      prevState && prevState.camera.zoom > 0.05 ? prevState.camera.zoom : curZoom;
+    const curZoom =
+      state.camera.zoom > 0.05 ? state.camera.zoom : state.room.zoom > 0.05 ? state.room.zoom : 0.85;
+    const prevZoom = prevState && prevState.camera.zoom > 0.05 ? prevState.camera.zoom : curZoom;
     const baseZoom = prevState ? prevZoom + (curZoom - prevZoom) * alpha : curZoom;
     const viewportScale = Math.max(
       0.55,
@@ -175,6 +255,8 @@ export class GameRenderer {
     nowMs: number
   ): void {
     if (!this.backend) return;
+
+    this.syncAtlasPackMode(settings.packMode);
 
     const dtSec =
       this.lastRenderMs > 0
@@ -231,6 +313,13 @@ export class GameRenderer {
   }
 
   public getPatronPortraitDataUrl(patronId: PatronId): string {
+    if (this.activePackMode === 'CUSTOM_PACK' && this.customPack) {
+      const customUrl =
+        this.customPack.getCustomPortraitDataUrl?.(patronId) ??
+        this.customPack.getCustomPortraitUrl?.(patronId) ??
+        null;
+      if (customUrl) return customUrl;
+    }
     return getCachedPatronPortraitDataUrl(patronId);
   }
 

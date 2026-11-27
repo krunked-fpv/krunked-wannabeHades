@@ -160,6 +160,55 @@ const SPRITE_SPECS: readonly SpriteSpec[] = [
   { id: 'vfx_shadow_blob', x: 1388, y: 1148, w: 128, h: 80, anchorX: 0.5, anchorY: 0.5 },
   { id: 'vfx_projectile_orb', x: 1528, y: 1148, w: 64, h: 64, anchorX: 0.5, anchorY: 0.5 },
   { id: 'vfx_projectile_arrow', x: 1604, y: 1148, w: 96, h: 36, anchorX: 0.5, anchorY: 0.5 },
+
+  // Row 7 (y=1284..1560): Wave 2 Biome Tiles, Pillars & Environmental VFX
+  { id: 'tile_cinder_b', x: 16, y: 1284, w: 256, h: 128, anchorX: 0.5, anchorY: 0.5 },
+  { id: 'tile_verdant_b', x: 280, y: 1284, w: 256, h: 128, anchorX: 0.5, anchorY: 0.5 },
+  { id: 'tile_crypt_b', x: 544, y: 1284, w: 256, h: 128, anchorX: 0.5, anchorY: 0.5 },
+  { id: 'tile_summit_b', x: 808, y: 1284, w: 256, h: 128, anchorX: 0.5, anchorY: 0.5 },
+  { id: 'prop_pillar_cinder', x: 1080, y: 1284, w: 128, h: 248, anchorX: 0.5, anchorY: 0.86 },
+  { id: 'prop_pillar_verdant', x: 1216, y: 1284, w: 128, h: 248, anchorX: 0.5, anchorY: 0.86 },
+  { id: 'prop_pillar_crypt', x: 1352, y: 1284, w: 128, h: 248, anchorX: 0.5, anchorY: 0.86 },
+  { id: 'prop_pillar_summit', x: 1488, y: 1284, w: 128, h: 248, anchorX: 0.5, anchorY: 0.86 },
+  { id: 'vfx_curing_basin', x: 1628, y: 1284, w: 128, h: 104, anchorX: 0.5, anchorY: 0.62 },
+  { id: 'vfx_sawblade', x: 1764, y: 1284, w: 96, h: 96, anchorX: 0.5, anchorY: 0.5 },
+  { id: 'vfx_blade_rift', x: 1868, y: 1284, w: 112, h: 112, anchorX: 0.5, anchorY: 0.5 },
+  { id: 'vfx_skull_proj', x: 1628, y: 1400, w: 96, h: 96, anchorX: 0.5, anchorY: 0.5 },
+  { id: 'vfx_petal', x: 1736, y: 1400, w: 48, h: 48, anchorX: 0.5, anchorY: 0.5 },
+  { id: 'vfx_snowflake', x: 1796, y: 1400, w: 48, h: 48, anchorX: 0.5, anchorY: 0.5 },
+  { id: 'vfx_pylon', x: 1856, y: 1400, w: 104, h: 136, anchorX: 0.5, anchorY: 0.82 },
+
+  // Row 8 (y=1420..1564, left half x=16..1068): Wave 2 Enemies Part 1 (8 bespoke archetypes)
+  { id: 'enemy_wretch_assassin', x: 16, y: 1420, w: 124, h: 144, anchorX: 0.5, anchorY: 0.85 },
+  { id: 'enemy_slag_thrower', x: 146, y: 1420, w: 124, h: 144, anchorX: 0.5, anchorY: 0.85 },
+  { id: 'enemy_lava_gorgon', x: 276, y: 1420, w: 124, h: 144, anchorX: 0.5, anchorY: 0.78 },
+  { id: 'enemy_bloodless_drifter', x: 406, y: 1420, w: 124, h: 144, anchorX: 0.5, anchorY: 0.85 },
+  { id: 'enemy_infernal_bomber', x: 536, y: 1420, w: 124, h: 144, anchorX: 0.5, anchorY: 0.85 },
+  { id: 'enemy_bone_hydra_head', x: 666, y: 1420, w: 128, h: 144, anchorX: 0.5, anchorY: 0.84 },
+  { id: 'enemy_colosseum_swordsman', x: 800, y: 1420, w: 124, h: 144, anchorX: 0.5, anchorY: 0.85 },
+  { id: 'enemy_colosseum_shieldbearer', x: 930, y: 1420, w: 132, h: 144, anchorX: 0.5, anchorY: 0.85 },
+
+  // Row 9 (y=1572..1720): Wave 2 Enemies Part 2 (7 archetypes) + Weapon/Portal VFX
+  { id: 'enemy_colosseum_bowman', x: 16, y: 1572, w: 128, h: 144, anchorX: 0.5, anchorY: 0.85 },
+  { id: 'enemy_chariot_flame', x: 152, y: 1572, w: 132, h: 132, anchorX: 0.5, anchorY: 0.82 },
+  { id: 'enemy_soul_orb', x: 292, y: 1572, w: 104, h: 104, anchorX: 0.5, anchorY: 0.65 },
+  { id: 'enemy_venom_satyr', x: 404, y: 1572, w: 128, h: 144, anchorX: 0.5, anchorY: 0.85 },
+  { id: 'enemy_giant_vermin', x: 540, y: 1572, w: 144, h: 128, anchorX: 0.5, anchorY: 0.82 },
+  { id: 'enemy_snakestone_laser', x: 692, y: 1572, w: 124, h: 144, anchorX: 0.5, anchorY: 0.78 },
+  { id: 'enemy_heavy_brawler', x: 824, y: 1572, w: 152, h: 148, anchorX: 0.5, anchorY: 0.86 },
+  { id: 'vfx_chaos_gate', x: 988, y: 1572, w: 144, h: 104, anchorX: 0.5, anchorY: 0.5 },
+  { id: 'vfx_muzzle_flash', x: 1144, y: 1572, w: 112, h: 96, anchorX: 0.2, anchorY: 0.5 },
+  { id: 'vfx_bow_flash', x: 1268, y: 1572, w: 112, h: 112, anchorX: 0.5, anchorY: 0.5 },
+  { id: 'vfx_shield_block', x: 1392, y: 1572, w: 112, h: 128, anchorX: 0.5, anchorY: 0.5 },
+
+  // Row 10 (y=1728..2036): ALL 7 Remaining Wave 2 Bosses (All 8 Bosses Bespoke!)
+  { id: 'boss_warden_fury', x: 16, y: 1732, w: 264, h: 272, anchorX: 0.5, anchorY: 0.85 },
+  { id: 'boss_warden_murder', x: 288, y: 1732, w: 264, h: 272, anchorX: 0.5, anchorY: 0.85 },
+  { id: 'boss_bone_leviathan', x: 560, y: 1732, w: 288, h: 288, anchorX: 0.5, anchorY: 0.85 },
+  { id: 'boss_colosseum_bull', x: 856, y: 1732, w: 276, h: 284, anchorX: 0.5, anchorY: 0.86 },
+  { id: 'boss_colosseum_spearlord', x: 1140, y: 1732, w: 256, h: 280, anchorX: 0.5, anchorY: 0.86 },
+  { id: 'boss_the_ferryman', x: 1404, y: 1732, w: 268, h: 288, anchorX: 0.5, anchorY: 0.86 },
+  { id: 'boss_sovereign_lord', x: 1680, y: 1728, w: 344, h: 308, anchorX: 0.5, anchorY: 0.86 },
 ];
 
 export const ATLAS_SPRITE_RECTS: ReadonlyMap<string, AtlasSpriteRect> = new Map(
@@ -174,7 +223,7 @@ export function getBuiltinAssetIds(): string[] {
   return SPRITE_SPECS.map((s) => s.id);
 }
 
-/** Resolve sprite ID for any enemy archetype cleanly */
+/** Resolve bespoke ink-cel sprite ID for EVERY enemy archetype & boss! */
 export function getEnemySpriteId(archetype: EnemyArchetypeId, isBoss: boolean): string {
   switch (archetype) {
     case 'numbskull':
@@ -189,12 +238,72 @@ export function getEnemySpriteId(archetype: EnemyArchetypeId, isBoss: boolean): 
       return 'enemy_ember_lout';
     case 'rattlebones_dummy':
       return 'enemy_rattlebones_dummy';
+    case 'wretch_assassin':
+      return 'enemy_wretch_assassin';
+    case 'slag_thrower':
+      return 'enemy_slag_thrower';
+    case 'lava_gorgon':
+      return 'enemy_lava_gorgon';
+    case 'bloodless_drifter':
+      return 'enemy_bloodless_drifter';
+    case 'infernal_bomber':
+      return 'enemy_infernal_bomber';
+    case 'bone_hydra_head':
+      return 'enemy_bone_hydra_head';
+    case 'colosseum_swordsman':
+      return 'enemy_colosseum_swordsman';
+    case 'colosseum_shieldbearer':
+      return 'enemy_colosseum_shieldbearer';
+    case 'colosseum_bowman':
+      return 'enemy_colosseum_bowman';
+    case 'chariot_flame':
+      return 'enemy_chariot_flame';
+    case 'soul_orb':
+      return 'enemy_soul_orb';
+    case 'venom_satyr':
+      return 'enemy_venom_satyr';
+    case 'giant_vermin':
+      return 'enemy_giant_vermin';
+    case 'snakestone_laser':
+      return 'enemy_snakestone_laser';
+    case 'heavy_brawler':
+      return 'enemy_heavy_brawler';
     case 'warden_malice':
-    case 'warden_fury':
-    case 'warden_murder':
       return 'boss_warden_malice';
+    case 'warden_fury':
+      return 'boss_warden_fury';
+    case 'warden_murder':
+      return 'boss_warden_murder';
+    case 'bone_leviathan':
+      return 'boss_bone_leviathan';
+    case 'colosseum_bull':
+      return 'boss_colosseum_bull';
+    case 'colosseum_spearlord':
+      return 'boss_colosseum_spearlord';
+    case 'the_ferryman':
+      return 'boss_the_ferryman';
+    case 'sovereign_lord':
+      return 'boss_sovereign_lord';
     default:
       return isBoss ? 'boss_generic_titan' : 'enemy_generic_shade';
+  }
+}
+
+export function getBiomePillarSpriteId(biome: BiomeId): string {
+  switch (biome) {
+    case 'sanctum_hub':
+      return 'prop_pillar_sanctum';
+    case 'cinder_mire':
+      return 'prop_pillar_cinder';
+    case 'verdant_colosseum':
+      return 'prop_pillar_verdant';
+    case 'crypt_of_bile':
+      return 'prop_pillar_crypt';
+    case 'frozen_summit':
+      return 'prop_pillar_summit';
+    case 'obsidian_pit':
+    default:
+      return 'prop_pillar_obsidian';
   }
 }
 
@@ -249,13 +358,13 @@ export function getBiomeTileIds(biome: BiomeId): readonly string[] {
     case 'obsidian_pit':
       return ['tile_obsidian_a', 'tile_obsidian_b', 'tile_obsidian_cracked', 'tile_obsidian_mosaic'];
     case 'cinder_mire':
-      return ['tile_cinder_a', 'tile_obsidian_cracked', 'tile_cinder_a', 'tile_cinder_a'];
+      return ['tile_cinder_a', 'tile_cinder_b', 'tile_cinder_a', 'tile_cinder_b'];
     case 'verdant_colosseum':
-      return ['tile_verdant_a', 'tile_verdant_a', 'tile_obsidian_mosaic', 'tile_verdant_a'];
+      return ['tile_verdant_a', 'tile_verdant_b', 'tile_verdant_a', 'tile_verdant_b'];
     case 'crypt_of_bile':
-      return ['tile_crypt_a', 'tile_obsidian_cracked', 'tile_crypt_a', 'tile_crypt_a'];
+      return ['tile_crypt_a', 'tile_crypt_b', 'tile_crypt_a', 'tile_crypt_b'];
     case 'frozen_summit':
-      return ['tile_summit_a', 'tile_summit_a', 'tile_obsidian_cracked', 'tile_summit_a'];
+      return ['tile_summit_a', 'tile_summit_b', 'tile_summit_a', 'tile_summit_b'];
   }
 }
 
@@ -3009,6 +3118,1443 @@ function drawVfxSprites(ctx: CanvasRenderingContext2D): void {
 // Atlas Baking Entry Point (Called ONCE at Renderer Init)
 // ============================================================================
 
+function drawWave2BiomePropsAndVfx(ctx: CanvasRenderingContext2D): void {
+  // 4 Secondary Biome Stone Tile Variants (matching 2:1 isometric flagstones)
+  withCell(ctx, 'tile_cinder_b', (c, w, h) =>
+    drawIsometricStoneTile(
+      c,
+      w,
+      h,
+      {
+        base: '#2b1615',
+        dark: '#14090a',
+        lit: '#4c2620',
+        bevelLit: '#ff8a38',
+        bevelDark: '#0b0405',
+        inlay: '#ff6a22',
+        accent: '#ffaa32',
+      },
+      'mosaic'
+    )
+  );
+  withCell(ctx, 'tile_verdant_b', (c, w, h) =>
+    drawIsometricStoneTile(
+      c,
+      w,
+      h,
+      {
+        base: '#275963',
+        dark: '#14333d',
+        lit: '#478d94',
+        bevelLit: '#9ff2eb',
+        bevelDark: '#0a1c24',
+        inlay: '#f2cb68',
+        accent: '#ff6ec7',
+      },
+      'alt'
+    )
+  );
+  withCell(ctx, 'tile_crypt_b', (c, w, h) =>
+    drawIsometricStoneTile(
+      c,
+      w,
+      h,
+      {
+        base: '#363b22',
+        dark: '#1c2010',
+        lit: '#575e34',
+        bevelLit: '#9aa84f',
+        bevelDark: '#0f1208',
+        inlay: '#c9a342',
+        accent: '#a8e62e',
+      },
+      'cracked'
+    )
+  );
+  withCell(ctx, 'tile_summit_b', (c, w, h) =>
+    drawIsometricStoneTile(
+      c,
+      w,
+      h,
+      {
+        base: '#3c546e',
+        dark: '#1e2e42',
+        lit: '#6d94b8',
+        bevelLit: '#e3f5ff',
+        bevelDark: '#0d1624',
+        inlay: '#e8f7ff',
+        accent: '#7cdfff',
+      },
+      'cracked'
+    )
+  );
+
+  // 4 Bespoke Biome Pillars (Cinder basalt spire, Verdant marble+laurel, Crypt bronze-bone, Summit frost monolith)
+  const drawBiomePillar = (
+    id: string,
+    cols: { dark: string; mid: string; lit: string; cap: string; accent: string; rim: string }
+  ) => {
+    withCell(ctx, id, (c, w, h) => {
+      const cx = w * 0.5;
+      const baseY = h * 0.88;
+      const topY = h * 0.1;
+      const sw = w * 0.56;
+      c.beginPath();
+      c.moveTo(cx - sw * 0.78, baseY);
+      c.lineTo(cx - sw * 0.48, baseY - 20);
+      c.lineTo(cx + sw * 0.48, baseY - 20);
+      c.lineTo(cx + sw * 0.78, baseY);
+      c.lineTo(cx + sw * 0.48, baseY + 20);
+      c.lineTo(cx - sw * 0.48, baseY + 20);
+      c.closePath();
+      c.fillStyle = cols.mid;
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 4;
+      c.stroke();
+
+      c.save();
+      c.beginPath();
+      c.moveTo(cx - sw * 0.48, baseY - 4);
+      c.lineTo(cx - sw * 0.44, topY + 22);
+      c.lineTo(cx + sw * 0.44, topY + 22);
+      c.lineTo(cx + sw * 0.48, baseY - 4);
+      c.closePath();
+      const sg = c.createLinearGradient(cx - sw * 0.5, 0, cx + sw * 0.5, 0);
+      sg.addColorStop(0, cols.lit);
+      sg.addColorStop(0.42, cols.mid);
+      sg.addColorStop(0.75, cols.dark);
+      sg.addColorStop(1, '#090910');
+      c.fillStyle = sg;
+      c.fill();
+      c.clip();
+      drawCrossHatch(c, cx + 2, topY + 22, sw * 0.5, baseY - topY, 8, -0.45, 'rgba(7,5,14,0.5)', 1.5);
+      c.strokeStyle = cols.accent;
+      c.lineWidth = 3;
+      c.beginPath();
+      c.moveTo(cx - sw * 0.34, baseY - 72);
+      c.lineTo(cx, baseY - 84);
+      c.lineTo(cx + sw * 0.34, baseY - 72);
+      c.stroke();
+      c.restore();
+
+      c.beginPath();
+      c.moveTo(cx - sw * 0.48, baseY - 4);
+      c.lineTo(cx - sw * 0.44, topY + 22);
+      c.lineTo(cx + sw * 0.44, topY + 22);
+      c.lineTo(cx + sw * 0.48, baseY - 4);
+      c.closePath();
+      c.strokeStyle = INK;
+      c.lineWidth = 4;
+      c.stroke();
+
+      c.fillStyle = cols.cap;
+      c.beginPath();
+      c.moveTo(cx - sw * 0.72, topY + 26);
+      c.lineTo(cx - sw * 0.76, topY + 6);
+      c.lineTo(cx, topY - 4);
+      c.lineTo(cx + sw * 0.76, topY + 8);
+      c.lineTo(cx + sw * 0.7, topY + 26);
+      c.closePath();
+      c.fill();
+      c.stroke();
+
+      c.strokeStyle = cols.rim;
+      c.lineWidth = 2.4;
+      c.beginPath();
+      c.moveTo(cx - sw * 0.44, topY + 28);
+      c.lineTo(cx - sw * 0.47, baseY - 8);
+      c.stroke();
+    });
+  };
+
+  drawBiomePillar('prop_pillar_cinder', {
+    dark: '#1c0d0d',
+    mid: '#3b1e1c',
+    lit: '#6e382e',
+    cap: '#e07a2f',
+    accent: '#ff5e1a',
+    rim: '#ffaa5c',
+  });
+  drawBiomePillar('prop_pillar_verdant', {
+    dark: '#102933',
+    mid: '#245863',
+    lit: '#5aa6ab',
+    cap: '#f2cb64',
+    accent: '#ff64c8',
+    rim: '#a6fff8',
+  });
+  drawBiomePillar('prop_pillar_crypt', {
+    dark: '#1b1e10',
+    mid: '#3a4021',
+    lit: '#6b703b',
+    cap: '#b89440',
+    accent: '#a8e62e',
+    rim: '#d4f27c',
+  });
+  drawBiomePillar('prop_pillar_summit', {
+    dark: '#182538',
+    mid: '#324d6e',
+    lit: '#78a4cc',
+    cap: '#e6f6ff',
+    accent: '#7cdfff',
+    rim: '#ffffff',
+  });
+
+  // Curing Pool Basin (Crypt of Bile luminous turquoise cleansing fountain!)
+  withCell(ctx, 'vfx_curing_basin', (c, w, h) => {
+    const cx = w * 0.5;
+    const cy = h * 0.58;
+    c.fillStyle = '#3c454a';
+    c.beginPath();
+    c.ellipse(cx, cy + 8, 52, 26, 0, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4;
+    c.stroke();
+    const g = c.createRadialGradient(cx, cy, 4, cx, cy, 42);
+    g.addColorStop(0, '#e6ffff');
+    g.addColorStop(0.55, '#38e6ff');
+    g.addColorStop(1, '#0d6e8f');
+    c.fillStyle = g;
+    c.beginPath();
+    c.ellipse(cx, cy, 42, 20, 0, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = '#d9b152';
+    c.lineWidth = 3.2;
+    c.stroke();
+  });
+
+  // Spinning Sawblade (Warden Fury)
+  withCell(ctx, 'vfx_sawblade', (c, w, h) => {
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    const teeth = 12;
+    c.beginPath();
+    for (let i = 0; i < teeth * 2; i++) {
+      const r = i % 2 === 0 ? 44 : 28;
+      const a = (i * Math.PI) / teeth;
+      const px = cx + Math.cos(a) * r;
+      const py = cy + Math.sin(a) * r;
+      if (i === 0) c.moveTo(px, py);
+      else c.lineTo(px, py);
+    }
+    c.closePath();
+    c.fillStyle = '#b4c0cf';
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 3.5;
+    c.stroke();
+    c.fillStyle = '#d62238';
+    c.beginPath();
+    c.arc(cx, cy, 14, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+  });
+
+  // Bellum Spinning Crimson Blade Rift Vortex
+  withCell(ctx, 'vfx_blade_rift', (c, w, h) => {
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    for (let i = 0; i < 6; i++) {
+      const a = (i * Math.PI) / 3;
+      c.save();
+      c.translate(cx, cy);
+      c.rotate(a);
+      c.beginPath();
+      c.moveTo(8, -4);
+      c.quadraticCurveTo(38, -24, 48, 2);
+      c.quadraticCurveTo(30, 6, 8, 4);
+      c.closePath();
+      c.fillStyle = i % 2 === 0 ? '#ff2418' : '#240b12';
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 3;
+      c.stroke();
+      c.restore();
+    }
+    c.fillStyle = '#ff6454';
+    c.beginPath();
+    c.arc(cx, cy, 12, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 3;
+    c.stroke();
+  });
+
+  // Boiling Blood Skull Projectile (Sovereign Lord)
+  withCell(ctx, 'vfx_skull_proj', (c, w, h) => {
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    const g = c.createRadialGradient(cx, cy, 4, cx, cy, 42);
+    g.addColorStop(0, '#9cff70');
+    g.addColorStop(0.55, '#e82c38');
+    g.addColorStop(1, 'rgba(200,20,30,0)');
+    c.fillStyle = g;
+    c.beginPath();
+    c.arc(cx, cy, 42, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#e8f5e0';
+    c.beginPath();
+    c.arc(cx, cy - 4, 22, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 3.6;
+    c.stroke();
+    c.fillStyle = '#24ff62';
+    c.beginPath();
+    c.arc(cx - 8, cy - 6, 5, 0, Math.PI * 2);
+    c.arc(cx + 8, cy - 6, 5, 0, Math.PI * 2);
+    c.fill();
+  });
+
+  // Painted Petal (Verdant Colosseum / Velouris) & Snowflake (Frozen Summit)
+  withCell(ctx, 'vfx_petal', (c, w, h) => {
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    c.beginPath();
+    c.moveTo(cx, 6);
+    c.bezierCurveTo(w - 6, 12, w - 10, h - 8, cx, h - 6);
+    c.bezierCurveTo(10, h - 8, 6, 12, cx, 6);
+    c.closePath();
+    c.fillStyle = '#ffffff';
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 2.4;
+    c.stroke();
+  });
+
+  withCell(ctx, 'vfx_snowflake', (c, w, h) => {
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    c.strokeStyle = '#ffffff';
+    c.lineWidth = 3.6;
+    for (let i = 0; i < 3; i++) {
+      const a = (i * Math.PI) / 3;
+      c.beginPath();
+      c.moveTo(cx - Math.cos(a) * 18, cy - Math.sin(a) * 18);
+      c.lineTo(cx + Math.cos(a) * 18, cy + Math.sin(a) * 18);
+      c.stroke();
+    }
+  });
+
+  // Crystal Turret Pylon (Glaciera Frost Crystal / Hazard Pylon)
+  withCell(ctx, 'vfx_pylon', (c, w, h) => {
+    const cx = w * 0.5;
+    const cy = h * 0.48;
+    c.beginPath();
+    c.moveTo(cx, 12);
+    c.lineTo(cx + 28, cy);
+    c.lineTo(cx + 16, h - 18);
+    c.lineTo(cx - 16, h - 18);
+    c.lineTo(cx - 28, cy);
+    c.closePath();
+    const g = c.createLinearGradient(cx - 26, 12, cx + 26, h - 18);
+    g.addColorStop(0, '#d8f6ff');
+    g.addColorStop(0.5, '#4eb4ff');
+    g.addColorStop(1, '#193b6b');
+    c.fillStyle = g;
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4;
+    c.stroke();
+  });
+
+  // Chaos Gate Swirling Primordial Floor Portal
+  withCell(ctx, 'vfx_chaos_gate', (c, w, h) => {
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    const g = c.createRadialGradient(cx, cy, 6, cx, cy, 66);
+    g.addColorStop(0, '#090214');
+    g.addColorStop(0.45, '#6419ff');
+    g.addColorStop(0.78, '#d49eff');
+    g.addColorStop(1, 'rgba(100,25,255,0)');
+    c.fillStyle = g;
+    c.beginPath();
+    c.ellipse(cx, cy, 66, 42, 0, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = '#f2c154';
+    c.lineWidth = 3.5;
+    c.beginPath();
+    c.ellipse(cx, cy, 46, 26, 0, 0, Math.PI * 2);
+    c.stroke();
+    // Primordial eye in center
+    c.fillStyle = '#c48eff';
+    c.beginPath();
+    c.ellipse(cx, cy, 20, 10, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#090214';
+    c.beginPath();
+    c.ellipse(cx, cy, 4, 10, 0, 0, Math.PI * 2);
+    c.fill();
+  });
+
+  // Weapon VFX: Adamant Rail Muzzle Flash, Bow Power-Shot Starburst, Shield Frontal Block Arc
+  withCell(ctx, 'vfx_muzzle_flash', (c, w, h) => {
+    const cy = h * 0.5;
+    c.beginPath();
+    c.moveTo(8, cy);
+    c.lineTo(38, cy - 32);
+    c.lineTo(52, cy - 10);
+    c.lineTo(w - 6, cy);
+    c.lineTo(52, cy + 10);
+    c.lineTo(38, cy + 32);
+    c.closePath();
+    c.fillStyle = '#ff9824';
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 3.2;
+    c.stroke();
+    c.fillStyle = '#fff9c4';
+    c.beginPath();
+    c.ellipse(38, cy, 24, 10, 0, 0, Math.PI * 2);
+    c.fill();
+  });
+
+  withCell(ctx, 'vfx_bow_flash', (c, w, h) => {
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    const spikes = 8;
+    c.beginPath();
+    for (let i = 0; i < spikes * 2; i++) {
+      const r = i % 2 === 0 ? 50 : 12;
+      const a = (i * Math.PI) / spikes;
+      const px = cx + Math.cos(a) * r;
+      const py = cy + Math.sin(a) * r;
+      if (i === 0) c.moveTo(px, py);
+      else c.lineTo(px, py);
+    }
+    c.closePath();
+    c.fillStyle = '#ffe966';
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 2.8;
+    c.stroke();
+  });
+
+  withCell(ctx, 'vfx_shield_block', (c, w, h) => {
+    const cx = w * 0.38;
+    const cy = h * 0.5;
+    c.strokeStyle = '#ffcf48';
+    c.lineWidth = 10;
+    c.beginPath();
+    c.arc(cx, cy, 46, -1.1, 1.1);
+    c.stroke();
+    c.strokeStyle = '#ffffff';
+    c.lineWidth = 4;
+    c.stroke();
+  });
+}
+
+function drawWave2EnemiesAndBosses(ctx: CanvasRenderingContext2D): void {
+  // 15 Bespoke Wave 2 Enemies
+  const drawCloakedWarrior = (
+    id: string,
+    cols: { top: string; mid: string; dark: string; eye: string; trim: string },
+    extra: (c: CanvasRenderingContext2D, cx: number, baseY: number) => void
+  ) => {
+    withCell(ctx, id, (c, w, h) => {
+      const cx = w * 0.5;
+      const baseY = h * 0.86;
+      c.beginPath();
+      c.moveTo(cx - 28, baseY);
+      c.quadraticCurveTo(cx - 38, baseY - 58, cx - 22, baseY - 96);
+      c.quadraticCurveTo(cx, baseY - 124, cx + 22, baseY - 96);
+      c.quadraticCurveTo(cx + 38, baseY - 58, cx + 28, baseY);
+      c.lineTo(cx + 10, baseY - 12);
+      c.lineTo(cx - 10, baseY - 12);
+      c.closePath();
+      const g = c.createLinearGradient(cx - 32, baseY - 120, cx + 32, baseY);
+      g.addColorStop(0, cols.top);
+      g.addColorStop(0.5, cols.mid);
+      g.addColorStop(1, cols.dark);
+      c.fillStyle = g;
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 4;
+      c.stroke();
+
+      // Hooded face & eyes
+      c.fillStyle = '#08060e';
+      c.beginPath();
+      c.ellipse(cx, baseY - 94, 14, 16, 0, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = cols.trim;
+      c.lineWidth = 2.4;
+      c.stroke();
+      c.fillStyle = cols.eye;
+      c.fillRect(cx - 8, baseY - 96, 5, 3);
+      c.fillRect(cx + 3, baseY - 96, 5, 3);
+
+      extra(c, cx, baseY);
+    });
+  };
+
+  drawCloakedWarrior(
+    'enemy_wretch_assassin',
+    { top: '#44b888', mid: '#184d3d', dark: '#081b18', eye: '#ff405c', trim: '#5ef2b6' },
+    (c, cx, by) => {
+      // Twin curved glowing daggers
+      c.strokeStyle = '#ff4b64';
+      c.lineWidth = 5;
+      c.beginPath();
+      c.moveTo(cx - 24, by - 56);
+      c.quadraticCurveTo(cx - 48, by - 36, cx - 42, by - 14);
+      c.moveTo(cx + 24, by - 56);
+      c.quadraticCurveTo(cx + 48, by - 36, cx + 42, by - 14);
+      c.stroke();
+    }
+  );
+
+  drawCloakedWarrior(
+    'enemy_slag_thrower',
+    { top: '#c44b24', mid: '#591b14', dark: '#1a0808', eye: '#ffcf48', trim: '#ff7a2b' },
+    (c, cx, by) => {
+      // Glowing volcanic boulder cradled overhead
+      c.fillStyle = '#ff6a1a';
+      c.beginPath();
+      c.arc(cx + 18, by - 78, 16, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 3.5;
+      c.stroke();
+    }
+  );
+
+  // Lava Gorgon: Floating horned Medusa head w/ writhing magma serpents!
+  withCell(ctx, 'enemy_lava_gorgon', (c, w, h) => {
+    const cx = w * 0.5;
+    const cy = h * 0.54;
+    // Writhing magma snake hair
+    c.strokeStyle = '#ff5e1a';
+    c.lineWidth = 7;
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI + (i / 5) * Math.PI;
+      c.beginPath();
+      c.moveTo(cx + Math.cos(a) * 18, cy + Math.sin(a) * 18);
+      c.quadraticCurveTo(cx + Math.cos(a - 0.3) * 44, cy + Math.sin(a - 0.3) * 44, cx + Math.cos(a) * 52, cy + Math.sin(a) * 46);
+      c.stroke();
+    }
+    c.fillStyle = '#3a2224';
+    c.beginPath();
+    c.ellipse(cx, cy, 24, 28, 0, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4.2;
+    c.stroke();
+    // Petrifying glowing emerald eyes
+    c.fillStyle = '#58ff62';
+    c.fillRect(cx - 12, cy - 4, 8, 4);
+    c.fillRect(cx + 4, cy - 4, 8, 4);
+  });
+
+  drawCloakedWarrior(
+    'enemy_bloodless_drifter',
+    { top: '#e6d8c5', mid: '#8c6d58', dark: '#2e1d18', eye: '#ff6424', trim: '#ff8e38' },
+    (c, cx, by) => {
+      c.strokeStyle = '#e8eef5';
+      c.lineWidth = 6;
+      c.beginPath();
+      c.moveTo(cx + 22, by - 70);
+      c.lineTo(cx + 48, by - 108);
+      c.stroke();
+    }
+  );
+
+  drawCloakedWarrior(
+    'enemy_infernal_bomber',
+    { top: '#d9ccb8', mid: '#6e5245', dark: '#211310', eye: '#ffde40', trim: '#ff5218' },
+    (c, cx, by) => {
+      c.fillStyle = '#291a1c';
+      c.beginPath();
+      c.arc(cx, by - 118, 19, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = '#ff6a18';
+      c.lineWidth = 3.5;
+      c.stroke();
+      c.fillStyle = '#ffe978';
+      c.beginPath();
+      c.arc(cx, by - 118, 7, 0, Math.PI * 2);
+      c.fill();
+    }
+  );
+
+  // Bone Hydra Auxiliary Head
+  withCell(ctx, 'enemy_bone_hydra_head', (c, w, h) => {
+    const cx = w * 0.5;
+    const baseY = h * 0.86;
+    // Sinuous bone vertebrae neck
+    c.strokeStyle = INK;
+    c.lineWidth = 22;
+    c.beginPath();
+    c.moveTo(cx, baseY);
+    c.bezierCurveTo(cx - 24, baseY - 38, cx + 24, baseY - 68, cx, baseY - 96);
+    c.stroke();
+    c.strokeStyle = '#e8dec8';
+    c.lineWidth = 13;
+    c.stroke();
+    // Fanged dragon skull
+    c.fillStyle = '#f5ecd6';
+    c.beginPath();
+    c.moveTo(cx - 26, baseY - 94);
+    c.lineTo(cx, baseY - 126);
+    c.lineTo(cx + 28, baseY - 94);
+    c.lineTo(cx + 14, baseY - 70);
+    c.lineTo(cx - 14, baseY - 70);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4;
+    c.stroke();
+    c.fillStyle = '#ff4524';
+    c.fillRect(cx - 11, baseY - 102, 7, 5);
+    c.fillRect(cx + 5, baseY - 102, 7, 5);
+  });
+
+  // Verdant Colosseum Exalted Shades (Swordsman, Shieldbearer, Bowman)
+  drawCloakedWarrior(
+    'enemy_colosseum_swordsman',
+    { top: '#68f2eb', mid: '#1e6e7d', dark: '#0b2430', eye: '#ffe66e', trim: '#f2c652' },
+    (c, cx, by) => {
+      c.fillStyle = '#f2c652';
+      c.beginPath();
+      c.moveTo(cx, by - 128);
+      c.lineTo(cx + 16, by - 114);
+      c.lineTo(cx - 16, by - 114);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = '#99fff8';
+      c.lineWidth = 6;
+      c.beginPath();
+      c.moveTo(cx + 22, by - 58);
+      c.lineTo(cx + 50, by - 96);
+      c.stroke();
+    }
+  );
+
+  drawCloakedWarrior(
+    'enemy_colosseum_shieldbearer',
+    { top: '#59e0d6', mid: '#1c5c6b', dark: '#0a202b', eye: '#ffe66e', trim: '#f2c652' },
+    (c, cx, by) => {
+      // Gleaming gilded hoplite greatshield in front!
+      c.fillStyle = '#e8b342';
+      c.beginPath();
+      c.roundRect(cx + 8, by - 88, 38, 66, 12);
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 4;
+      c.stroke();
+      c.fillStyle = '#38c7c4';
+      c.beginPath();
+      c.arc(cx + 27, by - 55, 11, 0, Math.PI * 2);
+      c.fill();
+      c.stroke();
+    }
+  );
+
+  drawCloakedWarrior(
+    'enemy_colosseum_bowman',
+    { top: '#78f5c8', mid: '#1f6b58', dark: '#0a2420', eye: '#fff080', trim: '#f2c652' },
+    (c, cx, by) => {
+      c.strokeStyle = '#f2c652';
+      c.lineWidth = 5;
+      c.beginPath();
+      c.moveTo(cx + 22, by - 108);
+      c.quadraticCurveTo(cx + 52, by - 72, cx + 22, by - 36);
+      c.stroke();
+    }
+  );
+
+  // Flamewheel Chariot
+  withCell(ctx, 'enemy_chariot_flame', (c, w, h) => {
+    const cx = w * 0.5;
+    const cy = h * 0.56;
+    c.fillStyle = '#ff6a18';
+    c.beginPath();
+    c.arc(cx, cy, 44, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#e0a938';
+    c.beginPath();
+    c.arc(cx, cy, 32, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4.2;
+    c.stroke();
+    c.fillStyle = '#291c22';
+    c.beginPath();
+    c.arc(cx, cy, 18, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+  });
+
+  // Soul-Eye Regenerating Orb (bright magenta-gold eye crystal — unmistakable target!)
+  withCell(ctx, 'enemy_soul_orb', (c, w, h) => {
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    const g = c.createRadialGradient(cx, cy, 4, cx, cy, 46);
+    g.addColorStop(0, '#fff2fc');
+    g.addColorStop(0.45, '#ff32d4');
+    g.addColorStop(1, 'rgba(200, 20, 180, 0)');
+    c.fillStyle = g;
+    c.beginPath();
+    c.arc(cx, cy, 46, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#ff40d4';
+    c.beginPath();
+    c.arc(cx, cy, 22, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = '#f2c852';
+    c.lineWidth = 4;
+    c.stroke();
+    c.fillStyle = '#ffffff';
+    c.beginPath();
+    c.ellipse(cx, cy, 12, 7, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = INK;
+    c.beginPath();
+    c.arc(cx, cy, 4.5, 0, Math.PI * 2);
+    c.fill();
+  });
+
+  // Crypt of Bile: Venom Satyr, Giant Vermin, Snakestone Laser, Heavy Brawler
+  drawCloakedWarrior(
+    'enemy_venom_satyr',
+    { top: '#8c2838', mid: '#3d1520', dark: '#14080c', eye: '#a8ff2e', trim: '#a8e62e' },
+    (c, cx, by) => {
+      // Curved goat horns + green dart pipe
+      c.strokeStyle = '#c4b898';
+      c.lineWidth = 5;
+      c.beginPath();
+      c.moveTo(cx - 10, by - 108);
+      c.quadraticCurveTo(cx - 26, by - 126, cx - 18, by - 134);
+      c.moveTo(cx + 10, by - 108);
+      c.quadraticCurveTo(cx + 26, by - 126, cx + 18, by - 134);
+      c.stroke();
+      c.strokeStyle = '#82e62e';
+      c.lineWidth = 4.5;
+      c.beginPath();
+      c.moveTo(cx + 10, by - 88);
+      c.lineTo(cx + 50, by - 82);
+      c.stroke();
+    }
+  );
+
+  withCell(ctx, 'enemy_giant_vermin', (c, w, h) => {
+    const cx = w * 0.5;
+    const baseY = h * 0.84;
+    c.beginPath();
+    c.ellipse(cx, baseY - 36, 48, 30, 0, 0, Math.PI * 2);
+    const g = c.createLinearGradient(cx - 48, baseY - 64, cx + 48, baseY);
+    g.addColorStop(0, '#595e42');
+    g.addColorStop(0.55, '#2b2e1f');
+    g.addColorStop(1, '#10120c');
+    c.fillStyle = g;
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4.4;
+    c.stroke();
+    c.fillStyle = '#b4ff38';
+    c.beginPath();
+    c.arc(cx + 26, baseY - 40, 5, 0, Math.PI * 2);
+    c.fill();
+  });
+
+  withCell(ctx, 'enemy_snakestone_laser', (c, w, h) => {
+    const cx = w * 0.5;
+    const cy = h * 0.48;
+    c.beginPath();
+    c.moveTo(cx, cy - 54);
+    c.lineTo(cx + 30, cy - 10);
+    c.lineTo(cx + 18, cy + 48);
+    c.lineTo(cx - 18, cy + 48);
+    c.lineTo(cx - 30, cy - 10);
+    c.closePath();
+    c.fillStyle = '#409e48';
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4.2;
+    c.stroke();
+    c.fillStyle = '#e8ff6e';
+    c.beginPath();
+    c.ellipse(cx, cy - 4, 12, 18, 0, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+  });
+
+  withCell(ctx, 'enemy_heavy_brawler', (c, w, h) => {
+    const cx = w * 0.5;
+    const baseY = h * 0.86;
+    c.beginPath();
+    c.moveTo(cx - 50, baseY);
+    c.quadraticCurveTo(cx - 64, baseY - 68, cx - 32, baseY - 106);
+    c.lineTo(cx + 32, baseY - 106);
+    c.quadraticCurveTo(cx + 64, baseY - 68, cx + 50, baseY);
+    c.closePath();
+    c.fillStyle = '#3b323d';
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4.6;
+    c.stroke();
+    c.fillStyle = '#d49e42';
+    c.beginPath();
+    c.arc(cx, baseY - 102, 20, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+    c.fillStyle = '#ff4830';
+    c.fillRect(cx - 10, baseY - 104, 7, 4);
+    c.fillRect(cx + 3, baseY - 104, 7, 4);
+  });
+
+  // ============================================================================
+  // ALL 7 REMAINING WAVE 2 BOSSES (Every Boss in the Game is Bespoke Ink-Cel!)
+  // ============================================================================
+
+  // Boss 2: Warden Fury (Crimson Rage Fury w/ flame-rimmed wings!)
+  const drawSisterFury = (
+    id: string,
+    cols: { wingTop: string; wingRim: string; cloak: string; eye: string; hair: string; crown: string }
+  ) => {
+    withCell(ctx, id, (c, w, h) => {
+      const cx = w * 0.5;
+      const baseY = h * 0.86;
+      for (const dir of [-1, 1] as const) {
+        c.beginPath();
+        c.moveTo(cx + dir * 14, baseY - 138);
+        c.bezierCurveTo(cx + dir * 68, baseY - 226, cx + dir * 108, baseY - 208, cx + dir * 124, baseY - 168);
+        c.quadraticCurveTo(cx + dir * 94, baseY - 118, cx + dir * 98, baseY - 82);
+        c.lineTo(cx + dir * 16, baseY - 96);
+        c.closePath();
+        c.fillStyle = cols.wingTop;
+        c.fill();
+        c.strokeStyle = INK;
+        c.lineWidth = 4.6;
+        c.stroke();
+        c.strokeStyle = cols.wingRim;
+        c.lineWidth = 2.6;
+        c.stroke();
+      }
+      c.fillStyle = cols.cloak;
+      c.beginPath();
+      c.moveTo(cx - 24, baseY - 138);
+      c.lineTo(cx + 24, baseY - 138);
+      c.lineTo(cx + 42, baseY);
+      c.lineTo(cx, baseY - 30);
+      c.lineTo(cx - 42, baseY);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 4.4;
+      c.stroke();
+      const hy = baseY - 164;
+      c.fillStyle = cols.hair;
+      c.beginPath();
+      c.arc(cx, hy - 4, 24, 0, Math.PI * 2);
+      c.fill();
+      c.stroke();
+      c.fillStyle = '#e8dceb';
+      c.beginPath();
+      c.ellipse(cx, hy, 14, 17, 0, 0, Math.PI * 2);
+      c.fill();
+      c.stroke();
+      c.fillStyle = cols.crown;
+      c.beginPath();
+      c.moveTo(cx - 18, hy - 14);
+      c.lineTo(cx - 26, hy - 46);
+      c.lineTo(cx, hy - 22);
+      c.lineTo(cx + 26, hy - 46);
+      c.lineTo(cx + 18, hy - 14);
+      c.closePath();
+      c.fill();
+      c.stroke();
+      c.fillStyle = cols.eye;
+      c.fillRect(cx - 9, hy - 3, 6, 3);
+      c.fillRect(cx + 3, hy - 3, 6, 3);
+    });
+  };
+
+  drawSisterFury('boss_warden_fury', {
+    wingTop: '#4f1018',
+    wingRim: '#ff4824',
+    cloak: '#b81a24',
+    eye: '#ffae24',
+    hair: '#a61420',
+    crown: '#ff7024',
+  });
+  drawSisterFury('boss_warden_murder', {
+    wingTop: '#102e28',
+    wingRim: '#4de09d',
+    cloak: '#1a423a',
+    eye: '#ff2442',
+    hair: '#0c1c1a',
+    crown: '#c7d9cf',
+  });
+
+  // Boss 4: Bone Leviathan (Menacing Sinuous Skeletal Hydra Dragon Head & Spined Ribcage over Lava!)
+  withCell(ctx, 'boss_bone_leviathan', (c, w, h) => {
+    const cx = w * 0.5;
+    const baseY = h * 0.87;
+    // Molten magma pool glow beneath skeletal column
+    const lava = c.createRadialGradient(cx, baseY - 8, 12, cx, baseY - 8, 112);
+    lava.addColorStop(0, '#ff8e24');
+    lava.addColorStop(0.55, 'rgba(210, 42, 12, 0.5)');
+    lava.addColorStop(1, 'rgba(80, 10, 8, 0)');
+    c.fillStyle = lava;
+    c.beginPath();
+    c.ellipse(cx, baseY - 8, 112, 42, 0, 0, Math.PI * 2);
+    c.fill();
+
+    // Sinuous curving dark-obsidian & molten-veined Hydra spinal neck!
+    c.beginPath();
+    c.moveTo(cx - 42, baseY);
+    c.bezierCurveTo(cx - 64, baseY - 68, cx - 22, baseY - 122, cx - 26, baseY - 172);
+    c.lineTo(cx + 28, baseY - 172);
+    c.bezierCurveTo(cx + 38, baseY - 118, cx + 62, baseY - 64, cx + 44, baseY);
+    c.closePath();
+    const neckG = c.createLinearGradient(cx - 50, baseY - 170, cx + 50, baseY);
+    neckG.addColorStop(0, '#4f2222');
+    neckG.addColorStop(0.5, '#260d12');
+    neckG.addColorStop(1, '#0e0509');
+    c.fillStyle = neckG;
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 5;
+    c.stroke();
+
+    // Jagged curved ivory rib-plates & molten orange furnace core glowing between ribs!
+    c.fillStyle = '#ff6a18';
+    c.beginPath();
+    c.ellipse(cx, baseY - 76, 18, 52, 0, 0, Math.PI * 2);
+    c.fill();
+    for (let i = 0; i < 4; i++) {
+      const ry = baseY - 28 - i * 28;
+      const rw = 46 - i * 4;
+      c.fillStyle = '#e8dcc2';
+      c.beginPath();
+      c.moveTo(cx - rw, ry + 6);
+      c.quadraticCurveTo(cx - rw * 0.5, ry - 12, cx - 10, ry - 4);
+      c.lineTo(cx - 12, ry + 8);
+      c.quadraticCurveTo(cx - rw * 0.5, ry + 2, cx - rw + 4, ry + 14);
+      c.closePath();
+      c.moveTo(cx + rw, ry + 6);
+      c.quadraticCurveTo(cx + rw * 0.5, ry - 12, cx + 10, ry - 4);
+      c.lineTo(cx + 12, ry + 8);
+      c.quadraticCurveTo(cx + rw * 0.5, ry + 2, cx + rw - 4, ry + 14);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 3.2;
+      c.stroke();
+    }
+
+    // Fierce Sculpted Horned Dragon Skull w/ Jagged Lower Jaw & Swept Obsidian Crown Horns!
+    const hy = baseY - 180;
+    // Dark swept dragon horns behind skull
+    c.fillStyle = '#381e24';
+    for (const dir of [-1, 1] as const) {
+      c.beginPath();
+      c.moveTo(cx + dir * 24, hy - 18);
+      c.quadraticCurveTo(cx + dir * 74, hy - 34, cx + dir * 88, hy - 78);
+      c.quadraticCurveTo(cx + dir * 56, hy - 54, cx + dir * 34, hy - 44);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 4.4;
+      c.stroke();
+    }
+
+    // Sculpted bony dragon cranium & snout with 3-tone shading
+    c.beginPath();
+    c.moveTo(cx - 52, hy - 22);
+    c.quadraticCurveTo(cx, hy - 56, cx + 52, hy - 22);
+    c.lineTo(cx + 42, hy + 20);
+    c.lineTo(cx + 22, hy + 46);
+    c.lineTo(cx, hy + 52);
+    c.lineTo(cx - 22, hy + 46);
+    c.lineTo(cx - 42, hy + 20);
+    c.closePath();
+    const skG = c.createLinearGradient(cx - 48, hy - 48, cx + 48, hy + 48);
+    skG.addColorStop(0, '#f5ebd6');
+    skG.addColorStop(0.55, '#c7b89d');
+    skG.addColorStop(1, '#5e4f47');
+    c.fillStyle = skG;
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4.8;
+    c.stroke();
+
+    // Fierce angled eye sockets w/ blazing molten orange flames + sharp fanged jaw!
+    c.fillStyle = '#12060a';
+    c.beginPath();
+    c.moveTo(cx - 38, hy - 12);
+    c.lineTo(cx - 10, hy - 2);
+    c.lineTo(cx - 18, hy + 10);
+    c.lineTo(cx - 36, hy + 4);
+    c.closePath();
+    c.moveTo(cx + 38, hy - 12);
+    c.lineTo(cx + 10, hy - 2);
+    c.lineTo(cx + 18, hy + 10);
+    c.lineTo(cx + 36, hy + 4);
+    c.closePath();
+    c.fill();
+    c.fillStyle = '#ff9c1a';
+    c.fillRect(cx - 28, hy - 4, 10, 6);
+    c.fillRect(cx + 18, hy - 4, 10, 6);
+
+    // Jagged inked dragon fangs along muzzle
+    c.fillStyle = '#fff5e0';
+    for (const fx of [-22, -10, 2, 14]) {
+      c.beginPath();
+      c.moveTo(cx + fx, hy + 30);
+      c.lineTo(cx + fx + 4, hy + 48);
+      c.lineTo(cx + fx + 8, hy + 30);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 2.4;
+      c.stroke();
+    }
+  });
+
+  // Boss 5: Colosseum Bull (Sculpted Muscular Horned Minotaur Juggernaut w/ Harness, Hooves & Labrys Axe!)
+  withCell(ctx, 'boss_colosseum_bull', (c, w, h) => {
+    const cx = w * 0.48;
+    const baseY = h * 0.88;
+
+    // Massive Gilded Double-Headed Labrys Battle-Axe angled behind shoulder
+    c.save();
+    c.translate(cx + 62, baseY - 126);
+    c.rotate(0.32);
+    c.fillStyle = '#5c341d';
+    c.fillRect(-6, -96, 12, 195);
+    c.strokeStyle = INK;
+    c.lineWidth = 4;
+    c.strokeRect(-6, -96, 12, 195);
+    c.fillStyle = '#e8b648';
+    c.beginPath();
+    c.moveTo(-46, -80);
+    c.quadraticCurveTo(0, -50, 46, -80);
+    c.lineTo(52, -22);
+    c.quadraticCurveTo(0, -44, -52, -22);
+    c.closePath();
+    c.fill();
+    c.stroke();
+    c.restore();
+
+    // Muscular armored legs & cloven hooves in wide stomping stance
+    for (const dir of [-1, 1] as const) {
+      c.fillStyle = '#47221a';
+      c.beginPath();
+      c.moveTo(cx + dir * 16, baseY - 62);
+      c.lineTo(cx + dir * 48, baseY - 62);
+      c.lineTo(cx + dir * 56, baseY);
+      c.lineTo(cx + dir * 24, baseY);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 4.4;
+      c.stroke();
+    }
+
+    // Broad V-tapered muscular bronzed minotaur torso + dark ink pectoral planes!
+    c.beginPath();
+    c.moveTo(cx - 42, baseY - 58);
+    c.lineTo(cx - 78, baseY - 132);
+    c.quadraticCurveTo(cx, baseY - 178, cx + 78, baseY - 132);
+    c.lineTo(cx + 42, baseY - 58);
+    c.closePath();
+    const bGrad = c.createLinearGradient(cx - 76, baseY - 165, cx + 76, baseY - 58);
+    bGrad.addColorStop(0, '#b56e4d');
+    bGrad.addColorStop(0.5, '#693426');
+    bGrad.addColorStop(1, '#261010');
+    c.fillStyle = bGrad;
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 5;
+    c.stroke();
+
+    // Crossed bronze gladiator chest harness & gilded waist belt + crimson loincloth!
+    c.strokeStyle = '#d99e3c';
+    c.lineWidth = 10;
+    c.beginPath();
+    c.moveTo(cx - 56, baseY - 144);
+    c.lineTo(cx + 38, baseY - 66);
+    c.moveTo(cx + 56, baseY - 144);
+    c.lineTo(cx - 38, baseY - 66);
+    c.stroke();
+    c.strokeStyle = INK;
+    c.lineWidth = 3.2;
+    c.stroke();
+    c.fillStyle = '#a81c2c';
+    c.beginPath();
+    c.moveTo(cx - 36, baseY - 64);
+    c.lineTo(cx + 36, baseY - 64);
+    c.lineTo(cx + 22, baseY - 16);
+    c.lineTo(cx - 22, baseY - 16);
+    c.closePath();
+    c.fill();
+    c.stroke();
+
+    // Sculpted Bull Head + Massive Curved Ivory Horns & Gold Nose Ring!
+    const hy = baseY - 178;
+    c.fillStyle = '#f2e6cf';
+    c.beginPath();
+    c.moveTo(cx - 26, hy - 14);
+    c.quadraticCurveTo(cx - 92, hy - 18, cx - 78, hy - 78);
+    c.quadraticCurveTo(cx - 58, hy - 36, cx - 18, hy - 28);
+    c.closePath();
+    c.moveTo(cx + 26, hy - 14);
+    c.quadraticCurveTo(cx + 92, hy - 18, cx + 78, hy - 78);
+    c.quadraticCurveTo(cx + 58, hy - 36, cx + 18, hy - 28);
+    c.closePath();
+    c.fill();
+    c.stroke();
+
+    c.fillStyle = '#5c2e22';
+    c.beginPath();
+    c.moveTo(cx - 32, hy - 18);
+    c.quadraticCurveTo(cx, hy - 38, cx + 32, hy - 18);
+    c.lineTo(cx + 24, hy + 28);
+    c.lineTo(cx, hy + 36);
+    c.lineTo(cx - 24, hy + 28);
+    c.closePath();
+    c.fill();
+    c.stroke();
+    c.strokeStyle = '#f5ca52';
+    c.lineWidth = 5;
+    c.beginPath();
+    c.arc(cx, hy + 24, 10, 0, Math.PI * 2);
+    c.stroke();
+    c.fillStyle = '#ff6428';
+    c.fillRect(cx - 16, hy - 6, 9, 5);
+    c.fillRect(cx + 7, hy - 6, 9, 5);
+  });
+
+  // Boss 6: Colosseum Spearlord (Athletic Golden Spartan Champion w/ Flowing Crimson Cape, Shield & Spear!)
+  withCell(ctx, 'boss_colosseum_spearlord', (c, w, h) => {
+    const cx = w * 0.5;
+    const baseY = h * 0.88;
+    // Blazing golden arena spear
+    c.strokeStyle = INK;
+    c.lineWidth = 10;
+    c.beginPath();
+    c.moveTo(cx - 64, baseY - 12);
+    c.lineTo(cx + 80, baseY - 216);
+    c.stroke();
+    c.strokeStyle = '#ffdf66';
+    c.lineWidth = 5;
+    c.stroke();
+
+    // Sweeping royal crimson Champion Cape billowing behind golden armor!
+    c.fillStyle = '#a61428';
+    c.beginPath();
+    c.moveTo(cx - 36, baseY - 148);
+    c.lineTo(cx + 36, baseY - 148);
+    c.quadraticCurveTo(cx + 68, baseY - 76, cx + 58, baseY - 4);
+    c.lineTo(cx - 42, baseY - 12);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4.4;
+    c.stroke();
+
+    // Armored greaved warrior legs
+    for (const lx of [cx - 20, cx + 10]) {
+      c.fillStyle = '#c48628';
+      c.fillRect(lx, baseY - 62, 14, 60);
+      c.strokeStyle = INK;
+      c.lineWidth = 3.8;
+      c.strokeRect(lx, baseY - 62, 14, 60);
+    }
+
+    // Tapered Sculpted Golden Spartan Cuirass & Pleated Pteruges Skirt!
+    c.beginPath();
+    c.moveTo(cx - 38, baseY - 146);
+    c.lineTo(cx + 38, baseY - 146);
+    c.lineTo(cx + 26, baseY - 88);
+    c.lineTo(cx + 36, baseY - 52);
+    c.lineTo(cx - 36, baseY - 52);
+    c.lineTo(cx - 26, baseY - 88);
+    c.closePath();
+    const g = c.createLinearGradient(cx - 38, baseY - 146, cx + 38, baseY - 52);
+    g.addColorStop(0, '#fff2b0');
+    g.addColorStop(0.45, '#d6972c');
+    g.addColorStop(1, '#54300c');
+    c.fillStyle = g;
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4.4;
+    c.stroke();
+
+    // Gleaming round golden hoplite shield w/ sunburst rim
+    c.fillStyle = '#f5c448';
+    c.beginPath();
+    c.arc(cx - 44, baseY - 96, 42, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+    c.fillStyle = '#b81d2c';
+    c.beginPath();
+    c.arc(cx - 44, baseY - 96, 24, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+
+    // Plumed Corinthian Champion Helm w/ fierce eye slits
+    const hy = baseY - 174;
+    c.fillStyle = '#d92234';
+    c.beginPath();
+    c.moveTo(cx - 10, hy - 22);
+    c.quadraticCurveTo(cx - 48, hy - 68, cx + 20, hy - 64);
+    c.quadraticCurveTo(cx + 54, hy - 48, cx + 26, hy - 14);
+    c.closePath();
+    c.fill();
+    c.stroke();
+    c.fillStyle = '#f2be44';
+    c.beginPath();
+    c.ellipse(cx, hy, 22, 26, 0, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+    c.fillStyle = INK;
+    c.fillRect(cx - 12, hy - 4, 24, 7);
+    c.fillStyle = '#5ef2ff';
+    c.fillRect(cx - 8, hy - 2, 5, 3);
+    c.fillRect(cx + 3, hy - 2, 5, 3);
+  });
+
+  // Boss 7: The Ferryman (Towering Draped Boatman w/ Ink Fold Cloak, Gold Shoulder Trim, Conical Hat & Giant Oar!)
+  withCell(ctx, 'boss_the_ferryman', (c, w, h) => {
+    const cx = w * 0.48;
+    const baseY = h * 0.87;
+    // Colossal gilded Stygian Oar diagonally behind body!
+    c.save();
+    c.translate(cx + 56, baseY - 122);
+    c.rotate(0.28);
+    c.fillStyle = '#332238';
+    c.fillRect(-7, -110, 14, 220);
+    c.strokeStyle = INK;
+    c.lineWidth = 4;
+    c.strokeRect(-7, -110, 14, 220);
+    c.fillStyle = '#e5b244';
+    c.beginPath();
+    c.ellipse(0, -104, 24, 46, 0, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+    c.restore();
+
+    // Tall billowing tattered dark-violet & gold-hemmed Ferryman robes w/ diagonal ink folds!
+    c.save();
+    c.beginPath();
+    c.moveTo(cx - 58, baseY);
+    c.quadraticCurveTo(cx - 66, baseY - 96, cx - 34, baseY - 172);
+    c.lineTo(cx + 34, baseY - 172);
+    c.quadraticCurveTo(cx + 66, baseY - 96, cx + 58, baseY);
+    c.lineTo(cx + 22, baseY - 14);
+    c.lineTo(cx, baseY + 4);
+    c.lineTo(cx - 24, baseY - 14);
+    c.closePath();
+    const rG = c.createLinearGradient(cx - 56, baseY - 172, cx + 56, baseY);
+    rG.addColorStop(0, '#5a2d75');
+    rG.addColorStop(0.5, '#241136');
+    rG.addColorStop(1, '#0b0514');
+    c.fillStyle = rG;
+    c.fill();
+    c.clip();
+    drawCrossHatch(c, cx + 4, baseY - 164, 58, 168, 9, -0.45, 'rgba(6, 3, 12, 0.5)', 1.5);
+    c.strokeStyle = '#e5b244';
+    c.lineWidth = 6;
+    c.beginPath();
+    c.moveTo(cx - 46, baseY - 134);
+    c.quadraticCurveTo(cx, baseY - 102, cx + 46, baseY - 134);
+    c.stroke();
+    c.restore();
+    c.strokeStyle = INK;
+    c.lineWidth = 5;
+    c.stroke();
+
+    // Shadowed veil face & glowing turquoise eyes
+    const hy = baseY - 188;
+    c.fillStyle = '#07050c';
+    c.beginPath();
+    c.ellipse(cx, hy, 22, 24, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#52fff4';
+    c.beginPath();
+    c.arc(cx - 8, hy, 4.5, 0, Math.PI * 2);
+    c.arc(cx + 8, hy, 4.5, 0, Math.PI * 2);
+    c.fill();
+
+    // Iconic wide-brimmed gilded conical Boatman Hat!
+    c.beginPath();
+    c.moveTo(cx - 80, hy - 8);
+    c.lineTo(cx, hy - 66);
+    c.lineTo(cx + 80, hy - 8);
+    c.quadraticCurveTo(cx, hy + 10, cx - 80, hy - 8);
+    c.closePath();
+    const hatG = c.createLinearGradient(cx - 72, hy - 58, cx + 72, hy);
+    hatG.addColorStop(0, '#854aa8');
+    hatG.addColorStop(0.55, '#3b1854');
+    hatG.addColorStop(1, '#160824');
+    c.fillStyle = hatG;
+    c.fill();
+    c.strokeStyle = '#f2be4c';
+    c.lineWidth = 4;
+    c.stroke();
+    c.strokeStyle = INK;
+    c.lineWidth = 3.2;
+    c.stroke();
+  });
+
+  // Boss 8: FINAL BOSS — SOVEREIGN LORD OF THE ABYSS (Towering Horned Monarch w/ Twin-Pronged Bident!)
+  withCell(ctx, 'boss_sovereign_lord', (c, w, h) => {
+    const cx = w * 0.48;
+    const baseY = h * 0.88;
+
+    // Dramatic volcanic crimson-and-gold royal backlight aura
+    const aura = c.createRadialGradient(cx, baseY - 150, 14, cx, baseY - 150, 140);
+    aura.addColorStop(0, 'rgba(255, 86, 36, 0.52)');
+    aura.addColorStop(0.55, 'rgba(150, 16, 28, 0.25)');
+    aura.addColorStop(1, 'rgba(20, 4, 12, 0)');
+    c.fillStyle = aura;
+    c.beginPath();
+    c.arc(cx, baseY - 150, 140, 0, Math.PI * 2);
+    c.fill();
+
+    // Colossal Twin-Pronged Abyssal Bident held diagonally across right flank!
+    c.save();
+    c.translate(cx + 88, baseY - 134);
+    c.rotate(0.2);
+    c.fillStyle = '#241a24';
+    c.fillRect(-7, -110, 14, 240);
+    c.strokeStyle = INK;
+    c.lineWidth = 4.5;
+    c.strokeRect(-7, -110, 14, 240);
+    // Twin jagged molten-gold prongs!
+    c.fillStyle = '#f5ba38';
+    c.beginPath();
+    c.moveTo(-26, -104);
+    c.lineTo(-22, -168);
+    c.lineTo(-8, -118);
+    c.lineTo(8, -118);
+    c.lineTo(22, -168);
+    c.lineTo(26, -104);
+    c.closePath();
+    c.fill();
+    c.stroke();
+    c.restore();
+
+    // Massive billowing dark-crimson & gold-hemmed Sovereign Mantle w/ dramatic ink folds!
+    c.save();
+    c.beginPath();
+    c.moveTo(cx - 90, baseY + 2);
+    c.bezierCurveTo(cx - 106, baseY - 104, cx - 88, baseY - 178, cx - 44, baseY - 196);
+    c.lineTo(cx + 44, baseY - 196);
+    c.bezierCurveTo(cx + 88, baseY - 178, cx + 106, baseY - 104, cx + 90, baseY + 2);
+    c.lineTo(cx + 38, baseY - 18);
+    c.lineTo(cx, baseY + 6);
+    c.lineTo(cx - 38, baseY - 18);
+    c.closePath();
+    const capeG = c.createLinearGradient(cx - 94, baseY - 196, cx + 94, baseY);
+    capeG.addColorStop(0, '#b51828');
+    capeG.addColorStop(0.5, '#4c0a16');
+    capeG.addColorStop(1, '#12040a');
+    c.fillStyle = capeG;
+    c.fill();
+    c.clip();
+    drawCrossHatch(c, cx + 12, baseY - 186, 90, 190, 9, -0.45, 'rgba(6, 3, 10, 0.55)', 1.6);
+    c.strokeStyle = '#f2ba44';
+    c.lineWidth = 5;
+    c.beginPath();
+    c.moveTo(cx - 86, baseY - 14);
+    c.lineTo(cx - 38, baseY - 30);
+    c.lineTo(cx, baseY - 10);
+    c.lineTo(cx + 38, baseY - 30);
+    c.lineTo(cx + 86, baseY - 14);
+    c.stroke();
+    c.restore();
+    c.strokeStyle = INK;
+    c.lineWidth = 5.4;
+    c.stroke();
+
+    // Broad sculpted obsidian armor breastplate & golden Underworld skull medallion!
+    c.fillStyle = '#1f1522';
+    c.beginPath();
+    c.moveTo(cx - 56, baseY - 190);
+    c.lineTo(cx + 56, baseY - 190);
+    c.lineTo(cx + 40, baseY - 76);
+    c.lineTo(cx, baseY - 62);
+    c.lineTo(cx - 40, baseY - 76);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = '#f2ba44';
+    c.lineWidth = 4;
+    c.stroke();
+    c.strokeStyle = INK;
+    c.lineWidth = 3.5;
+    c.stroke();
+
+    // Twin sculpted gilded skull pauldrons!
+    for (const dir of [-1, 1] as const) {
+      c.fillStyle = '#e8ac38';
+      c.beginPath();
+      c.ellipse(cx + dir * 58, baseY - 184, 28, 20, dir * 0.3, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 4.5;
+      c.stroke();
+    }
+
+    // Imposing Sovereign Visage, Sweeping Forked Dark Beard & Massive Branching Golden Crown-Horns!
+    const hy = baseY - 216;
+    c.fillStyle = '#dfd3e0';
+    c.beginPath();
+    c.ellipse(cx, hy, 24, 28, 0, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4.6;
+    c.stroke();
+
+    // Sweeping forked sovereign dark-charcoal beard
+    c.fillStyle = '#120d17';
+    c.beginPath();
+    c.moveTo(cx - 24, hy + 4);
+    c.lineTo(cx - 32, hy + 48);
+    c.lineTo(cx - 6, hy + 30);
+    c.lineTo(cx, hy + 58);
+    c.lineTo(cx + 6, hy + 30);
+    c.lineTo(cx + 32, hy + 48);
+    c.lineTo(cx + 24, hy + 4);
+    c.closePath();
+    c.fill();
+    c.stroke();
+
+    // Massive iconic branching golden Crown-Horns sweeping wide above brow!
+    c.fillStyle = '#ffcf48';
+    c.strokeStyle = INK;
+    c.lineWidth = 4.5;
+    for (const dir of [-1, 1] as const) {
+      c.beginPath();
+      c.moveTo(cx + dir * 14, hy - 18);
+      c.quadraticCurveTo(cx + dir * 58, hy - 22, cx + dir * 78, hy - 68);
+      c.lineTo(cx + dir * 54, hy - 48);
+      c.lineTo(cx + dir * 50, hy - 80);
+      c.quadraticCurveTo(cx + dir * 32, hy - 36, cx + dir * 6, hy - 26);
+      c.closePath();
+      c.fill();
+      c.stroke();
+    }
+
+    // Blazing Molten-Gold Sovereign Eyes!
+    c.fillStyle = '#ff6818';
+    c.fillRect(cx - 14, hy - 6, 9, 5);
+    c.fillRect(cx + 5, hy - 6, 9, 5);
+    c.fillStyle = '#fff5a8';
+    c.fillRect(cx - 12, hy - 5, 5, 3);
+    c.fillRect(cx + 7, hy - 5, 5, 3);
+  });
+}
+
+// ============================================================================
+// Atlas Baking & Optional Custom-Pack Composite Builder
+// ============================================================================
+
 let cachedAtlas: BakedAtlas | null = null;
 
 export function bakeProceduralInkCelAtlas(): BakedAtlas {
@@ -3065,7 +4611,7 @@ export function bakeProceduralInkCelAtlas(): BakedAtlas {
     drawIsometricStoneTile(c, w, h, sanctumPal, 'mosaic')
   );
 
-  // Additional Biome Tiles
+  // Primary Wave 2 Biome Tiles
   withCell(ctx, 'tile_cinder_a', (c, w, h) =>
     drawIsometricStoneTile(
       c,
@@ -3156,11 +4702,13 @@ export function bakeProceduralInkCelAtlas(): BakedAtlas {
   withCell(ctx, 'hero_diag_down', (c, w, h) => drawHeroPose(c, w, h, 'diag_down'));
   withCell(ctx, 'hero_diag_up', (c, w, h) => drawHeroPose(c, w, h, 'diag_up'));
 
-  // Weapons, Enemies, Bosses, Pickups, Sigils, VFX
+  // Weapons, Enemies, Bosses, Pickups, Sigils, VFX (Wave 1 + Full Wave 2 Roster!)
   drawWeapons(ctx);
   drawEnemiesAndBosses(ctx);
   drawPickupsAndSigils(ctx);
   drawVfxSprites(ctx);
+  drawWave2BiomePropsAndVfx(ctx);
+  drawWave2EnemiesAndBosses(ctx);
 
   cachedAtlas = {
     canvas,
@@ -3169,6 +4717,45 @@ export function bakeProceduralInkCelAtlas(): BakedAtlas {
     sprites: ATLAS_SPRITE_RECTS,
   };
   return cachedAtlas;
+}
+
+export interface CustomSpritePatchSource {
+  getCustomSprite(
+    cleanId: string
+  ): { readonly image: CanvasImageSource; readonly x: number; readonly y: number; readonly w: number; readonly h: number } | null;
+}
+
+/**
+ * Clones the built-in 2048x2048 atlas ONCE and overlays any matching custom-pack sprites
+ * cleanly into their exact UV slots (preserving built-in fallback for every non-overridden slot).
+ */
+export function buildCompositeCustomAtlas(
+  baseAtlas: BakedAtlas,
+  provider: CustomSpritePatchSource
+): { canvas: HTMLCanvasElement; overriddenCount: number } {
+  const canvas = document.createElement('canvas');
+  canvas.width = baseAtlas.width;
+  canvas.height = baseAtlas.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return { canvas: baseAtlas.canvas, overriddenCount: 0 };
+  }
+  ctx.drawImage(baseAtlas.canvas, 0, 0);
+
+  let overriddenCount = 0;
+  for (const [id, rect] of baseAtlas.sprites.entries()) {
+    if (id === 'white_pixel') continue;
+    const custom = provider.getCustomSprite(id);
+    if (!custom || custom.w <= 0 || custom.h <= 0) continue;
+    try {
+      ctx.clearRect(rect.x, rect.y, rect.w, rect.h);
+      ctx.drawImage(custom.image, custom.x, custom.y, custom.w, custom.h, rect.x, rect.y, rect.w, rect.h);
+      overriddenCount++;
+    } catch {
+      // Keep built-in fallback if a custom image source isn't ready
+    }
+  }
+  return { canvas, overriddenCount };
 }
 
 export { INK_WARM };

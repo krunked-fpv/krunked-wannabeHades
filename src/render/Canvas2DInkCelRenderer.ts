@@ -20,6 +20,7 @@ import type {
 import { BIOME_CONSTANTS, PATRON_CONSTANTS } from '../contracts/index.js';
 import type { BakedAtlas } from '../assets/ProceduralInkCelAtlas.js';
 import {
+  getBiomePillarSpriteId,
   getBiomeTileIds,
   getEnemySpriteId,
   getPatronSigilSpriteId,
@@ -49,6 +50,7 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D | null;
   private readonly atlas: BakedAtlas;
+  private atlasCanvas: HTMLCanvasElement;
 
   private viewW = 1;
   private viewH = 1;
@@ -64,10 +66,15 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.atlas = atlas;
+    this.atlasCanvas = atlas.canvas;
     this.sortPool = new Array<SortEntry>(MAX_SORT);
     for (let i = 0; i < MAX_SORT; i++) {
       this.sortPool[i] = { kind: 'hero', sortY: 0, idx: 0, x: 0, y: 0 };
     }
+  }
+
+  public setAtlasCanvas(canvas: HTMLCanvasElement): void {
+    this.atlasCanvas = canvas;
   }
 
   public resize(width: number, height: number, dpr: number): void {
@@ -104,7 +111,7 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
     if (rot !== 0) ctx.rotate(rot);
     ctx.scale(scaleX, scaleY);
     ctx.drawImage(
-      this.atlas.canvas,
+      this.atlasCanvas,
       rect.x,
       rect.y,
       rect.w,
@@ -568,9 +575,7 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
         ? 'prop_urn'
         : obs.kind === 'statue'
           ? 'prop_statue'
-          : biome === 'sanctum_hub'
-            ? 'prop_pillar_sanctum'
-            : 'prop_pillar_obsidian';
+          : getBiomePillarSpriteId(biome);
     const sc = (obs.kind === 'destructible_urn' ? 0.74 : 0.88) * cam.zoom;
     this.drawSprite(ctx, id, sx, sy, sc, sc);
   }

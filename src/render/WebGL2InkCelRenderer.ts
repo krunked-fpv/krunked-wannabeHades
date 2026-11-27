@@ -29,6 +29,7 @@ import type {
 import { PATRON_CONSTANTS } from '../contracts/index.js';
 import type { AtlasSpriteRect, BakedAtlas } from '../assets/ProceduralInkCelAtlas.js';
 import {
+  getBiomePillarSpriteId,
   getBiomeTileIds,
   getEnemySpriteId,
   getPatronSigilSpriteId,
@@ -262,6 +263,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       uMidColor: gl.getUniformLocation(this.abyssProg, 'uMidColor'),
       uMistColor: gl.getUniformLocation(this.abyssProg, 'uMistColor'),
       uAccentColor: gl.getUniformLocation(this.abyssProg, 'uAccentColor'),
+      uBiomeMode: gl.getUniformLocation(this.abyssProg, 'uBiomeMode'),
     };
     this.uBatch = {
       uResolution: gl.getUniformLocation(this.batchProg, 'uResolution'),
@@ -1021,6 +1023,17 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     gl.uniform3fv(this.uAbyss.uMidColor, theme.mid);
     gl.uniform3fv(this.uAbyss.uMistColor, theme.mist);
     gl.uniform3fv(this.uAbyss.uAccentColor, theme.accent);
+    const biomeMode =
+      state.room.biome === 'cinder_mire'
+        ? 1.0
+        : state.room.biome === 'verdant_colosseum'
+          ? 2.0
+          : state.room.biome === 'crypt_of_bile'
+            ? 3.0
+            : state.room.biome === 'frozen_summit'
+              ? 4.0
+              : 0.0;
+    gl.uniform1f(this.uAbyss.uBiomeMode, biomeMode);
     gl.bindVertexArray(this.emptyVao);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     this.drawCalls++;
@@ -1471,39 +1484,41 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     }
 
     if (h.kind === 'poison_pool') {
-      this.pushEllipseFill(sx, sy, rx, ry, 18, 0.55, 0.88, 0.18, 0.72, 0.95);
-      this.pushEllipseRing(sx, sy, rx, ry, rx - 4 * cam.zoom, ry - 2.5 * cam.zoom, 18, 0.06, 0.1, 0.04, 0.9);
+      const pulse = 0.94 + 0.06 * Math.sin(timeSec * 3.8 + h.pos.y * 0.03);
+      this.pushEllipseFill(sx, sy, rx, ry, 18, 0.45, 0.82, 0.16, 0.76, 0.48 * pulse);
+      this.pushEllipseFill(sx, sy, rx * 0.62, ry * 0.62, 14, 0.72, 0.98, 0.24, 0.55, 0.72 * pulse);
+      this.pushEllipseRing(sx, sy, rx, ry, rx - 4 * cam.zoom, ry - 2.5 * cam.zoom, 18, 0.05, 0.09, 0.04, 0.92);
       return;
     }
 
-    if (h.kind === 'consecrated_aura' || h.kind === 'curing_pool') {
-      const isCure = h.kind === 'curing_pool';
-      this.pushEllipseFill(
-        sx,
-        sy,
-        rx,
-        ry,
-        24,
-        isCure ? 0.22 : 1.0,
-        isCure ? 0.95 : 0.84,
-        isCure ? 0.88 : 0.34,
-        0.24,
-        1.1
-      );
-      this.pushEllipseRing(
-        sx,
-        sy,
-        rx,
-        ry,
-        rx - 4 * cam.zoom,
-        ry - 2.5 * cam.zoom,
-        24,
-        isCure ? 0.45 : 1.0,
-        isCure ? 1.0 : 0.9,
-        isCure ? 0.95 : 0.48,
-        0.85,
-        1.6
-      );
+    if (h.kind === 'curing_pool') {
+      const pulse = 0.92 + 0.08 * Math.sin(timeSec * 4.2);
+      this.pushSprite('vfx_glow_soft', sx, sy, (rx * 1.45) / 64, (ry * 1.45) / 64, 0, 0.24, 0.92, 1.0, 0.48 * pulse, 0, 0.9);
+      this.pushSprite('vfx_curing_basin', sx, sy, Math.max(0.7, rx / 52), Math.max(0.7, rx / 52), 0, 1, 1, 1, 1, 0, 0.35);
+      return;
+    }
+
+    if (h.kind === 'sawblade') {
+      const sc = Math.max(0.7, (h.radius * 2.1) / 88) * cam.zoom;
+      this.pushSprite('vfx_sawblade', sx, sy - 8 * cam.zoom, sc, sc * 0.86, timeSec * 14, 1, 1, 1, 1, 0, 0.4);
+      return;
+    }
+
+    if (h.kind === 'pylon') {
+      const sc = Math.max(0.7, (h.radius * 2.1) / 76) * cam.zoom;
+      this.pushSprite('vfx_pylon', sx, sy, sc, sc, 0, 1, 1, 1, 1, 0, 0.55);
+      return;
+    }
+
+    if (h.kind === 'rift_vortex') {
+      const sc = Math.max(0.85, (h.radius * 2.1) / 96) * cam.zoom;
+      this.pushSprite('vfx_blade_rift', sx, sy - 6 * cam.zoom, sc, sc * cam.isoScaleY, timeSec * 9, 1, 1, 1, 0.95, 0, 0.75);
+      return;
+    }
+
+    if (h.kind === 'consecrated_aura') {
+      this.pushEllipseFill(sx, sy, rx, ry, 24, 1.0, 0.84, 0.34, 0.22, 0.65);
+      this.pushEllipseRing(sx, sy, rx, ry, rx - 4 * cam.zoom, ry - 2.5 * cam.zoom, 24, 1.0, 0.9, 0.48, 0.85, 0.95);
     }
   }
 
@@ -1853,8 +1868,8 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       return;
     }
 
-    // Carved obsidian / sanctum pillar
-    const pillarId = biome === 'sanctum_hub' ? 'prop_pillar_sanctum' : 'prop_pillar_obsidian';
+    // Biome-specific carved pillar
+    const pillarId = getBiomePillarSpriteId(biome);
     const scale = Math.max(0.72, (obs.halfW * 2.15) / 100) * cam.zoom;
     this.pushSprite(pillarId, sx, sy, scale, scale, 0, 1, 1, 1, 1);
   }
@@ -1994,6 +2009,13 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       0.85,
       1.5
     );
+
+    // Primordial Chaos Gate swirling floor chasm portal!
+    if (pk.kind === 'chaos_gate') {
+      const pulse = 0.94 + 0.08 * Math.sin(timeSec * 3.6);
+      this.pushSprite('vfx_chaos_gate', sx, sy, 1.05 * cam.zoom * pulse, 1.05 * cam.zoom * pulse, 0, 1, 1, 1, 1, 0, 0.75);
+      return;
+    }
 
     const spriteId = getPickupSpriteId(pk.kind, pk.patronId);
     this.pushSprite(spriteId, sx, sy - 30 * cam.zoom + bob, 0.78 * cam.zoom, 0.78 * cam.zoom, 0, 1, 1, 1, 1, 0, 0.9);
@@ -2156,6 +2178,47 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       0,
       wepEmissive
     );
+
+    // Bespoke Wave 2 Infernal Arm Active Stance VFX!
+    if (p.weaponId === 'shield_of_chaos' && (p.isBlocking || p.attackChargeTimer > 0.08)) {
+      // Glowing golden frontal Aegis Ward arc!
+      this.pushSprite(
+        'vfx_shield_block',
+        sx + Math.cos(p.facingAngle) * 32 * cam.zoom,
+        sy - 40 * cam.zoom + Math.sin(p.facingAngle) * 18 * cam.zoom,
+        0.92 * cam.zoom,
+        0.92 * cam.zoom,
+        p.facingAngle,
+        1,
+        0.88,
+        0.38,
+        0.92,
+        0,
+        1.25
+      );
+    } else if (p.weaponId === 'heart_seeking_bow' && p.attackChargeTimer > 0.06) {
+      // Converging golden aiming sight-lines + Power Shot starburst flash!
+      const chargeFrac = Math.min(1, p.attackChargeTimer / 0.6);
+      const spread = (1 - chargeFrac) * 0.42;
+      const inPowerWindow = chargeFrac >= 0.72 && chargeFrac <= 0.98;
+      const lineLen = (180 + chargeFrac * 260) * cam.zoom;
+      const lR = inPowerWindow ? 1.0 : 0.96;
+      const lG = inPowerWindow ? 0.92 : 0.74;
+      const lB = inPowerWindow ? 0.34 : 0.3;
+      this.pushLine(handX, handY, handX + Math.cos(p.facingAngle - spread) * lineLen, handY + Math.sin(p.facingAngle - spread) * lineLen * cam.isoScaleY, 2.2 * cam.zoom, lR, lG, lB, 0.78, 0.6);
+      this.pushLine(handX, handY, handX + Math.cos(p.facingAngle + spread) * lineLen, handY + Math.sin(p.facingAngle + spread) * lineLen * cam.isoScaleY, 2.2 * cam.zoom, lR, lG, lB, 0.78, 0.6);
+      if (inPowerWindow) {
+        this.pushSprite('vfx_bow_flash', handX + Math.cos(p.facingAngle) * 18 * cam.zoom, handY + Math.sin(p.facingAngle) * 10 * cam.zoom, 0.75 * cam.zoom, 0.75 * cam.zoom, timeSec * 8, 1, 0.95, 0.45, 0.95, 0, 1.3);
+      }
+    } else if (p.weaponId === 'eternal_spear' && p.attackChargeTimer > 0.1) {
+      // Expanding 3-tier Spear Spin Attack preview ring!
+      const frac = Math.min(1, p.attackChargeTimer / 0.75);
+      const rad = (170 + frac * 260) * cam.zoom;
+      this.pushEllipseRing(sx, sy, rad, rad * cam.isoScaleY, rad - 3.5 * cam.zoom, (rad - 3.5 * cam.zoom) * cam.isoScaleY, 28, 1.0, 0.86, 0.36, 0.65, 0.6);
+    } else if (p.weaponId === 'twin_fists' && (p.attackTimer > 0 || p.specialTimer > 0)) {
+      // Fiery twin gauntlet burst glow!
+      this.pushSprite('vfx_glow_soft', handX, handY, 0.7 * cam.zoom, 0.7 * cam.zoom, 0, 1.0, 0.42, 0.18, 0.72, 0, 1.2);
+    }
   }
 
   private renderFlowingHeroCloak(
@@ -2423,7 +2486,19 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       return;
     }
 
-    // Default glowing energy orb / skull / wave / bomb
+    if (pr.kind === 'blade_rift') {
+      const sc = Math.max(0.75, (pr.radius * 2.2) / 96) * cam.zoom;
+      this.pushSprite('vfx_blade_rift', sx, sy, sc, sc * cam.isoScaleY, timeSec * 12, 1, 1, 1, 0.96, 0, 0.7);
+      return;
+    }
+
+    if (pr.kind === 'skull') {
+      const sc = Math.max(0.62, (pr.radius * 2.4) / 68) * cam.zoom;
+      this.pushSprite('vfx_skull_proj', sx, sy, sc, sc, Math.sin(timeSec * 6) * 0.2, 1, 1, 1, 1, 0, 0.85);
+      return;
+    }
+
+    // Default glowing energy orb / wave / bomb
     const orbScale = Math.max(0.45, (pr.radius * 2.4) / 52) * cam.zoom;
     this.pushSprite('vfx_glow_soft', sx, sy, orbScale * 1.15, orbScale * 1.15, 0, r, g, b, 0.58, 0, 1.6);
     this.pushSprite('vfx_projectile_orb', sx, sy, orbScale, orbScale, timeSec * 5, r, g, b, 1, 0, 1.8);
@@ -2542,19 +2617,32 @@ export class WebGL2InkCelRenderer implements RenderBackend {
   }
 
   private renderParticles(vfx: ParticlesAndDecals, cam: CameraView): void {
-    // Alpha-blended particles first (shards, smoke, rose petals, splashes)
+    // Alpha-blended particles first (shards, smoke, rose petals, splashes, petals, snowflakes)
     this.setBatchState(this.atlasTex, 'alpha');
     for (let i = 0; i < MAX_PARTICLES; i++) {
       const p = vfx.particles[i];
       if (!p.active) continue;
-      if (p.kind !== 'shard' && p.kind !== 'smoke' && p.kind !== 'rose' && p.kind !== 'splash') continue;
+      if (
+        p.kind !== 'shard' &&
+        p.kind !== 'smoke' &&
+        p.kind !== 'rose' &&
+        p.kind !== 'splash' &&
+        p.kind !== 'petal' &&
+        p.kind !== 'snowflake'
+      ) {
+        continue;
+      }
       const t = 1 - p.life / Math.max(0.001, p.maxLife);
       const sz = (p.size + (p.endSize - p.size) * t) * cam.zoom;
       const a = p.alpha * (1 - t);
       const sx = this.wxToSx(p.x, cam);
       const sy = this.wyToSy(p.y, p.z, cam);
 
-      if (p.kind === 'splash' || p.kind === 'rose') {
+      if (p.kind === 'petal' || p.kind === 'rose') {
+        this.pushSprite('vfx_petal', sx, sy, sz / 36, sz / 36, p.angle, p.r, p.g, p.b, a, 0, p.emissive);
+      } else if (p.kind === 'snowflake') {
+        this.pushSprite('vfx_snowflake', sx, sy, sz / 38, sz / 38, p.angle, p.r, p.g, p.b, a, 0, p.emissive);
+      } else if (p.kind === 'splash') {
         this.pushSprite('vfx_wave_crest', sx, sy, sz / 72, sz / 72, p.angle, p.r, p.g, p.b, a, 0, p.emissive);
       } else if (p.kind === 'shard') {
         this.pushSprite('vfx_spark_burst', sx, sy, sz / 64, sz / 84, p.angle, p.r, p.g, p.b, a, 0, p.emissive);
@@ -2563,19 +2651,30 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       }
     }
 
-    // Additive glowing VFX particles (ember footsteps, hit sparks, lightning bolts, flames, shockwaves)
+    // Additive glowing VFX particles (ember footsteps, hit sparks, lightning bolts, flames, muzzle flash, shockwaves)
     this.setBatchState(this.atlasTex, 'additive');
     for (let i = 0; i < MAX_PARTICLES; i++) {
       const p = vfx.particles[i];
       if (!p.active) continue;
-      if (p.kind === 'shard' || p.kind === 'smoke' || p.kind === 'rose' || p.kind === 'splash') continue;
+      if (
+        p.kind === 'shard' ||
+        p.kind === 'smoke' ||
+        p.kind === 'rose' ||
+        p.kind === 'splash' ||
+        p.kind === 'petal' ||
+        p.kind === 'snowflake'
+      ) {
+        continue;
+      }
       const t = 1 - p.life / Math.max(0.001, p.maxLife);
       const sz = (p.size + (p.endSize - p.size) * t) * cam.zoom;
       const a = p.alpha * (1 - t);
       const sx = this.wxToSx(p.x, cam);
       const sy = this.wyToSy(p.y, p.z, cam);
 
-      if (p.kind === 'shockwave' || p.kind === 'deflect_ring') {
+      if (p.kind === 'muzzle_flash') {
+        this.pushSprite('vfx_muzzle_flash', sx, sy, sz / 54, sz / 54, p.angle, p.r, p.g, p.b, a, 0, p.emissive);
+      } else if (p.kind === 'shockwave' || p.kind === 'deflect_ring') {
         const sc = sz / 58;
         this.pushSprite('vfx_ring_soft', sx, sy, sc, sc * cam.isoScaleY, 0, p.r, p.g, p.b, a, 0, p.emissive);
       } else if (p.kind === 'bolt') {
@@ -2845,6 +2944,13 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       default:
         return [0.72, 0.94, 0.3];
     }
+  }
+
+  /** Hot-swaps the GPU atlas texture ONCE when toggling BUILTIN <-> CUSTOM_PACK. */
+  public setAtlasCanvas(canvas: HTMLCanvasElement): void {
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.atlasTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
   }
 
   public dispose(): void {

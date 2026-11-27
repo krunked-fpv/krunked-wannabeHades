@@ -1309,165 +1309,557 @@ function paintWardenMalice(ctx: CanvasRenderingContext2D): void {
   paintPortraitBorder(ctx, '#FF3B9A');
 }
 
-function paintSecondaryPatron(ctx: CanvasRenderingContext2D, patronId: PatronId): void {
-  const def = PATRON_CONSTANTS[patronId];
-  paintMythicBackdrop(ctx, def.colorHex, def.accentHex, '#120c1c', 12);
+function paintSylvara(ctx: CanvasRenderingContext2D): void {
+  paintMythicBackdrop(ctx, '#6EFF00', '#C6FFA0', '#0a210d', 14);
 
-  const themes: Record<
-    string,
-    {
-      skinH: string;
-      skinM: string;
-      skinS: string;
-      skinD: string;
-      clothL: string;
-      clothM: string;
-      clothD: string;
-      fem: boolean;
-      expr: 'regal' | 'fierce' | 'smirk' | 'alluring';
-    }
-  > = {
-    sylvara: {
-      skinH: '#f5d2b8',
-      skinM: '#cf9f7e',
-      skinS: '#82543e',
-      skinD: '#45261d',
-      clothL: '#4bb84e',
-      clothM: '#1e6328',
-      clothD: '#0b2613',
-      fem: true,
-      expr: 'regal',
-    },
-    bellum: {
-      skinH: '#bd928b',
-      skinM: '#8a5d5a',
-      skinS: '#4f2c2f',
-      skinD: '#241014',
-      clothL: '#d92828',
-      clothM: '#7a1216',
-      clothD: '#240609',
-      fem: false,
-      expr: 'fierce',
-    },
-    bacchion: {
-      skinH: '#de9f7c',
-      skinM: '#b06f51',
-      skinS: '#6b3828',
-      skinD: '#381915',
-      clothL: '#a638e6',
-      clothM: '#5c158a',
-      clothD: '#1e0733',
-      fem: false,
-      expr: 'smirk',
-    },
-    glaciera: {
-      skinH: '#eaf1fa',
-      skinM: '#b9cae0',
-      skinS: '#6d82a3',
-      skinD: '#2f3d59',
-      clothL: '#7cc9ff',
-      clothM: '#336b9c',
-      clothD: '#11263d',
-      fem: true,
-      expr: 'regal',
-    },
-    veloce: {
-      skinH: '#f5cca6',
-      skinM: '#cc9368',
-      skinS: '#7d4c2f',
-      skinD: '#402214',
-      clothL: '#ff7d30',
-      clothM: '#b84212',
-      clothD: '#3b1508',
-      fem: false,
-      expr: 'smirk',
-    },
-    abyssos: {
-      skinH: '#dcd0ff',
-      skinM: '#967ae6',
-      skinS: '#4b2f8f',
-      skinD: '#1c0f40',
-      clothL: '#7e38ff',
-      clothM: '#3f1291',
-      clothD: '#120629',
-      fem: false,
-      expr: 'regal',
-    },
+  // Gleaming Sylvan Spirit Bow & Quiver of Fletched Arrows angled behind shoulder
+  ctx.save();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 11;
+  ctx.beginPath();
+  ctx.moveTo(68, 92);
+  ctx.bezierCurveTo(18, 200, 28, 326, 86, 444);
+  ctx.stroke();
+  ctx.strokeStyle = '#a86e3b';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  ctx.strokeStyle = '#9dff66';
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(68, 96);
+  ctx.lineTo(86, 440);
+  ctx.stroke();
+  // Quiver arrow fletchings peeking behind right shoulder
+  for (let i = 0; i < 3; i++) {
+    ctx.strokeStyle = '#6EFF00';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(270 + i * 14, 210 + i * 10);
+    ctx.lineTo(240 + i * 10, 284 + i * 8);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Deep hooded forest-emerald hunter cloak framing head
+  ctx.beginPath();
+  ctx.moveTo(68, 340);
+  ctx.bezierCurveTo(54, 152, 114, 58, 192, 62);
+  ctx.bezierCurveTo(270, 66, 302, 166, 282, 340);
+  ctx.closePath();
+  const hoodG = ctx.createLinearGradient(70, 62, 280, 340);
+  hoodG.addColorStop(0, '#368a40');
+  hoodG.addColorStop(0.5, '#164522');
+  hoodG.addColorStop(1, '#07170d');
+  ctx.fillStyle = hoodG;
+  ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  const cfg: BustConfig = {
+    skinHighlight: '#f7d5bc',
+    skinMid: '#d4a382',
+    skinShadow: '#875742',
+    skinDeepShadow: '#45241c',
+    lipHex: '#a85a4f',
+    clothLit: '#48b552',
+    clothMid: '#1f612a',
+    clothDark: '#0b2613',
+    metalLit: '#e0ffc4',
+    metalMid: '#7fe048',
+    metalDark: '#23571a',
+    eyeHex: '#7DFF26',
+    rimHex: '#B6FF7A',
+    feminine: true,
+    expression: 'regal',
+    pauldronSide: 'left',
   };
 
-  const t = themes[patronId] ?? themes.sylvara;
+  paintHeroicTorso34(ctx, cfg);
+  paintHeroicHead34(ctx, cfg);
 
-  // Flowing regal hood / cloak silhouette behind head
+  // Swept auburn-chestnut windblown hunter locks framing temple & cheek
+  paintLockRibbon(
+    ctx,
+    [
+      [126, 158],
+      [154, 108],
+      [226, 118],
+      [252, 196],
+      [238, 284],
+      [218, 192],
+      [186, 134],
+      [134, 168],
+    ],
+    '#c77346',
+    '#7d3d22',
+    '#2e120c'
+  );
+
+  // Sculpted Silver Crescent Moon & Antler Circlet at temple!
+  ctx.fillStyle = '#e8f5e0';
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 3.8;
   ctx.beginPath();
-  ctx.moveTo(86, 300);
-  ctx.bezierCurveTo(72, 140, 126, 72, 188, 72);
-  ctx.bezierCurveTo(254, 72, 294, 150, 276, 300);
+  ctx.arc(178, 126, 20, 0.35 * Math.PI, 1.65 * Math.PI);
+  ctx.quadraticCurveTo(176, 126, 188, 143);
   ctx.closePath();
-  ctx.fillStyle = t.clothD;
+  ctx.fill();
+  ctx.stroke();
+
+  paintPortraitBorder(ctx, '#6EFF00');
+}
+
+function paintBellum(ctx: CanvasRenderingContext2D): void {
+  paintMythicBackdrop(ctx, '#FF1400', '#FF8E82', '#260507', 18);
+
+  // Crossed Crimson-Steel War Blades rising behind obsidian armored shoulders
+  ctx.save();
+  for (const dir of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.moveTo(180 + dir * 24, 300);
+    ctx.lineTo(180 + dir * 136, 62);
+    ctx.lineTo(180 + dir * 154, 96);
+    ctx.lineTo(180 + dir * 54, 316);
+    ctx.closePath();
+    ctx.fillStyle = dir < 0 ? '#4d1a24' : '#2b0d14';
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    drawTaperedInkArc(ctx, 180 + dir * 34, 290, 180 + dir * 90, 180, 180 + dir * 138, 74, 3, '#ff4538');
+  }
+  ctx.restore();
+
+  const cfg: BustConfig = {
+    skinHighlight: '#ad847e',
+    skinMid: '#7d5452',
+    skinShadow: '#47282b',
+    skinDeepShadow: '#210e12',
+    lipHex: '#5c262b',
+    clothLit: '#cc1f24',
+    clothMid: '#6e0d14',
+    clothDark: '#1c0508',
+    metalLit: '#ffb59e',
+    metalMid: '#a82222',
+    metalDark: '#2b080b',
+    eyeHex: '#FF2A1A',
+    rimHex: '#FF7066',
+    broad: true,
+    expression: 'fierce',
+    pauldronSide: 'both',
+  };
+
+  paintHeroicTorso34(ctx, cfg);
+  paintHeroicHead34(ctx, cfg);
+
+  // Iconic Crimson Blood War-Paint Mask across cheekbones & nose bridge!
+  ctx.fillStyle = 'rgba(224, 18, 26, 0.86)';
+  ctx.beginPath();
+  ctx.moveTo(130, 186);
+  ctx.lineTo(166, 198);
+  ctx.lineTo(222, 186);
+  ctx.lineTo(216, 214);
+  ctx.lineTo(168, 218);
+  ctx.lineTo(134, 210);
+  ctx.closePath();
+  ctx.fill();
+
+  // Swept Raven-Black & Ash-White War Mane + Spiked Obsidian War-Crest!
+  paintLockRibbon(
+    ctx,
+    [
+      [126, 166],
+      [112, 114],
+      [154, 96],
+      [182, 54],
+      [216, 98],
+      [256, 116],
+      [240, 174],
+      [216, 138],
+      [172, 128],
+      [136, 152],
+    ],
+    '#eef0f5',
+    '#3d3138',
+    '#120b12'
+  );
+
+  // Blood-red forehead battle sigil
+  ctx.fillStyle = '#ff2214';
+  ctx.beginPath();
+  ctx.moveTo(170, 144);
+  ctx.lineTo(176, 158);
+  ctx.lineTo(170, 172);
+  ctx.lineTo(164, 158);
+  ctx.closePath();
+  ctx.fill();
+
+  paintPortraitBorder(ctx, '#FF1400');
+}
+
+function paintBacchion(ctx: CanvasRenderingContext2D): void {
+  paintMythicBackdrop(ctx, '#C800FF', '#EBA8FF', '#1e0629', 14);
+
+  // Lush Cascading Dark-Violet Wavy Revelry Hair Locks!
+  paintLockRibbon(
+    ctx,
+    [
+      [78, 286],
+      [62, 206],
+      [94, 118],
+      [182, 68],
+      [268, 102],
+      [296, 200],
+      [274, 294],
+      [226, 272],
+      [122, 274],
+    ],
+    '#7c2eb8',
+    '#3b0f66',
+    '#140426'
+  );
+
+  const cfg: BustConfig = {
+    skinHighlight: '#e3a682',
+    skinMid: '#ba7756',
+    skinShadow: '#733e2c',
+    skinDeepShadow: '#3d1c16',
+    lipHex: '#964742',
+    clothLit: '#b83df2',
+    clothMid: '#641594',
+    clothDark: '#210738',
+    metalLit: '#fff0a6',
+    metalMid: '#e8aa34',
+    metalDark: '#693c0e',
+    eyeHex: '#E04CFF',
+    rimHex: '#EE9EFF',
+    broad: true,
+    expression: 'smirk',
+    pauldronSide: 'left',
+  };
+
+  paintHeroicTorso34(ctx, cfg);
+  paintHeroicHead34(ctx, cfg);
+
+  // Crown of Lush Emerald Ivy Leaves & Glistening Amethyst Grape Clusters!
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 3.2;
+  for (const [gx, gy, col] of [
+    [136, 134, '#4ce064'],
+    [164, 118, '#36b550'],
+    [196, 118, '#4ce064'],
+    [224, 132, '#36b550'],
+    [126, 152, '#c82eff'],
+    [134, 164, '#e478ff'],
+    [234, 152, '#c82eff'],
+    [226, 166, '#e478ff'],
+  ] as const) {
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(gx, gy, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Overflowing Golden Revelry Chalice raised in foreground right!
+  ctx.save();
+  ctx.translate(292, 370);
+  ctx.rotate(-0.18);
+  ctx.fillStyle = '#f2be44';
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.moveTo(-30, -28);
+  ctx.lineTo(30, -28);
+  ctx.quadraticCurveTo(22, 12, 6, 18);
+  ctx.lineTo(18, 48);
+  ctx.lineTo(-18, 48);
+  ctx.lineTo(-6, 18);
+  ctx.quadraticCurveTo(-22, 12, -30, -28);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Glowing violet wine splash cresting over rim
+  ctx.fillStyle = '#df4cff';
+  ctx.beginPath();
+  ctx.ellipse(0, -28, 26, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  paintPortraitBorder(ctx, '#C800FF');
+}
+
+function paintGlaciera(ctx: CanvasRenderingContext2D): void {
+  paintMythicBackdrop(ctx, '#60BDFF', '#D6F0FF', '#081829', 16);
+
+  // Sweeping Frost-Silver Braided Tresses & Crystalline Ice Halo
+  paintLockRibbon(
+    ctx,
+    [
+      [70, 312],
+      [62, 180],
+      [112, 86],
+      [186, 68],
+      [264, 92],
+      [298, 198],
+      [284, 326],
+      [224, 286],
+      [126, 286],
+    ],
+    '#ffffff',
+    '#c6d9ed',
+    '#526c8f'
+  );
+
+  const cfg: BustConfig = {
+    skinHighlight: '#eff5fc',
+    skinMid: '#c6d6eb',
+    skinShadow: '#7b92b5',
+    skinDeepShadow: '#384b6e',
+    lipHex: '#7d8eb0',
+    clothLit: '#a8deff',
+    clothMid: '#3d79ad',
+    clothDark: '#122945',
+    metalLit: '#ffffff',
+    metalMid: '#8cd4ff',
+    metalDark: '#2c5b85',
+    eyeHex: '#7CE0FF',
+    rimHex: '#D4F4FF',
+    feminine: true,
+    expression: 'regal',
+    pauldronSide: 'both',
+  };
+
+  paintHeroicTorso34(ctx, cfg);
+  paintHeroicHead34(ctx, cfg);
+
+  // Swept silver temple locks framing austere cheekbone
+  paintLockRibbon(
+    ctx,
+    [
+      [128, 154],
+      [164, 112],
+      [226, 122],
+      [244, 200],
+      [222, 166],
+      [184, 134],
+      [136, 164],
+    ],
+    '#ffffff',
+    '#d8e8fa',
+    '#6d87ab'
+  );
+
+  // Sharp Faceted Crystalline Glacial Diadem!
+  ctx.beginPath();
+  ctx.moveTo(124, 140);
+  ctx.lineTo(116, 86);
+  ctx.lineTo(148, 116);
+  ctx.lineTo(164, 52);
+  ctx.lineTo(182, 102);
+  ctx.lineTo(206, 46);
+  ctx.lineTo(216, 112);
+  ctx.lineTo(248, 84);
+  ctx.lineTo(238, 140);
+  ctx.closePath();
+  const iceG = ctx.createLinearGradient(120, 48, 240, 140);
+  iceG.addColorStop(0, '#ffffff');
+  iceG.addColorStop(0.45, '#8ee0ff');
+  iceG.addColorStop(1, '#2b6c9e');
+  ctx.fillStyle = iceG;
+  ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 4.4;
+  ctx.stroke();
+
+  // Floating geometric frost snowflakes in foreground
+  ctx.strokeStyle = '#d9f4ff';
+  ctx.lineWidth = 2.6;
+  for (const [fx, fy, r] of [
+    [54, 128, 14],
+    [310, 148, 12],
+    [62, 378, 16],
+  ]) {
+    for (let k = 0; k < 3; k++) {
+      const a = (k * Math.PI) / 3;
+      ctx.beginPath();
+      ctx.moveTo(fx - Math.cos(a) * r, fy - Math.sin(a) * r);
+      ctx.lineTo(fx + Math.cos(a) * r, fy + Math.sin(a) * r);
+      ctx.stroke();
+    }
+  }
+
+  paintPortraitBorder(ctx, '#60BDFF');
+}
+
+function paintVeloce(ctx: CanvasRenderingContext2D): void {
+  paintMythicBackdrop(ctx, '#FF5A00', '#FFC18F', '#291006', 16);
+
+  // Kinetic diagonal golden speed streaks zooming behind herald!
+  ctx.save();
+  ctx.strokeStyle = '#ff9838';
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 4;
+  for (let i = 0; i < 6; i++) {
+    ctx.beginPath();
+    ctx.moveTo(20, 110 + i * 54);
+    ctx.lineTo(340, 62 + i * 54);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const cfg: BustConfig = {
+    skinHighlight: '#f7cfa8',
+    skinMid: '#d1986e',
+    skinShadow: '#854e32',
+    skinDeepShadow: '#422014',
+    lipHex: '#9e5340',
+    clothLit: '#ff8a36',
+    clothMid: '#c44512',
+    clothDark: '#3d1408',
+    metalLit: '#fff0a8',
+    metalMid: '#f2ac34',
+    metalDark: '#703d0c',
+    eyeHex: '#FF9E2C',
+    rimHex: '#FFCB80',
+    expression: 'smirk',
+    pauldronSide: 'left',
+  };
+
+  paintHeroicTorso34(ctx, cfg);
+  paintHeroicHead34(ctx, cfg);
+
+  // Tousled wind-swept auburn bangs peeking beneath winged messenger helm
+  paintLockRibbon(
+    ctx,
+    [
+      [126, 166],
+      [148, 134],
+      [212, 138],
+      [242, 184],
+      [226, 198],
+      [192, 152],
+      [142, 162],
+    ],
+    '#c7622e',
+    '#7d3214',
+    '#2e1008'
+  );
+
+  // Iconic Burnished-Bronze Winged Swift-Helm with Swept Feathered Wings!
+  ctx.beginPath();
+  ctx.moveTo(126, 156);
+  ctx.bezierCurveTo(124, 96, 160, 74, 192, 76);
+  ctx.bezierCurveTo(228, 78, 246, 108, 242, 158);
+  ctx.quadraticCurveTo(182, 134, 126, 156);
+  ctx.closePath();
+  const hG = ctx.createLinearGradient(126, 76, 242, 156);
+  hG.addColorStop(0, '#fff2b0');
+  hG.addColorStop(0.45, '#e89b2c');
+  hG.addColorStop(1, '#66340a');
+  ctx.fillStyle = hG;
+  ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 4.8;
+  ctx.stroke();
+
+  // Sweeping white-and-gold feathered wings bursting from both temples!
+  for (const dir of [-1, 1] as const) {
+    ctx.fillStyle = '#fff5dc';
+    ctx.beginPath();
+    ctx.moveTo(184 + dir * 48, 134);
+    ctx.quadraticCurveTo(184 + dir * 102, 78, 184 + dir * 130, 56);
+    ctx.quadraticCurveTo(184 + dir * 116, 102, 184 + dir * 92, 126);
+    ctx.quadraticCurveTo(184 + dir * 108, 126, 184 + dir * 68, 146);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 4.2;
+    ctx.stroke();
+  }
+
+  paintPortraitBorder(ctx, '#FF5A00');
+}
+
+function paintAbyssos(ctx: CanvasRenderingContext2D): void {
+  paintMythicBackdrop(ctx, '#6419FF', '#C4A8FF', '#0d041f', 12);
+
+  // Floating Golden Primordial Orbit Rings & Starlit Cosmic Nebula Cloak
+  ctx.save();
+  ctx.strokeStyle = '#d9b5ff';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(180, 198, 148, 54, -0.32, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = '#f2c154';
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.ellipse(180, 198, 134, 42, 0.45, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // Ethereal Swirling Starry Nebula Shroud
+  ctx.beginPath();
+  ctx.moveTo(46, PORTRAIT_HEIGHT + 8);
+  ctx.bezierCurveTo(36, 260, 74, 72, 184, 62);
+  ctx.bezierCurveTo(294, 72, 326, 260, 314, PORTRAIT_HEIGHT + 8);
+  ctx.closePath();
+  const nebG = ctx.createLinearGradient(50, 62, 310, PORTRAIT_HEIGHT);
+  nebG.addColorStop(0, '#5a1cd6');
+  nebG.addColorStop(0.5, '#1f084d');
+  nebG.addColorStop(1, '#070214');
+  ctx.fillStyle = nebG;
   ctx.fill();
   ctx.strokeStyle = INK;
   ctx.lineWidth = 5.5;
   ctx.stroke();
 
   const cfg: BustConfig = {
-    skinHighlight: t.skinH,
-    skinMid: t.skinM,
-    skinShadow: t.skinS,
-    skinDeepShadow: t.skinD,
-    lipHex: t.skinS,
-    clothLit: t.clothL,
-    clothMid: t.clothM,
-    clothDark: t.clothD,
-    metalLit: def.accentHex,
-    metalMid: def.colorHex,
-    metalDark: t.clothD,
-    eyeHex: def.colorHex,
-    rimHex: def.accentHex,
-    feminine: t.fem,
-    expression: t.expr,
-    pauldronSide: patronId === 'bellum' ? 'both' : 'left',
+    skinHighlight: '#ebe3ff',
+    skinMid: '#b5a0ed',
+    skinShadow: '#5e43a3',
+    skinDeepShadow: '#241252',
+    lipHex: '#5c389e',
+    clothLit: '#7c36ff',
+    clothMid: '#370f85',
+    clothDark: '#0f0426',
+    metalLit: '#fff0b8',
+    metalMid: '#d9a441',
+    metalDark: '#4a2b10',
+    eyeHex: '#B67CFF',
+    rimHex: '#D8B8FF',
+    expression: 'regal',
+    pauldronSide: 'none',
   };
 
   paintHeroicTorso34(ctx, cfg);
   paintHeroicHead34(ctx, cfg);
 
-  // Iconic headpiece per secondary patron
-  ctx.fillStyle = def.colorHex;
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 4.6;
-  ctx.beginPath();
-  if (patronId === 'sylvara') {
-    ctx.arc(178, 128, 22, 0.25 * Math.PI, 1.75 * Math.PI);
-    ctx.closePath();
-  } else if (patronId === 'bellum') {
-    ctx.moveTo(132, 146);
-    ctx.lineTo(182, 56);
-    ctx.lineTo(234, 146);
-    ctx.closePath();
-  } else if (patronId === 'glaciera') {
-    ctx.moveTo(126, 142);
-    ctx.lineTo(148, 76);
-    ctx.lineTo(180, 108);
-    ctx.lineTo(214, 72);
-    ctx.lineTo(236, 142);
-    ctx.closePath();
-  } else if (patronId === 'veloce') {
-    ctx.moveTo(130, 144);
-    ctx.lineTo(88, 92);
-    ctx.lineTo(150, 118);
-    ctx.lineTo(212, 118);
-    ctx.lineTo(274, 90);
-    ctx.lineTo(234, 144);
-    ctx.closePath();
-  } else if (patronId === 'abyssos') {
-    ctx.ellipse(180, 118, 32, 15, 0, 0, Math.PI * 2);
-  } else {
-    ctx.ellipse(182, 132, 54, 14, -0.08, 0, Math.PI * 2);
-  }
-  ctx.fill();
-  ctx.stroke();
+  // Surreal Floating Third Void Eye on Brow + Twin Orbiting Eldritch Eyes!
+  const drawVoidEye = (ex: number, ey: number, rx: number, ry: number) => {
+    ctx.fillStyle = '#090414';
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#f2be54';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = '#b46eff';
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, rx * 0.45, ry * 0.78, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, rx * 0.14, ry * 0.65, 0, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  drawVoidEye(174, 146, 22, 11);
+  drawVoidEye(72, 140, 26, 13);
+  drawVoidEye(292, 232, 24, 12);
 
-  paintPortraitBorder(ctx, def.colorHex);
+  paintPortraitBorder(ctx, '#6419FF');
 }
 
 function paintPortrait(ctx: CanvasRenderingContext2D, id: CharacterPortraitId): void {
@@ -1484,14 +1876,29 @@ function paintPortrait(ctx: CanvasRenderingContext2D, id: CharacterPortraitId): 
     case 'velouris':
       paintVelouris(ctx);
       break;
+    case 'sylvara':
+      paintSylvara(ctx);
+      break;
+    case 'bellum':
+      paintBellum(ctx);
+      break;
+    case 'bacchion':
+      paintBacchion(ctx);
+      break;
+    case 'glaciera':
+      paintGlaciera(ctx);
+      break;
+    case 'veloce':
+      paintVeloce(ctx);
+      break;
+    case 'abyssos':
+      paintAbyssos(ctx);
+      break;
     case 'prince_pyreus':
       paintPrincePyreus(ctx);
       break;
     case 'warden_malice':
       paintWardenMalice(ctx);
-      break;
-    default:
-      paintSecondaryPatron(ctx, id);
       break;
   }
 }
