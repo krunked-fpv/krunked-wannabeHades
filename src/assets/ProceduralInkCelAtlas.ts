@@ -1054,183 +1054,188 @@ function drawHeroPose(
   pose: 'down' | 'up' | 'side' | 'diag_down' | 'diag_up'
 ): void {
   const cx = w * 0.5;
-  const footY = h * 0.84;
+  const footY = h * 0.85;
   const isUp = pose === 'up' || pose === 'diag_up';
   const isSide = pose === 'side';
 
-  // Blazing Ember Feet (iconic fiery underworld step!)
+  // Blazing Ember Feet (athletic combat stance with rising flame tongues!)
   const drawEmberFoot = (fx: number, fy: number) => {
-    const fGrad = ctx.createRadialGradient(fx, fy, 2, fx, fy - 4, 16);
-    fGrad.addColorStop(0, '#fff7a8');
-    fGrad.addColorStop(0.45, '#ff6a1a');
-    fGrad.addColorStop(1, 'rgba(200, 24, 18, 0)');
+    const fGrad = ctx.createRadialGradient(fx, fy, 2, fx, fy - 4, 20);
+    fGrad.addColorStop(0, '#fff9b8');
+    fGrad.addColorStop(0.45, '#ff6218');
+    fGrad.addColorStop(1, 'rgba(210, 22, 16, 0)');
     ctx.fillStyle = fGrad;
     ctx.beginPath();
-    ctx.ellipse(fx, fy, 15, 9, 0, 0, Math.PI * 2);
+    ctx.ellipse(fx, fy, 18, 10, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Sandaled foot contour
-    ctx.fillStyle = '#331d1d';
+    // Stylized rising ink-cel flame lick on ankle
+    ctx.fillStyle = '#ff7b24';
     ctx.beginPath();
-    ctx.ellipse(fx, fy - 1, 9, 5.5, 0, 0, Math.PI * 2);
+    ctx.moveTo(fx - 8, fy - 2);
+    ctx.quadraticCurveTo(fx - 13, fy - 14, fx - 2, fy - 20);
+    ctx.quadraticCurveTo(fx + 5, fy - 12, fx + 8, fy - 2);
+    ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = INK;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.6;
     ctx.stroke();
   };
 
-  drawEmberFoot(cx - (isSide ? 9 : 13), footY);
-  drawEmberFoot(cx + (isSide ? 11 : 13), footY + (isSide ? 2 : 0));
+  const lFootX = cx - (isSide ? 14 : 18);
+  const rFootX = cx + (isSide ? 18 : 18);
+  drawEmberFoot(lFootX, footY - 1);
+  drawEmberFoot(rFootX, footY + 3);
 
-  // Legs (athletic cel-shaded with bronze greaves)
+  // Athletic tapered legs in wide heroic warrior lunge + gilded shin greaves
+  ctx.fillStyle = '#c4835e';
   ctx.strokeStyle = INK;
-  ctx.lineWidth = 13;
+  ctx.lineWidth = 4;
+  // Back leg
   ctx.beginPath();
-  ctx.moveTo(cx - 10, footY - 36);
-  ctx.lineTo(cx - 11, footY - 4);
-  ctx.moveTo(cx + 10, footY - 36);
-  ctx.lineTo(cx + 11, footY - 4);
-  ctx.stroke();
-
-  ctx.strokeStyle = '#d49a74';
-  ctx.lineWidth = 7;
-  ctx.stroke();
-
-  // Flowing Asymmetric Crimson Cloak Mantle (back drape)
-  ctx.beginPath();
-  ctx.moveTo(cx - 28, footY - 82);
-  ctx.quadraticCurveTo(cx - 42, footY - 42, cx - 32, footY - 12);
-  ctx.lineTo(cx + 14, footY - 22);
-  ctx.quadraticCurveTo(cx + 34, footY - 52, cx + 26, footY - 84);
+  ctx.moveTo(cx - 14, footY - 46);
+  ctx.lineTo(lFootX - 6, footY - 2);
+  ctx.lineTo(lFootX + 8, footY - 2);
+  ctx.lineTo(cx - 2, footY - 44);
   ctx.closePath();
-  const cloakGrad = ctx.createLinearGradient(cx - 36, footY - 84, cx + 28, footY - 14);
-  cloakGrad.addColorStop(0, '#e32b34');
-  cloakGrad.addColorStop(0.55, '#9d1422');
-  cloakGrad.addColorStop(1, '#440915');
+  ctx.fill();
+  ctx.stroke();
+  // Front leg
+  ctx.beginPath();
+  ctx.moveTo(cx + 2, footY - 46);
+  ctx.lineTo(rFootX - 7, footY + 1);
+  ctx.lineTo(rFootX + 8, footY + 1);
+  ctx.lineTo(cx + 16, footY - 44);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Flowing Asymmetric Crimson Cloak sweeping dramatically behind stride
+  ctx.beginPath();
+  ctx.moveTo(cx - 24, footY - 88);
+  ctx.bezierCurveTo(cx - 48, footY - 56, cx - 50, footY - 22, cx - 36, footY - 6);
+  ctx.lineTo(cx - 10, footY - 18);
+  ctx.lineTo(cx + 22, footY - 14);
+  ctx.quadraticCurveTo(cx + 36, footY - 54, cx + 24, footY - 88);
+  ctx.closePath();
+  const cloakGrad = ctx.createLinearGradient(cx - 46, footY - 88, cx + 32, footY - 8);
+  cloakGrad.addColorStop(0, '#e62434');
+  cloakGrad.addColorStop(0.52, '#961020');
+  cloakGrad.addColorStop(1, '#3b0612');
   ctx.fillStyle = cloakGrad;
+  ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 4.2;
+  ctx.stroke();
+
+  // Tapered Obsidian Warrior Chiton Tunic (V-shaped heroic torso!)
+  ctx.beginPath();
+  ctx.moveTo(cx - 22, footY - 88);
+  ctx.lineTo(cx + 22, footY - 88);
+  ctx.lineTo(cx + 17, footY - 54);
+  ctx.lineTo(cx + 25, footY - 30);
+  ctx.lineTo(cx - 25, footY - 30);
+  ctx.lineTo(cx - 17, footY - 54);
+  ctx.closePath();
+  const tunicGrad = ctx.createLinearGradient(cx - 22, footY - 88, cx + 22, footY - 30);
+  tunicGrad.addColorStop(0, '#362e42');
+  tunicGrad.addColorStop(0.55, '#191522');
+  tunicGrad.addColorStop(1, '#0b0812');
+  ctx.fillStyle = tunicGrad;
   ctx.fill();
   ctx.strokeStyle = INK;
   ctx.lineWidth = 4;
   ctx.stroke();
 
-  // Dark Obsidian Chiton Tunic with Gold Trim
+  // Gold skirt border & diagonal crimson himation drape across chest
+  ctx.fillStyle = '#ebb446';
+  ctx.fillRect(cx - 23, footY - 37, 46, 5.5);
   ctx.beginPath();
-  ctx.moveTo(cx - 20, footY - 84);
-  ctx.lineTo(cx + 20, footY - 84);
-  ctx.lineTo(cx + 24, footY - 30);
-  ctx.lineTo(cx - 24, footY - 30);
+  ctx.moveTo(cx - 24, footY - 88);
+  ctx.lineTo(cx + 2, footY - 84);
+  ctx.lineTo(cx + 22, footY - 52);
+  ctx.lineTo(cx - 18, footY - 56);
   ctx.closePath();
-  const tunicGrad = ctx.createLinearGradient(cx - 22, footY - 84, cx + 22, footY - 30);
-  tunicGrad.addColorStop(0, '#3a3447');
-  tunicGrad.addColorStop(0.55, '#1d1926');
-  tunicGrad.addColorStop(1, '#0e0c14');
-  ctx.fillStyle = tunicGrad;
+  ctx.fillStyle = isUp ? '#850e1c' : '#db2232';
   ctx.fill();
   ctx.strokeStyle = INK;
   ctx.lineWidth = 3.8;
   ctx.stroke();
 
-  // Gold skirt hem & crimson belt sash
-  ctx.fillStyle = '#e5b24c';
-  ctx.fillRect(cx - 21, footY - 37, 42, 6);
-  ctx.fillStyle = '#d42632';
-  ctx.fillRect(cx - 21, footY - 56, 42, 9);
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 2.6;
-  ctx.strokeRect(cx - 21, footY - 56, 42, 9);
-
-  // Diagonal crimson cloak wrap across chest
+  // Sculpted Burnished-Gold Horned-Skull Shoulder Pauldron (left shoulder!)
+  const px = isSide ? cx - 6 : cx - 23;
+  const py = footY - 86;
   ctx.beginPath();
-  ctx.moveTo(cx - 24, footY - 84);
-  ctx.lineTo(cx + 4, footY - 80);
-  ctx.lineTo(cx + 22, footY - 52);
-  ctx.lineTo(cx - 18, footY - 54);
+  ctx.moveTo(px - 17, py + 8);
+  ctx.bezierCurveTo(px - 20, py - 14, px + 6, py - 18, px + 18, py - 4);
+  ctx.bezierCurveTo(px + 16, py + 12, px - 4, py + 14, px - 17, py + 8);
   ctx.closePath();
-  ctx.fillStyle = isUp ? '#8f1320' : '#d92834';
-  ctx.fill();
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 3.6;
-  ctx.stroke();
-
-  // Sculpted Burnished Gold Horned-Skull Shoulder Pauldron (iconic asymmetric silhouette!)
-  const px = isSide ? cx - 6 : cx - 22;
-  const py = footY - 84;
-  ctx.beginPath();
-  ctx.ellipse(px, py, 16, 13, -0.25, 0, Math.PI * 2);
-  const paulGrad = ctx.createLinearGradient(px - 14, py - 12, px + 14, py + 12);
-  paulGrad.addColorStop(0, '#fff0a8');
-  paulGrad.addColorStop(0.45, '#e8ac41');
-  paulGrad.addColorStop(1, '#6e4214');
+  const paulGrad = ctx.createLinearGradient(px - 16, py - 14, px + 16, py + 12);
+  paulGrad.addColorStop(0, '#fff2b0');
+  paulGrad.addColorStop(0.45, '#e8ac3c');
+  paulGrad.addColorStop(1, '#663a0e');
   ctx.fillStyle = paulGrad;
   ctx.fill();
   ctx.strokeStyle = INK;
-  ctx.lineWidth = 3.6;
+  ctx.lineWidth = 3.8;
   ctx.stroke();
 
-  // Head & Neck
-  const headY = footY - 104;
+  // Sculpted Angular Heroic Head (3/4 jawline, not a flat pill!)
+  const headY = footY - 108;
   ctx.beginPath();
-  ctx.ellipse(cx, headY, 16, 18, 0, 0, Math.PI * 2);
-  ctx.fillStyle = isUp ? '#1c1824' : '#e6b28d';
+  ctx.moveTo(cx - 14, headY - 12);
+  ctx.quadraticCurveTo(cx, headY - 22, cx + 15, headY - 10);
+  ctx.lineTo(cx + 13, headY + 8);
+  ctx.quadraticCurveTo(cx + 2, headY + 19, cx - 2, headY + 18);
+  ctx.lineTo(cx - 14, headY + 7);
+  ctx.closePath();
+  ctx.fillStyle = isUp ? '#1a1524' : '#e0a580';
+  ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  if (!isUp) {
+    // Fierce narrow comic eyes (glowing crimson + emerald heterochromia!)
+    const exOff = isSide ? 4 : 0;
+    ctx.fillStyle = INK;
+    ctx.fillRect(cx - 10 + exOff, headY - 4, 8, 4.5);
+    ctx.fillRect(cx + 2 + exOff, headY - 4, 8, 4.5);
+    ctx.fillStyle = '#ff3838';
+    ctx.fillRect(cx - 8 + exOff, headY - 3, 3.6, 2.5);
+    ctx.fillStyle = '#48ffa2';
+    ctx.fillRect(cx + 4 + exOff, headY - 3, 3.6, 2.5);
+  }
+
+  // Wild Swept Charcoal Hair with Blazing Crimson-Gold Tips
+  ctx.beginPath();
+  ctx.moveTo(cx - 18, headY - 2);
+  ctx.lineTo(cx - 28, headY - 16);
+  ctx.lineTo(cx - 14, headY - 17);
+  ctx.lineTo(cx - 20, headY - 34);
+  ctx.lineTo(cx - 4, headY - 22);
+  ctx.lineTo(cx + 5, headY - 38);
+  ctx.lineTo(cx + 12, headY - 22);
+  ctx.lineTo(cx + 28, headY - 26);
+  ctx.lineTo(cx + 18, headY - 6);
+  ctx.quadraticCurveTo(cx, headY - 14, cx - 18, headY - 2);
+  ctx.closePath();
+  const hairGrad = ctx.createLinearGradient(cx, headY - 38, cx, headY);
+  hairGrad.addColorStop(0, '#ff592b');
+  hairGrad.addColorStop(0.32, '#291c2e');
+  hairGrad.addColorStop(1, '#0d0914');
+  ctx.fillStyle = hairGrad;
   ctx.fill();
   ctx.strokeStyle = INK;
   ctx.lineWidth = 3.8;
   ctx.stroke();
 
-  if (!isUp) {
-    // Fierce comic eyes (mismatched glowing amber & emerald glint!)
-    const exOff = isSide ? 5 : 0;
-    ctx.fillStyle = '#09070f';
-    ctx.fillRect(cx - 9 + exOff, headY - 3, 7, 3.5);
-    ctx.fillRect(cx + 2 + exOff, headY - 3, 7, 3.5);
-    ctx.fillStyle = '#ff4b3a';
-    ctx.fillRect(cx - 7 + exOff, headY - 2, 3.2, 2.2);
-    ctx.fillStyle = '#55ffa8';
-    ctx.fillRect(cx + 4 + exOff, headY - 2, 3.2, 2.2);
-  }
-
-  // Spiky Charcoal Hair with Fiery Crimson-Gold Tips
-  ctx.beginPath();
-  ctx.moveTo(cx - 18, headY - 4);
-  ctx.lineTo(cx - 26, headY - 18);
-  ctx.lineTo(cx - 12, headY - 18);
-  ctx.lineTo(cx - 16, headY - 32);
-  ctx.lineTo(cx - 2, headY - 22);
-  ctx.lineTo(cx + 6, headY - 35);
-  ctx.lineTo(cx + 12, headY - 20);
-  ctx.lineTo(cx + 26, headY - 24);
-  ctx.lineTo(cx + 18, headY - 6);
-  ctx.quadraticCurveTo(cx, headY - 14, cx - 18, headY - 4);
-  ctx.closePath();
-  const hairGrad = ctx.createLinearGradient(cx, headY - 36, cx, headY);
-  hairGrad.addColorStop(0, '#ff5930');
-  hairGrad.addColorStop(0.35, '#2b1e2e');
-  hairGrad.addColorStop(1, '#0e0b14');
-  ctx.fillStyle = hairGrad;
-  ctx.fill();
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 3.6;
-  ctx.stroke();
-
   // Glowing Golden Laurel Crown
-  ctx.strokeStyle = '#ffcf48';
+  ctx.strokeStyle = '#ffd24a';
   ctx.lineWidth = 4.2;
   ctx.beginPath();
-  ctx.arc(cx, headY - 10, 17, Math.PI * 1.08, Math.PI * 1.92);
+  ctx.arc(cx, headY - 11, 17, Math.PI * 1.1, Math.PI * 1.9);
   ctx.stroke();
-  // Laurel leaf spikes
-  ctx.fillStyle = '#ffe97a';
-  for (let i = -2; i <= 2; i++) {
-    const a = -Math.PI * 0.5 + i * 0.36;
-    const lx = cx + Math.cos(a) * 19;
-    const ly = headY - 10 + Math.sin(a) * 15;
-    ctx.beginPath();
-    ctx.ellipse(lx, ly, 4.5, 2.2, a + 0.6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
-  }
 }
 
 function drawWeapons(ctx: CanvasRenderingContext2D): void {
@@ -1863,150 +1868,170 @@ function drawEnemiesAndBosses(ctx: CanvasRenderingContext2D): void {
     c.fill();
   });
 
-  // 8. WARDEN MALICE (BOSS): Commanding winged violet-and-crimson Fury boss!
+  // 8. WARDEN MALICE (BOSS): Commanding dark-ink winged violet-and-crimson Fury boss!
   withCell(ctx, 'boss_warden_malice', (c, w, h) => {
     const cx = w * 0.5;
     const baseY = h * 0.85;
 
-    // Radiant crimson-violet Fury halo crest behind head
-    const halo = c.createRadialGradient(cx, baseY - 174, 8, cx, baseY - 174, 72);
-    halo.addColorStop(0, 'rgba(255, 86, 210, 0.9)');
-    halo.addColorStop(0.5, 'rgba(180, 28, 120, 0.45)');
-    halo.addColorStop(1, 'rgba(110, 12, 80, 0)');
+    // Subtle dark crimson-violet Fury aura behind silhouette
+    const halo = c.createRadialGradient(cx, baseY - 156, 10, cx, baseY - 156, 86);
+    halo.addColorStop(0, 'rgba(220, 42, 168, 0.55)');
+    halo.addColorStop(0.55, 'rgba(110, 18, 92, 0.22)');
+    halo.addColorStop(1, 'rgba(20, 6, 26, 0)');
     c.fillStyle = halo;
     c.beginPath();
-    c.arc(cx, baseY - 174, 72, 0, Math.PI * 2);
+    c.arc(cx, baseY - 156, 86, 0, Math.PI * 2);
     c.fill();
 
-    // Sweeping dramatic bat-feathered ink wings (left & right)
+    // Sweeping dramatic jagged bat-feathered obsidian wings (left & right)
     const drawWing = (dir: -1 | 1) => {
       c.beginPath();
-      c.moveTo(cx + dir * 18, baseY - 146);
-      c.quadraticCurveTo(cx + dir * 78, baseY - 236, cx + dir * 136, baseY - 196);
-      c.quadraticCurveTo(cx + dir * 116, baseY - 146, cx + dir * 124, baseY - 110);
-      c.quadraticCurveTo(cx + dir * 92, baseY - 124, cx + dir * 88, baseY - 82);
-      c.quadraticCurveTo(cx + dir * 56, baseY - 104, cx + dir * 48, baseY - 64);
-      c.lineTo(cx + dir * 18, baseY - 104);
+      c.moveTo(cx + dir * 16, baseY - 144);
+      c.bezierCurveTo(cx + dir * 72, baseY - 240, cx + dir * 124, baseY - 226, cx + dir * 144, baseY - 196);
+      c.quadraticCurveTo(cx + dir * 120, baseY - 146, cx + dir * 130, baseY - 104);
+      c.quadraticCurveTo(cx + dir * 96, baseY - 124, cx + dir * 92, baseY - 76);
+      c.quadraticCurveTo(cx + dir * 60, baseY - 102, cx + dir * 50, baseY - 56);
+      c.lineTo(cx + dir * 16, baseY - 98);
       c.closePath();
-      const wGrad = c.createLinearGradient(cx, baseY - 220, cx + dir * 136, baseY - 80);
-      wGrad.addColorStop(0, '#5a1f6e');
-      wGrad.addColorStop(0.45, '#281036');
-      wGrad.addColorStop(1, '#100717');
+      const wGrad = c.createLinearGradient(cx, baseY - 228, cx + dir * 140, baseY - 70);
+      wGrad.addColorStop(0, '#441559');
+      wGrad.addColorStop(0.45, '#1d0a2b');
+      wGrad.addColorStop(1, '#090410');
       c.fillStyle = wGrad;
       c.fill();
       c.strokeStyle = INK;
-      c.lineWidth = 4.6;
+      c.lineWidth = 5;
       c.stroke();
 
-      // Magenta rim edge & wing ribs
-      c.strokeStyle = '#ff4cd8';
-      c.lineWidth = 2.6;
+      // Wing bone spurs & crimson inner edge highlight
+      c.strokeStyle = '#ff3898';
+      c.lineWidth = 2.4;
       c.beginPath();
-      c.moveTo(cx + dir * 24, baseY - 144);
-      c.quadraticCurveTo(cx + dir * 78, baseY - 226, cx + dir * 132, baseY - 192);
+      c.moveTo(cx + dir * 22, baseY - 144);
+      c.bezierCurveTo(cx + dir * 74, baseY - 232, cx + dir * 122, baseY - 218, cx + dir * 140, baseY - 194);
       c.stroke();
     };
     drawWing(-1);
     drawWing(1);
 
-    // Coiled barbed ink whip arcing around right side
+    // Coiled barbed ink whip arcing menacingly around right flank
     c.strokeStyle = INK;
-    c.lineWidth = 10;
+    c.lineWidth = 9;
     c.beginPath();
-    c.moveTo(cx + 38, baseY - 110);
-    c.bezierCurveTo(cx + 128, baseY - 90, cx + 114, baseY - 12, cx + 44, baseY - 18);
+    c.moveTo(cx + 30, baseY - 108);
+    c.bezierCurveTo(cx + 122, baseY - 96, cx + 114, baseY - 12, cx + 48, baseY - 16);
     c.stroke();
-    c.strokeStyle = '#ff3878';
-    c.lineWidth = 4;
+    c.strokeStyle = '#ff2864';
+    c.lineWidth = 3.5;
     c.stroke();
 
-    // Flowing crimson-violet war skirt & armored silhouette
+    // Tattered flowing dark obsidian-crimson battle-skirt with boots visible below!
     c.beginPath();
-    c.moveTo(cx - 28, baseY - 144);
-    c.lineTo(cx + 28, baseY - 144);
-    c.quadraticCurveTo(cx + 46, baseY - 62, cx + 52, baseY);
-    c.lineTo(cx + 12, baseY - 16);
-    c.lineTo(cx, baseY + 6);
-    c.lineTo(cx - 18, baseY - 14);
-    c.lineTo(cx - 50, baseY);
-    c.quadraticCurveTo(cx - 44, baseY - 66, cx - 28, baseY - 144);
+    c.moveTo(cx - 24, baseY - 138);
+    c.lineTo(cx + 24, baseY - 138);
+    c.lineTo(cx + 16, baseY - 92);
+    c.quadraticCurveTo(cx + 42, baseY - 46, cx + 48, baseY + 2);
+    c.lineTo(cx + 22, baseY - 20);
+    c.lineTo(cx + 6, baseY + 6);
+    c.lineTo(cx - 8, baseY - 18);
+    c.lineTo(cx - 24, baseY + 4);
+    c.lineTo(cx - 46, baseY - 4);
+    c.quadraticCurveTo(cx - 38, baseY - 52, cx - 16, baseY - 92);
     c.closePath();
-    const dressGrad = c.createLinearGradient(cx - 40, baseY - 144, cx + 40, baseY);
-    dressGrad.addColorStop(0, '#c4224f');
-    dressGrad.addColorStop(0.5, '#69123b');
-    dressGrad.addColorStop(1, '#1d081c');
+    const dressGrad = c.createLinearGradient(cx - 38, baseY - 138, cx + 38, baseY + 4);
+    dressGrad.addColorStop(0, '#8f133b');
+    dressGrad.addColorStop(0.5, '#3b0924');
+    dressGrad.addColorStop(1, '#120514');
     c.fillStyle = dressGrad;
     c.fill();
     c.strokeStyle = INK;
-    c.lineWidth = 4.5;
+    c.lineWidth = 4.6;
     c.stroke();
 
-    // Spiked obsidian corset & asymmetric crimson shoulder mantle
-    c.fillStyle = '#24142b';
+    // Sleek spiked obsidian corset armor + burnished gold V-trim
+    c.fillStyle = '#1b0d24';
     c.beginPath();
-    c.moveTo(cx - 24, baseY - 146);
-    c.lineTo(cx + 24, baseY - 146);
-    c.lineTo(cx + 16, baseY - 90);
-    c.lineTo(cx - 16, baseY - 90);
+    c.moveTo(cx - 24, baseY - 144);
+    c.lineTo(cx + 24, baseY - 144);
+    c.lineTo(cx + 15, baseY - 88);
+    c.lineTo(cx - 15, baseY - 88);
     c.closePath();
     c.fill();
-    c.strokeStyle = '#f2b84c';
-    c.lineWidth = 3;
+    c.strokeStyle = '#e8ac3c';
+    c.lineWidth = 2.8;
     c.stroke();
-
-    // Horned obsidian pauldrons
-    c.fillStyle = '#381945';
-    c.beginPath();
-    c.ellipse(cx - 32, baseY - 144, 19, 13, -0.3, 0, Math.PI * 2);
-    c.ellipse(cx + 32, baseY - 144, 19, 13, 0.3, 0, Math.PI * 2);
-    c.fill();
     c.strokeStyle = INK;
     c.lineWidth = 3.8;
     c.stroke();
 
-    // Fierce alabaster visage & swept dark violet hair
-    const hy = baseY - 172;
-    c.fillStyle = '#e5d4eb';
+    // Sharp angular spiked shoulder blades (NOT round balls!)
+    for (const dir of [-1, 1] as const) {
+      c.fillStyle = '#2d123b';
+      c.beginPath();
+      c.moveTo(cx + dir * 14, baseY - 142);
+      c.lineTo(cx + dir * 48, baseY - 154);
+      c.lineTo(cx + dir * 36, baseY - 126);
+      c.lineTo(cx + dir * 18, baseY - 128);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 3.8;
+      c.stroke();
+    }
+
+    // Fierce alabaster angular visage & wild flowing dark-violet hair
+    const hy = baseY - 170;
+    c.fillStyle = '#dcd0e8';
     c.beginPath();
-    c.ellipse(cx, hy, 18, 22, 0, 0, Math.PI * 2);
+    c.moveTo(cx - 15, hy - 14);
+    c.quadraticCurveTo(cx, hy - 22, cx + 15, hy - 14);
+    c.lineTo(cx + 13, hy + 10);
+    c.lineTo(cx, hy + 20);
+    c.lineTo(cx - 13, hy + 10);
+    c.closePath();
     c.fill();
     c.strokeStyle = INK;
     c.lineWidth = 4;
     c.stroke();
 
-    // Sweeping dark hair & golden horned Fury crown
-    c.fillStyle = '#1b0d29';
+    c.fillStyle = '#150821';
     c.beginPath();
-    c.moveTo(cx - 24, hy + 10);
-    c.quadraticCurveTo(cx - 32, hy - 26, cx, hy - 32);
-    c.quadraticCurveTo(cx + 32, hy - 26, cx + 26, hy + 14);
-    c.lineTo(cx + 16, hy - 8);
-    c.lineTo(cx - 16, hy - 8);
+    c.moveTo(cx - 22, hy + 18);
+    c.quadraticCurveTo(cx - 28, hy - 26, cx, hy - 30);
+    c.quadraticCurveTo(cx + 28, hy - 26, cx + 24, hy + 22);
+    c.lineTo(cx + 14, hy - 8);
+    c.lineTo(cx - 14, hy - 8);
     c.closePath();
     c.fill();
     c.stroke();
 
-    // Horned crimson-gold diadem
-    c.fillStyle = '#f5be4c';
+    // Curved dark-gold twin-horned Fury crown
+    c.fillStyle = '#ebae38';
     c.beginPath();
-    c.moveTo(cx - 20, hy - 14);
-    c.lineTo(cx - 32, hy - 44);
-    c.lineTo(cx - 8, hy - 24);
-    c.lineTo(cx, hy - 42);
-    c.lineTo(cx + 8, hy - 24);
-    c.lineTo(cx + 32, hy - 44);
-    c.lineTo(cx + 20, hy - 14);
+    c.moveTo(cx - 18, hy - 16);
+    c.quadraticCurveTo(cx - 32, hy - 36, cx - 26, hy - 54);
+    c.quadraticCurveTo(cx - 14, hy - 34, cx - 6, hy - 22);
+    c.lineTo(cx, hy - 36);
+    c.lineTo(cx + 6, hy - 22);
+    c.quadraticCurveTo(cx + 14, hy - 34, cx + 26, hy - 54);
+    c.quadraticCurveTo(cx + 32, hy - 36, cx + 18, hy - 16);
     c.closePath();
     c.fill();
     c.strokeStyle = INK;
-    c.lineWidth = 3.4;
+    c.lineWidth = 3.6;
     c.stroke();
 
-    // Blazing crimson Fury eyes
-    c.fillStyle = '#ff2864';
+    // Fierce blazing crimson slit eyes
+    c.fillStyle = '#ff1f5a';
     c.beginPath();
-    c.ellipse(cx - 7, hy - 2, 4.5, 2.5, 0.15, 0, Math.PI * 2);
-    c.ellipse(cx + 7, hy - 2, 4.5, 2.5, -0.15, 0, Math.PI * 2);
+    c.moveTo(cx - 11, hy - 3);
+    c.lineTo(cx - 3, hy);
+    c.lineTo(cx - 10, hy + 2);
+    c.closePath();
+    c.moveTo(cx + 11, hy - 3);
+    c.lineTo(cx + 3, hy);
+    c.lineTo(cx + 10, hy + 2);
+    c.closePath();
     c.fill();
   });
 
