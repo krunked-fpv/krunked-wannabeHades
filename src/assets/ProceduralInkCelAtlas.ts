@@ -584,13 +584,154 @@ function paintTaperedArc(
   width: number,
   color = INK
 ): void {
+  const steps = 10;
+  const left: [number, number][] = [];
+  const right: [number, number][] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const it = 1 - t;
+    const px = it * it * x0 + 2 * it * t * cx + t * t * x1;
+    const py = it * it * y0 + 2 * it * t * cy + t * t * y1;
+    const tx = 2 * it * (cx - x0) + 2 * t * (x1 - cx);
+    const ty = 2 * it * (cy - y0) + 2 * t * (y1 - cy);
+    const len = Math.hypot(tx, ty) || 1;
+    const nx = -ty / len;
+    const ny = tx / len;
+    const w = width * (0.14 + 0.86 * Math.sin(t * Math.PI)) * 0.5;
+    left.push([px + nx * w, py + ny * w]);
+    right.push([px - nx * w, py - ny * w]);
+  }
   ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = width;
+  ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  ctx.quadraticCurveTo(cx, cy, x1, y1);
+  ctx.moveTo(left[0][0], left[0][1]);
+  for (let i = 1; i < left.length; i++) ctx.lineTo(left[i][0], left[i][1]);
+  for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i][0], right[i][1]);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Tapered crescent calligraphic hair/feather/horn blade with ink contour and rim edge. */
+function paintComicBladeLock(
+  ctx: CanvasRenderingContext2D,
+  x0: number,
+  y0: number,
+  cx1: number,
+  cy1: number,
+  tipX: number,
+  tipY: number,
+  cx2: number,
+  cy2: number,
+  cols: { lit: string; mid: string; dark: string; rim?: string },
+  inkW = 2.8
+): void {
+  const trace = () => {
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.quadraticCurveTo(cx1, cy1, tipX, tipY);
+    ctx.quadraticCurveTo(cx2, cy2, x0, y0);
+    ctx.closePath();
+  };
+  ctx.save();
+  trace();
+  const g = ctx.createLinearGradient(x0, y0, tipX, tipY);
+  g.addColorStop(0, cols.dark);
+  g.addColorStop(0.45, cols.mid);
+  g.addColorStop(1, cols.lit);
+  ctx.fillStyle = g;
+  ctx.fill();
+  if (cols.rim) {
+    ctx.save();
+    trace();
+    ctx.clip();
+    paintTaperedArc(ctx, x0, y0, cx1, cy1, tipX, tipY, 2.4, cols.rim);
+    ctx.restore();
+  }
+  trace();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = inkW;
   ctx.stroke();
+  ctx.restore();
+}
+
+/** Sculpted horned bronze skull emblem (for Prince Pyreus & Sovereign Lord pauldrons — ZERO smiley cookies!). */
+function paintCarvedSkullPauldron(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  scale: number,
+  flip = 1,
+  cols = { lit: '#FFF0AC', mid: '#D4912A', dark: '#462208', rim: '#FFFFFF' }
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(flip * scale, scale);
+
+  // Swept curved obsidian-bronze ram/underworld horns flaring off skull crown
+  paintComicBladeLock(ctx, -10, -10, -24, -22, -32, -12, -20, -6, { lit: cols.lit, mid: cols.dark, dark: INK, rim: cols.rim }, 2.4);
+  paintComicBladeLock(ctx, 10, -10, 24, -22, 30, -8, 18, -4, { lit: cols.lit, mid: cols.dark, dark: INK }, 2.4);
+
+  // Layered armored flange beneath skull
+  paintChiaroscuroShape(
+    ctx,
+    () => {
+      ctx.beginPath();
+      ctx.moveTo(-24, 2);
+      ctx.quadraticCurveTo(-20, -16, 0, -18);
+      ctx.quadraticCurveTo(22, -16, 26, 4);
+      ctx.lineTo(16, 16);
+      ctx.lineTo(0, 12);
+      ctx.lineTo(-16, 16);
+      ctx.closePath();
+    },
+    { x0: -26, y0: -18, x1: 26, y1: 16 },
+    { lit: '#6E4A3E', mid: '#2E1818', dark: INK, rim: cols.rim },
+    { shadowPoolFrac: 0.42, hatch: false, inkW: 3.0 }
+  );
+
+  // Carved angular skull cranium + flared cheekbones + serrated jaw teeth
+  paintChiaroscuroShape(
+    ctx,
+    () => {
+      ctx.beginPath();
+      ctx.moveTo(-14, -4);
+      ctx.bezierCurveTo(-16, -18, 16, -18, 14, -4);
+      ctx.lineTo(17, 4);
+      ctx.lineTo(10, 10);
+      ctx.lineTo(7, 17);
+      ctx.lineTo(3, 12);
+      ctx.lineTo(0, 17);
+      ctx.lineTo(-3, 12);
+      ctx.lineTo(-7, 17);
+      ctx.lineTo(-10, 10);
+      ctx.lineTo(-17, 4);
+      ctx.closePath();
+    },
+    { x0: -17, y0: -18, x1: 17, y1: 17 },
+    cols,
+    { shadowPoolFrac: 0.36, hatch: false, inkW: 2.8 }
+  );
+
+  // Deep angular hollow skull sockets & nasal cavity (fierce furrowed brow!)
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.moveTo(-12, -3);
+  ctx.lineTo(-2, 0);
+  ctx.lineTo(-5, 6);
+  ctx.lineTo(-12, 3);
+  ctx.closePath();
+  ctx.moveTo(12, -3);
+  ctx.lineTo(2, 0);
+  ctx.lineTo(5, 6);
+  ctx.lineTo(12, 3);
+  ctx.closePath();
+  ctx.moveTo(0, 3);
+  ctx.lineTo(3, 9);
+  ctx.lineTo(-3, 9);
+  ctx.closePath();
+  ctx.fill();
+
   ctx.restore();
 }
 
@@ -1972,189 +2113,198 @@ function drawHeroPose(
   pose: 'down' | 'up' | 'side' | 'diag_down' | 'diag_up'
 ): void {
   const cx = w * 0.5;
-  const footY = h * 0.87;
+  const footY = h * 0.89;
   const isUp = pose === 'up' || pose === 'diag_up';
   const isSide = pose === 'side';
-  const leanX = isSide ? 5 : pose === 'diag_down' || pose === 'diag_up' ? 3 : 0;
+  const leanX = isSide ? 7 : pose === 'diag_down' || pose === 'diag_up' ? 4 : 0;
 
-  // Fiery Underworld Ember Footsteps licking around ankles
+  // Blazing Underworld Ember Foot-Flames licking dynamically off heels
   const drawEmberAnkle = (fx: number, fy: number) => {
-    const fGrad = ctx.createRadialGradient(fx, fy, 2, fx, fy - 4, 21);
-    fGrad.addColorStop(0, '#FFF8B8');
-    fGrad.addColorStop(0.45, '#FF681E');
+    const fGrad = ctx.createRadialGradient(fx, fy - 2, 2, fx, fy - 4, 24);
+    fGrad.addColorStop(0, '#FFF8C4');
+    fGrad.addColorStop(0.42, '#FF6A1A');
     fGrad.addColorStop(1, 'rgba(200, 18, 14, 0)');
     ctx.fillStyle = fGrad;
     ctx.beginPath();
-    ctx.ellipse(fx, fy, 19, 10, 0, 0, Math.PI * 2);
+    ctx.ellipse(fx, fy, 20, 10, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Multi-lick stylized flame curling back from heel
-    ctx.beginPath();
-    ctx.moveTo(fx - 8, fy);
-    ctx.quadraticCurveTo(fx - 22, fy - 12, fx - 14, fy - 28);
-    ctx.quadraticCurveTo(fx - 5, fy - 16, fx - 2, fy - 22);
-    ctx.quadraticCurveTo(fx + 3, fy - 10, fx + 8, fy - 2);
-    ctx.closePath();
-    const lg = ctx.createLinearGradient(fx - 14, fy - 28, fx + 6, fy);
-    lg.addColorStop(0, '#FFF6A8');
-    lg.addColorStop(0.5, '#FF7824');
-    lg.addColorStop(1, '#CC1E18');
-    ctx.fillStyle = lg;
-    ctx.fill();
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
+    // Swept calligraphic ember tongues curling backward
+    paintComicBladeLock(
+      ctx,
+      fx - 6,
+      fy - 2,
+      fx - 24,
+      fy - 14,
+      fx - 18,
+      fy - 32,
+      fx - 4,
+      fy - 16,
+      { lit: '#FFF8B8', mid: '#FF7C20', dark: '#B81814' },
+      2.2
+    );
+    paintComicBladeLock(
+      ctx,
+      fx + 2,
+      fy - 4,
+      fx - 10,
+      fy - 18,
+      fx - 4,
+      fy - 28,
+      fx + 8,
+      fy - 14,
+      { lit: '#FFF6B0', mid: '#FF5618', dark: '#8C0E12' },
+      2.0
+    );
   };
 
-  const lFootX = cx - (isSide ? 16 : 20);
-  const rFootX = cx + (isSide ? 21 : 19);
-  drawEmberAnkle(lFootX, footY - 2);
-  drawEmberAnkle(rFootX, footY + 3);
+  const lFootX = cx - (isSide ? 18 : 22);
+  const rFootX = cx + (isSide ? 24 : 21);
+  drawEmberAnkle(lFootX, footY - 3);
+  drawEmberAnkle(rFootX, footY + 2);
 
-  // Dynamic Athletic Action-Crouch Legs & Wrapped Bronze Shin Greaves
-  const drawAthleticLeg = (hipX: number, hipY: number, kneeX: number, kneeY: number, fx: number, fy: number, front: boolean) => {
-    // Muscular thigh
+  // Dynamic Athletic Lunging Legs + Tapered Anatomical Bronze Shin Greaves (ZERO boxy gold rectangles!)
+  const drawHeroicLeg = (
+    hipX: number,
+    hipY: number,
+    kneeX: number,
+    kneeY: number,
+    fx: number,
+    fy: number,
+    front: boolean
+  ) => {
+    // Tapered muscular thigh
     paintChiaroscuroShape(
       ctx,
       () => {
         ctx.beginPath();
-        ctx.moveTo(hipX - 8, hipY);
-        ctx.lineTo(kneeX - 7, kneeY);
+        ctx.moveTo(hipX - 9, hipY);
+        ctx.quadraticCurveTo((hipX + kneeX) * 0.5 - 9, (hipY + kneeY) * 0.5, kneeX - 7, kneeY);
         ctx.lineTo(kneeX + 7, kneeY);
-        ctx.lineTo(hipX + 8, hipY);
+        ctx.quadraticCurveTo((hipX + kneeX) * 0.5 + 8, (hipY + kneeY) * 0.5, hipX + 9, hipY);
         ctx.closePath();
       },
-      { x0: Math.min(hipX, kneeX) - 8, y0: hipY, x1: Math.max(hipX, kneeX) + 8, y1: kneeY },
+      { x0: Math.min(hipX, kneeX) - 10, y0: hipY, x1: Math.max(hipX, kneeX) + 10, y1: kneeY },
       front
-        ? { lit: '#F2BC94', mid: '#CC8A62', dark: '#6E3B28' }
-        : { lit: '#BA7E5A', mid: '#824C34', dark: '#3D1D16' },
-      { shadowPoolFrac: 0.4, hatch: false, inkW: 3.4 }
+        ? { lit: '#F7C8A0', mid: '#CF8A62', dark: '#6E3B28' }
+        : { lit: '#B87A58', mid: '#78442E', dark: '#361812' },
+      { shadowPoolFrac: 0.42, hatch: false, inkW: 3.0 }
     );
-    // Sculpted bronze shin greave & knee cop
+
+    // Tapered anatomical curved bronze calf greave with pointed knee ridge + flaring armored boot toe
     paintChiaroscuroShape(
       ctx,
       () => {
         ctx.beginPath();
-        ctx.moveTo(kneeX - 7, kneeY - 2);
-        ctx.lineTo(kneeX + 7, kneeY - 2);
-        ctx.lineTo(fx + 6, fy);
-        ctx.lineTo(fx - 6, fy);
+        ctx.moveTo(kneeX - 8, kneeY - 4);
+        ctx.lineTo(kneeX, kneeY - 10); // pointed knee cop ridge!
+        ctx.lineTo(kneeX + 8, kneeY - 3);
+        ctx.quadraticCurveTo(fx + 10, (kneeY + fy) * 0.5, fx + 5, fy - 4);
+        ctx.lineTo(fx + (front ? 11 : 7), fy + 2); // sleek tapered boot toe
+        ctx.lineTo(fx - 7, fy + 2);
+        ctx.quadraticCurveTo(fx - 9, (kneeY + fy) * 0.5, kneeX - 8, kneeY - 4);
         ctx.closePath();
       },
-      { x0: Math.min(kneeX, fx) - 7, y0: kneeY - 2, x1: Math.max(kneeX, fx) + 7, y1: fy },
+      { x0: Math.min(kneeX, fx) - 10, y0: kneeY - 10, x1: Math.max(kneeX, fx) + 11, y1: fy + 2 },
       front
-        ? { lit: '#FFF0A8', mid: '#D69834', dark: '#4A280A', rim: '#FFE894' }
-        : { lit: '#C48A30', mid: '#784A18', dark: '#281408' },
-      { shadowPoolFrac: 0.44, hatch: false, inkW: 3.2 }
+        ? { lit: '#FFF4B8', mid: '#D4922C', dark: '#3E1E08', rim: '#FFFFFF' }
+        : { lit: '#BA7E2A', mid: '#6E4014', dark: '#201006' },
+      { shadowPoolFrac: 0.44, hatch: false, inkW: 3.0 }
     );
+    // Strapped leather greave band crease
+    paintTaperedArc(ctx, kneeX - 6, kneeY + 8, kneeX, kneeY + 12, kneeX + 6, kneeY + 8, 2.4, INK);
   };
 
-  drawAthleticLeg(cx - 9, footY - 58, cx - 18, footY - 30, lFootX, footY - 2, false);
-  drawAthleticLeg(cx + 9, footY - 58, cx + 19, footY - 28, rFootX, footY + 2, true);
+  drawHeroicLeg(cx - 10, footY - 58, cx - 22, footY - 30, lFootX, footY - 2, false);
+  drawHeroicLeg(cx + 10, footY - 58, cx + 22, footY - 28, rFootX, footY + 2, true);
 
-  // Billowing Asymmetric Crimson Chlamys Cloak with Mignola Deep-Fold Shadows!
+  // Billowing Multi-Fold Tattered Crimson Chlamys Cloak with Deep #09060E Inner Shadow Pooling!
   paintChiaroscuroShape(
     ctx,
     () => {
       ctx.beginPath();
-      ctx.moveTo(cx - 24 + leanX, footY - 102);
-      ctx.bezierCurveTo(cx - 60, footY - 74, cx - 64, footY - 28, cx - 44, footY - 10);
-      ctx.lineTo(cx - 18, footY - 28);
-      ctx.lineTo(cx + 8, footY - 16);
-      ctx.quadraticCurveTo(cx + 32, footY - 54, cx + 24 + leanX, footY - 98);
+      ctx.moveTo(cx - 24 + leanX, footY - 106);
+      ctx.bezierCurveTo(cx - 66, footY - 82, cx - 70, footY - 34, cx - 50, footY - 6);
+      ctx.lineTo(cx - 32, footY - 24); // tattered hem notch 1
+      ctx.lineTo(cx - 16, footY - 4);
+      ctx.lineTo(cx - 2, footY - 26); // tattered hem notch 2
+      ctx.lineTo(cx + 18, footY - 10);
+      ctx.bezierCurveTo(cx + 38, footY - 44, cx + 36, footY - 80, cx + 24 + leanX, footY - 104);
       ctx.closePath();
     },
-    { x0: cx - 60, y0: footY - 102, x1: cx + 30, y1: footY - 10 },
-    { lit: '#EE2638', mid: '#9E1024', dark: '#3A0510', rim: '#FF8658' },
-    { shadowPoolFrac: 0.42, inkW: 4.2 }
+    { x0: cx - 68, y0: footY - 106, x1: cx + 38, y1: footY - 4 },
+    { lit: '#F2263A', mid: '#9C0E22', dark: '#2E040C', rim: '#FF9868' },
+    { shadowPoolFrac: 0.46, inkW: 3.8 }
   );
-  // Crisp ink cloak fold creases
-  paintTaperedArc(ctx, cx - 22, footY - 92, cx - 38, footY - 56, cx - 38, footY - 18, 2.8, INK);
-  paintTaperedArc(ctx, cx - 10, footY - 88, cx - 18, footY - 58, cx - 16, footY - 30, 2.4, INK);
-
-  // Broad-Shouldered Tapered Obsidian Chiton Tunic & Pleated Gold-Key Hem
-  paintChiaroscuroShape(
-    ctx,
-    () => {
-      ctx.beginPath();
-      ctx.moveTo(cx - 23 + leanX, footY - 102);
-      ctx.lineTo(cx + 23 + leanX, footY - 102);
-      ctx.lineTo(cx + 14 + leanX, footY - 64);
-      ctx.lineTo(cx + 25, footY - 40);
-      ctx.lineTo(cx + 5, footY - 46);
-      ctx.lineTo(cx - 25, footY - 40);
-      ctx.lineTo(cx - 14 + leanX, footY - 64);
-      ctx.closePath();
-    },
-    { x0: cx - 25, y0: footY - 102, x1: cx + 25, y1: footY - 40 },
-    { lit: '#443854', mid: '#1D172B', dark: '#0B0814' },
-    { shadowPoolFrac: 0.44, inkW: 3.8 }
-  );
-
-  // Gilded Greek-key hem & crimson chest sash
-  ctx.strokeStyle = '#F5C44E';
-  ctx.lineWidth = 3.2;
-  ctx.beginPath();
-  ctx.moveTo(cx - 22, footY - 44);
-  ctx.lineTo(cx + 22, footY - 44);
-  ctx.stroke();
-
-  paintChiaroscuroShape(
-    ctx,
-    () => {
-      ctx.beginPath();
-      ctx.moveTo(cx - 24 + leanX, footY - 102);
-      ctx.lineTo(cx + 4 + leanX, footY - 94);
-      ctx.lineTo(cx + 19 + leanX, footY - 60);
-      ctx.lineTo(cx - 16 + leanX, footY - 66);
-      ctx.closePath();
-    },
-    { x0: cx - 24 + leanX, y0: footY - 102, x1: cx + 19 + leanX, y1: footY - 60 },
-    { lit: isUp ? '#A81426' : '#F22A3C', mid: '#8C0E20', dark: '#2E050E', rim: '#FF9A68' },
-    { shadowPoolFrac: 0.36, hatch: false, inkW: 3.4 }
-  );
-
-  // Sculpted Bronze Skull-Medallion Left Shoulder Pauldron!
-  const px = (isSide ? cx - 6 : cx - 22) + leanX;
-  const py = footY - 98;
-  paintChiaroscuroShape(
-    ctx,
-    () => {
-      ctx.beginPath();
-      ctx.moveTo(px - 20, py + 8);
-      ctx.bezierCurveTo(px - 24, py - 15, px + 6, py - 20, px + 18, py - 4);
-      ctx.bezierCurveTo(px + 16, py + 13, px - 6, py + 15, px - 20, py + 8);
-      ctx.closePath();
-    },
-    { x0: px - 22, y0: py - 18, x1: px + 18, y1: py + 14 },
-    { lit: '#FFF5BC', mid: '#EBA832', dark: '#542D0A', rim: '#FFFFFF' },
-    { shadowPoolFrac: 0.36, hatch: false, inkW: 3.6 }
-  );
-  // Embossed tiny skull eyes on pauldron
+  // Heavy #09060E Mignola inner shadow fold wedges inside billowing cloak!
   ctx.fillStyle = INK;
-  ctx.fillRect(px - 6, py - 2, 4, 3);
-  ctx.fillRect(px + 2, py - 2, 4, 3);
+  ctx.beginPath();
+  ctx.moveTo(cx - 24, footY - 94);
+  ctx.quadraticCurveTo(cx - 46, footY - 56, cx - 32, footY - 24);
+  ctx.quadraticCurveTo(cx - 34, footY - 58, cx - 16, footY - 92);
+  ctx.closePath();
+  ctx.moveTo(cx - 6, footY - 88);
+  ctx.quadraticCurveTo(cx - 14, footY - 54, cx - 2, footY - 26);
+  ctx.quadraticCurveTo(cx - 2, footY - 56, cx + 4, footY - 86);
+  ctx.closePath();
+  ctx.fill();
+  paintTaperedArc(ctx, cx - 48, footY - 18, cx - 34, footY - 28, cx - 16, footY - 12, 2.8, '#F5C44E');
 
-  // Chiseled 3/4 Warrior Head, Heavy Mignola Brow Shadow & Heterochromatic Glowing Eyes!
-  const hx = cx + leanX;
-  const hy = footY - 122;
+  // Broad-Shouldered Tapered Obsidian Chiton Tunic & Pleated Gold-Key War Skirt
+  paintChiaroscuroShape(
+    ctx,
+    () => {
+      ctx.beginPath();
+      ctx.moveTo(cx - 26 + leanX, footY - 104);
+      ctx.quadraticCurveTo(cx + leanX, footY - 110, cx + 26 + leanX, footY - 104);
+      ctx.quadraticCurveTo(cx + 22 + leanX, footY - 80, cx + 14 + leanX, footY - 64);
+      ctx.lineTo(cx + 28, footY - 38);
+      ctx.lineTo(cx + 10, footY - 45);
+      ctx.lineTo(cx, footY - 35);
+      ctx.lineTo(cx - 12, footY - 45);
+      ctx.lineTo(cx - 27, footY - 38);
+      ctx.lineTo(cx - 14 + leanX, footY - 64);
+      ctx.quadraticCurveTo(cx - 22 + leanX, footY - 80, cx - 26 + leanX, footY - 104);
+      ctx.closePath();
+    },
+    { x0: cx - 28, y0: footY - 108, x1: cx + 28, y1: footY - 35 },
+    { lit: '#4A3C5E', mid: '#1D152C', dark: INK },
+    { shadowPoolFrac: 0.44, inkW: 3.4 }
+  );
 
-  // Exposed Athletic Warrior Arms w/ Wrapped Bronze Combat Bracers (distinct per directional pose!)
+  // Diagonal draped crimson chlamys sash sweeping cleanly across torso + gilded Greek-key belt
+  paintChiaroscuroShape(
+    ctx,
+    () => {
+      ctx.beginPath();
+      ctx.moveTo(cx - 26 + leanX, footY - 104);
+      ctx.quadraticCurveTo(cx - 2 + leanX, footY - 98, cx + 10 + leanX, footY - 86);
+      ctx.quadraticCurveTo(cx + 18 + leanX, footY - 70, cx + 18 + leanX, footY - 58);
+      ctx.quadraticCurveTo(cx - 4 + leanX, footY - 62, cx - 18 + leanX, footY - 68);
+      ctx.closePath();
+    },
+    { x0: cx - 26 + leanX, y0: footY - 104, x1: cx + 18 + leanX, y1: footY - 58 },
+    { lit: isUp ? '#B41628' : '#F42A3E', mid: '#8E0E20', dark: '#28040C', rim: '#FFA26E' },
+    { shadowPoolFrac: 0.38, hatch: false, inkW: 3.0 }
+  );
+  paintTaperedArc(ctx, cx - 22, footY - 44, cx, footY - 40, cx + 22, footY - 44, 3.6, '#F5C44E');
+  paintTaperedArc(ctx, cx - 16 + leanX, footY - 64, cx + leanX, footY - 60, cx + 16 + leanX, footY - 64, 4.2, '#E8AE38');
+
+  // Sculpted Athletic Arms w/ Curved Muscular Forearms & Tapered Bronze Vambraces!
   if (isSide) {
-    // Forward lunging side-arm + rear balance arm
     paintChiaroscuroShape(
       ctx,
       () => {
         ctx.beginPath();
-        ctx.moveTo(cx + 8, footY - 92);
-        ctx.lineTo(cx + 34, footY - 76);
-        ctx.lineTo(cx + 28, footY - 64);
-        ctx.lineTo(cx + 4, footY - 78);
+        ctx.moveTo(cx + 6 + leanX, footY - 96);
+        ctx.quadraticCurveTo(cx + 26 + leanX, footY - 90, cx + 38 + leanX, footY - 72);
+        ctx.lineTo(cx + 30 + leanX, footY - 62);
+        ctx.quadraticCurveTo(cx + 16 + leanX, footY - 72, cx + 2 + leanX, footY - 80);
         ctx.closePath();
       },
-      { x0: cx + 4, y0: footY - 92, x1: cx + 34, y1: footY - 64 },
-      { lit: '#FAD0AA', mid: '#D4946E', dark: '#6E3B28' },
-      { shadowPoolFrac: 0.3, hatch: false, inkW: 3.2 }
+      { x0: cx + 2 + leanX, y0: footY - 96, x1: cx + 38 + leanX, y1: footY - 62 },
+      { lit: '#FAD0AA', mid: '#D4926B', dark: '#6E3A28' },
+      { shadowPoolFrac: 0.34, hatch: false, inkW: 3.0 }
     );
   } else {
     for (const dir of [-1, 1] as const) {
@@ -2162,101 +2312,179 @@ function drawHeroPose(
         ctx,
         () => {
           ctx.beginPath();
-          ctx.moveTo(cx + dir * 20, footY - 94);
-          ctx.lineTo(cx + dir * 32, footY - 68);
-          ctx.lineTo(cx + dir * 21, footY - 64);
-          ctx.lineTo(cx + dir * 12, footY - 84);
+          ctx.moveTo(cx + dir * 20 + leanX, footY - 98);
+          ctx.quadraticCurveTo(cx + dir * 34 + leanX, footY - 84, cx + dir * 32 + leanX, footY - 62);
+          ctx.lineTo(cx + dir * 20 + leanX, footY - 60);
+          ctx.quadraticCurveTo(cx + dir * 22 + leanX, footY - 76, cx + dir * 13 + leanX, footY - 86);
           ctx.closePath();
         },
-        { x0: cx - 32, y0: footY - 94, x1: cx + 32, y1: footY - 64 },
-        { lit: '#FAD0AA', mid: '#D4946E', dark: '#6E3B28' },
-        { shadowPoolFrac: 0.3, hatch: false, inkW: 3.0 }
+        { x0: cx - 36, y0: footY - 98, x1: cx + 36, y1: footY - 60 },
+        { lit: '#FAD0AA', mid: '#D4926B', dark: '#6E3A28' },
+        { shadowPoolFrac: 0.34, hatch: false, inkW: 2.8 }
       );
-      ctx.fillStyle = '#E5AE3C';
-      ctx.fillRect(cx + dir * 26 - 5, footY - 74, 10, 9);
-      ctx.strokeStyle = INK;
-      ctx.lineWidth = 2.2;
-      ctx.strokeRect(cx + dir * 26 - 5, footY - 74, 10, 9);
+      // Tapered bronze wrist vambrace (organic curve, not a rect!)
+      paintChiaroscuroShape(
+        ctx,
+        () => {
+          ctx.beginPath();
+          ctx.moveTo(cx + dir * 22 + leanX, footY - 74);
+          ctx.lineTo(cx + dir * 34 + leanX, footY - 72);
+          ctx.lineTo(cx + dir * 31 + leanX, footY - 60);
+          ctx.lineTo(cx + dir * 20 + leanX, footY - 62);
+          ctx.closePath();
+        },
+        { x0: cx - 34, y0: footY - 74, x1: cx + 34, y1: footY - 60 },
+        { lit: '#FFF0A8', mid: '#D4942C', dark: '#4A2608' },
+        { shadowPoolFrac: 0.36, hatch: false, inkW: 2.2 }
+      );
     }
   }
 
+  // CARVED BRONZE SKULL PAULDRON ON LEFT SHOULDER (ZERO yellow smiley button!)
+  paintCarvedSkullPauldron(ctx, (isSide ? cx - 6 : cx - 23) + leanX, footY - 100, 0.86, 1);
+
+  // Chiseled Hero Head, Sunlit Jawline, Deep Mignola Brow Shadow & Swept Multi-Lock Obsidian Hair!
+  const hx = cx + leanX;
+  const hy = footY - 126;
+
+  // Sculpted neck with cast jaw shadow
   ctx.fillStyle = '#B87854';
-  ctx.fillRect(hx - 5, hy + 10, 10, 11);
+  ctx.beginPath();
+  ctx.moveTo(hx - 6, hy + 10);
+  ctx.lineTo(hx + 6, hy + 10);
+  ctx.lineTo(hx + 8, hy + 24);
+  ctx.lineTo(hx - 8, hy + 24);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.moveTo(hx - 6, hy + 10);
+  ctx.lineTo(hx + 6, hy + 10);
+  ctx.lineTo(hx + 7, hy + 18);
+  ctx.lineTo(hx - 3, hy + 15);
+  ctx.closePath();
+  ctx.fill();
 
-  paintChiaroscuroShape(
-    ctx,
-    () => {
-      ctx.beginPath();
-      ctx.moveTo(hx - 14, hy - 14);
-      ctx.quadraticCurveTo(hx, hy - 22, hx + 15, hy - 12);
-      ctx.lineTo(hx + 14, hy + 7);
-      ctx.quadraticCurveTo(hx + 4, hy + 19, hx - 2, hy + 18);
-      ctx.quadraticCurveTo(hx - 14, hy + 13, hx - 14, hy - 14);
-      ctx.closePath();
-    },
-    { x0: hx - 15, y0: hy - 22, x1: hx + 15, y1: hy + 18 },
-    isUp
-      ? { lit: '#322244', mid: '#160E24', dark: INK }
-      : { lit: '#FCE0BE', mid: '#E0A07A', dark: '#7E4630', rim: '#FFF2D6' },
-    { shadowPoolFrac: isUp ? 0.45 : 0.24, hatch: false, inkW: 3.6 }
-  );
+  if (isUp) {
+    // Facing north: sculpted sunlit neck/ears + LUSH cascading spiky raven-obsidian back hair mane w/ blazing ember rim!
+    paintChiaroscuroShape(
+      ctx,
+      () => {
+        ctx.beginPath();
+        ctx.moveTo(hx - 18, hy + 8);
+        ctx.bezierCurveTo(hx - 22, hy - 18, hx + 22, hy - 18, hx + 18, hy + 8);
+        ctx.quadraticCurveTo(hx + 8, hy + 18, hx, hy + 14);
+        ctx.quadraticCurveTo(hx - 8, hy + 18, hx - 18, hy + 8);
+        ctx.closePath();
+      },
+      { x0: hx - 20, y0: hy - 20, x1: hx + 20, y1: hy + 18 },
+      { lit: '#3A2038', mid: '#180E22', dark: INK, rim: '#FF8642' },
+      { shadowPoolFrac: 0.45, hatch: false, inkW: 3.4 }
+    );
+  } else {
+    // Facing south / diagonal / side: Chiseled lit jawline + sculpted cheekbone + fierce shadowed brow!
+    paintChiaroscuroShape(
+      ctx,
+      () => {
+        ctx.beginPath();
+        ctx.moveTo(hx - 15, hy - 14);
+        ctx.quadraticCurveTo(hx, hy - 23, hx + 16, hy - 12);
+        ctx.lineTo(hx + 16, hy + 5);
+        ctx.lineTo(hx + 6, hy + 18); // chiseled heroic jaw angle!
+        ctx.lineTo(hx - 3, hy + 19);
+        ctx.lineTo(hx - 14, hy + 9);
+        ctx.closePath();
+      },
+      { x0: hx - 16, y0: hy - 22, x1: hx + 16, y1: hy + 19 },
+      { lit: '#FFE4C4', mid: '#E4A47E', dark: '#7E4430', rim: '#FFF6E0' },
+      { shadowPoolFrac: 0.28, hatch: false, inkW: 3.2 }
+    );
 
-  if (!isUp) {
-    // Sharp comic brow shadow + vivid crimson/emerald-gold heterochromatic eyes!
-    const ex = isSide ? 4 : pose === 'diag_down' ? 2 : 0;
+    // Sharp Mignola brow shadow + blazing angular crimson & emerald heterochromatic eyes!
+    const ex = isSide ? 5 : pose === 'diag_down' ? 2.5 : 0;
     ctx.fillStyle = INK;
     ctx.beginPath();
-    ctx.moveTo(hx - 11 + ex, hy - 6);
-    ctx.lineTo(hx + 12 + ex, hy - 6);
-    ctx.lineTo(hx + 10 + ex, hy + 2);
-    ctx.lineTo(hx - 9 + ex, hy + 2);
+    ctx.moveTo(hx - 13 + ex, hy - 7);
+    ctx.lineTo(hx + 13 + ex, hy - 7);
+    ctx.lineTo(hx + 11 + ex, hy + 2);
+    ctx.lineTo(hx + ex, hy + 4);
+    ctx.lineTo(hx - 11 + ex, hy + 2);
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = '#FF384A';
-    ctx.fillRect(hx - 8 + ex, hy - 3, 5, 3.2);
-    ctx.fillStyle = '#56FFA8';
-    ctx.fillRect(hx + 3.5 + ex, hy - 3, 5, 3.2);
+    // Angled fierce glowing eyes (NOT square pixel blocks!)
+    ctx.fillStyle = '#FF2E44';
+    ctx.beginPath();
+    ctx.moveTo(hx - 10 + ex, hy - 4);
+    ctx.lineTo(hx - 3 + ex, hy - 1);
+    ctx.lineTo(hx - 9 + ex, hy + 1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#4EFF9C';
+    ctx.beginPath();
+    ctx.moveTo(hx + 10 + ex, hy - 4);
+    ctx.lineTo(hx + 3 + ex, hy - 1);
+    ctx.lineTo(hx + 9 + ex, hy + 1);
+    ctx.closePath();
+    ctx.fill();
+    // Subtle heroic nose & smirk line
+    paintTaperedArc(ctx, hx - 4 + ex, hy + 10, hx + 1 + ex, hy + 12, hx + 6 + ex, hy + 9, 1.8, INK);
   }
 
-  // Swept Wild Obsidian-Black Hair Crowned with Ember Rim & Golden Laurel Wreath!
+  // Cohesive sculpted obsidian hair-crown base under the outer curved locks (eliminates floating-petal gaps!)
   paintChiaroscuroShape(
     ctx,
     () => {
       ctx.beginPath();
-      ctx.moveTo(hx - 17, hy + 5);
-      ctx.lineTo(hx - 36, hy - 8);
-      ctx.lineTo(hx - 19, hy - 13);
-      ctx.lineTo(hx - 38, hy - 28);
-      ctx.lineTo(hx - 15, hy - 23);
-      ctx.lineTo(hx - 20, hy - 46);
-      ctx.lineTo(hx - 2, hy - 27);
-      ctx.lineTo(hx + 9, hy - 48);
-      ctx.lineTo(hx + 16, hy - 26);
-      ctx.lineTo(hx + 36, hy - 32);
-      ctx.lineTo(hx + 22, hy - 14);
-      ctx.lineTo(hx + 32, hy - 5);
-      ctx.lineTo(hx + 15, hy - 2);
-      ctx.quadraticCurveTo(hx + 2, hy - 15, hx - 17, hy + 5);
+      ctx.moveTo(hx - 18, hy + 2);
+      ctx.quadraticCurveTo(hx - 24, hy - 20, hx, hy - 28);
+      ctx.quadraticCurveTo(hx + 24, hy - 20, hx + 18, hy + 2);
+      ctx.quadraticCurveTo(hx, hy - 14, hx - 18, hy + 2);
       ctx.closePath();
     },
-    { x0: hx - 36, y0: hy - 48, x1: hx + 36, y1: hy + 4 },
-    { lit: '#FF6A2C', mid: '#261830', dark: INK, rim: '#FFB668' },
-    { shadowPoolFrac: 0.48, hatch: false, inkW: 3.6 }
+    { x0: hx - 24, y0: hy - 28, x1: hx + 24, y1: hy + 2 },
+    { lit: '#4A243C', mid: '#1C1026', dark: INK, rim: '#FF9858' },
+    { shadowPoolFrac: 0.45, hatch: false, inkW: 2.8 }
   );
 
-  // Gleaming Golden Laurel Wreath leaves
-  ctx.fillStyle = '#F5CC58';
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 1.6;
+  // Wild Calligraphic Multi-Lock Swept Obsidian Hair w/ Fiery Ember Rim (overlapping curved claw-locks rooted cleanly into crown!)
+  const hairCols = { lit: '#FF6A2A', mid: '#261530', dark: INK, rim: '#FFBE78' };
+  const darkHair = { lit: '#4A243E', mid: '#1A0E24', dark: INK };
+  paintComicBladeLock(ctx, hx - 14, hy - 6, hx - 30, hy - 8, hx - 38, hy - 18, hx - 20, hy - 18, hairCols, 2.4);
+  paintComicBladeLock(ctx, hx - 12, hy - 14, hx - 32, hy - 24, hx - 34, hy - 38, hx - 14, hy - 26, hairCols, 2.4);
+  paintComicBladeLock(ctx, hx - 5, hy - 20, hx - 20, hy - 38, hx - 12, hy - 52, hx, hy - 32, hairCols, 2.4);
+  paintComicBladeLock(ctx, hx + 2, hy - 20, hx + 6, hy - 40, hx + 18, hy - 50, hx + 14, hy - 28, hairCols, 2.4);
+  paintComicBladeLock(ctx, hx + 10, hy - 14, hx + 28, hy - 32, hx + 40, hy - 26, hx + 24, hy - 16, darkHair, 2.4);
+  paintComicBladeLock(ctx, hx + 13, hy - 6, hx + 28, hy - 12, hx + 34, hy + 1, hx + 18, hy + 2, darkHair, 2.2);
+  if (isUp) {
+    // Cascading back locks over nape of neck for rich north-facing hair silhouette
+    paintComicBladeLock(ctx, hx - 14, hy - 4, hx - 22, hy + 12, hx - 14, hy + 24, hx - 6, hy + 10, darkHair, 2.6);
+    paintComicBladeLock(ctx, hx + 2, hy - 2, hx - 4, hy + 14, hx + 4, hy + 26, hx + 12, hy + 12, darkHair, 2.6);
+    paintComicBladeLock(ctx, hx + 14, hy - 4, hx + 24, hy + 10, hx + 18, hy + 22, hx + 8, hy + 10, darkHair, 2.6);
+  } else {
+    // Swept dark forelock curling diagonally over brow
+    paintComicBladeLock(ctx, hx + 4, hy - 18, hx - 8, hy - 10, hx - 12, hy + 2, hx, hy - 8, darkHair, 2.2);
+  }
+
+  // Gleaming Sculpted Golden Laurel Wreath Crown (sharp leaf blades!)
   for (let i = -3; i <= 3; i++) {
-    const a = -Math.PI * 0.5 + i * 0.28;
-    const lx = hx + Math.cos(a) * 17;
+    const a = -Math.PI * 0.5 + i * 0.27;
+    const lx = hx + Math.cos(a) * 18;
     const ly = hy - 11 + Math.sin(a) * 12;
+    ctx.save();
+    ctx.translate(lx, ly);
+    ctx.rotate(a + 0.72);
+    ctx.fillStyle = i % 2 === 0 ? '#FFE878' : '#E8AC2C';
     ctx.beginPath();
-    ctx.ellipse(lx, ly, 5.2, 2.3, a + 0.72, 0, Math.PI * 2);
+    ctx.moveTo(-6, 0);
+    ctx.quadraticCurveTo(0, -4, 6, 0);
+    ctx.quadraticCurveTo(0, 4, -6, 0);
+    ctx.closePath();
     ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.6;
     ctx.stroke();
+    ctx.restore();
   }
 }
 
@@ -3299,113 +3527,151 @@ function drawAllRegularEnemies(ctx: CanvasRenderingContext2D): void {
     c.fill();
   });
 
-  // 13. BONE HYDRA AUXILIARY HEAD (Articulated Horned Dragon Skull + Segmented Vertebrae + Magma Gullet — ZERO Guitar Picks!)
+  // 13. BONE HYDRA AUXILIARY HEAD (Fierce Jagged Obsidian-Bone Drake Skull + Spiked Serpentine Vertebrae + Magma Fissures — ZERO Bead Chains!)
   withCell(ctx, 'enemy_bone_hydra_head', (c, w, h) => {
     const cx = w * 0.5;
-    const baseY = h * 0.87;
-    // Articulated segmented bone vertebrae neck curving sinuously!
+    const baseY = h * 0.89;
+
+    // Coiled S-Curve Molten Magma Spine Tendon Core glowing through jagged bone vertebrae!
+    paintTaperedArc(c, cx - 6, baseY, cx + 26, baseY - 46, cx - 8, baseY - 104, 15, '#CC240C');
+    paintTaperedArc(c, cx - 6, baseY, cx + 26, baseY - 46, cx - 8, baseY - 104, 7, '#FFA828');
+
+    // 6 Interlocking Angular Obsidian-Bone Serpentine Vertebrae w/ Sweeping Razor Dorsal Spines (ZERO round beads!)
     for (let i = 0; i < 6; i++) {
       const t = i / 5;
-      const vx = cx + Math.sin(t * Math.PI * 1.4) * 18;
+      const vx = cx - 4 + Math.sin(t * Math.PI * 1.15) * 19 - t * 6;
       const vy = baseY - 10 - t * 88;
-      const vr = 17 - t * 4;
-      // Glowing magma spine core behind vertebrae
-      c.fillStyle = '#FF5A14';
-      c.beginPath();
-      c.arc(vx, vy, vr * 0.9, 0, Math.PI * 2);
-      c.fill();
+      const vw = 21 - t * 4;
+      const vh = 14 - t * 1.8;
+
+      // Swept jagged razor dorsal bone fin spine jutting back!
+      paintComicBladeLock(
+        c,
+        vx - vw * 0.7,
+        vy - 3,
+        vx - vw - 16,
+        vy - 12,
+        vx - vw - 22,
+        vy - 4,
+        vx - vw - 6,
+        vy + 6,
+        { lit: '#FAF0D6', mid: '#8C7A68', dark: '#2E1E1C', rim: '#FFAE52' },
+        2.4
+      );
+      // Angular chevron-plated vertebra segment
       paintChiaroscuroShape(
         c,
         () => {
           c.beginPath();
-          c.ellipse(vx, vy, vr, vr * 0.68, 0.15, 0, Math.PI * 2);
+          c.moveTo(vx - vw, vy - vh * 0.35);
+          c.lineTo(vx - vw * 0.25, vy - vh);
+          c.lineTo(vx + vw * 0.85, vy - vh * 0.55);
+          c.lineTo(vx + vw, vy + vh * 0.35);
+          c.lineTo(vx + vw * 0.2, vy + vh * 0.85);
+          c.lineTo(vx - vw * 0.78, vy + vh * 0.5);
+          c.closePath();
         },
-        { x0: vx - vr, y0: vy - vr, x1: vx + vr, y1: vy + vr },
-        { lit: '#F6ECD4', mid: '#C2B094', dark: '#463832', rim: '#FFAA58' },
-        { shadowPoolFrac: 0.42, hatch: false, inkW: 3.2 }
+        { x0: vx - vw, y0: vy - vh, x1: vx + vw, y1: vy + vh },
+        { lit: '#FAF0D8', mid: '#BFA88C', dark: '#3E2E2B', rim: '#FFB662' },
+        { shadowPoolFrac: 0.44, hatch: false, inkW: 2.8 }
       );
-      // Dorsal bone spine spike
-      c.fillStyle = '#E8DAC0';
-      c.beginPath();
-      c.moveTo(vx - vr - 8, vy);
-      c.lineTo(vx - vr + 4, vy - 5);
-      c.lineTo(vx - vr + 4, vy + 5);
-      c.closePath();
-      c.fill();
-      c.strokeStyle = INK;
-      c.lineWidth = 2.2;
-      c.stroke();
     }
 
-    // Articulated Horned Dragon Skull w/ Hinged Fanged Jaw & Blazing Ember Sockets!
-    const hy = baseY - 114;
-    // Swept obsidian-bone horns
-    for (const dir of [-1, 1] as const) {
-      c.fillStyle = '#381E22';
-      c.beginPath();
-      c.moveTo(cx + dir * 14, hy - 14);
-      c.quadraticCurveTo(cx + dir * 42, hy - 28, cx + dir * 48, hy - 48);
-      c.quadraticCurveTo(cx + dir * 32, hy - 32, cx + dir * 18, hy - 26);
-      c.closePath();
-      c.fill();
-      c.strokeStyle = INK;
-      c.lineWidth = 3.2;
-      c.stroke();
-    }
+    // Fierce Angled 3/4 Predatory Drake-Serpent Skull w/ Swept Obsidian Horns, Hinged Roaring Lava Jaw & Curved Hooked Fangs!
+    const hx = cx - 4;
+    const hy = baseY - 118;
 
-    // Glowing molten gullet inside open hinged jaw
-    c.fillStyle = '#FF6218';
+    // Sweeping barbed obsidian-bone drake crown horns & neck frill spikes!
+    paintComicBladeLock(c, hx - 12, hy - 14, hx - 40, hy - 34, hx - 48, hy - 54, hx - 26, hy - 36, { lit: '#8E4A42', mid: '#381B22', dark: INK, rim: '#FFC070' }, 3.0);
+    paintComicBladeLock(c, hx + 8, hy - 16, hx + 32, hy - 34, hx + 42, hy - 50, hx + 22, hy - 32, { lit: '#723A36', mid: '#2E141C', dark: INK, rim: '#FFAE5C' }, 3.0);
+    paintComicBladeLock(c, hx - 18, hy - 2, hx - 38, hy - 4, hx - 44, hy + 8, hx - 26, hy + 8, { lit: '#E2D0B6', mid: '#6E5A4E', dark: INK }, 2.4);
+
+    // Incandescent Magma Gullet flaring inside gaping lower jaw!
+    const jawG = c.createRadialGradient(hx + 12, hy + 20, 3, hx + 12, hy + 20, 26);
+    jawG.addColorStop(0, '#FFF8B8');
+    jawG.addColorStop(0.5, '#FF6214');
+    jawG.addColorStop(1, 'rgba(180, 18, 10, 0)');
+    c.fillStyle = jawG;
     c.beginPath();
-    c.ellipse(cx, hy + 18, 16, 12, 0, 0, Math.PI * 2);
+    c.ellipse(hx + 12, hy + 20, 24, 16, 0.2, 0, Math.PI * 2);
     c.fill();
 
-    // Sculpted angular horned dragon cranium
+    // Hinged Angular Lower Mandible w/ Upward-Curved Lower Fangs
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 32, hy - 10);
-        c.quadraticCurveTo(cx, hy - 34, cx + 32, hy - 10);
-        c.lineTo(cx + 26, hy + 14);
-        c.lineTo(cx + 12, hy + 28);
-        c.lineTo(cx - 12, hy + 28);
-        c.lineTo(cx - 26, hy + 14);
+        c.moveTo(hx - 14, hy + 12);
+        c.lineTo(hx + 4, hy + 36);
+        c.lineTo(hx + 34, hy + 30);
+        c.lineTo(hx + 24, hy + 18);
+        c.lineTo(hx + 6, hy + 22);
         c.closePath();
       },
-      { x0: cx - 32, y0: hy - 34, x1: cx + 32, y1: hy + 28 },
-      { lit: '#FAF0DC', mid: '#C8B89E', dark: '#54443E', rim: '#FFC078' },
-      { shadowPoolFrac: 0.38, inkW: 3.8 }
+      { x0: hx - 14, y0: hy + 12, x1: hx + 34, y1: hy + 36 },
+      { lit: '#E2D2B8', mid: '#98826E', dark: '#362624' },
+      { shadowPoolFrac: 0.44, hatch: false, inkW: 3.0 }
     );
-    // Deep shadow sockets + glowing ember eyes
+
+    // Razor-Angular Elongated Drake Upper Cranium & Ridged Armored Snout!
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(hx - 28, hy - 8);
+        c.lineTo(hx - 14, hy - 28);
+        c.lineTo(hx + 14, hy - 26);
+        c.lineTo(hx + 34, hy - 8);
+        c.lineTo(hx + 48, hy + 8); // sharp predatory drake snout tip!
+        c.lineTo(hx + 32, hy + 18);
+        c.lineTo(hx + 4, hy + 14);
+        c.lineTo(hx - 20, hy + 12);
+        c.closePath();
+      },
+      { x0: hx - 28, y0: hy - 28, x1: hx + 48, y1: hy + 18 },
+      { lit: '#FFF6E0', mid: '#C8B498', dark: '#4A3832', rim: '#FFC878' },
+      { shadowPoolFrac: 0.4, inkW: 3.4 }
+    );
+    // Cracked magma-fissure veins along brow & jagged recessed eye-socket!
+    paintTaperedArc(c, hx - 12, hy - 22, hx - 2, hy - 14, hx + 12, hy - 16, 2.2, '#FF5C14');
     c.fillStyle = INK;
     c.beginPath();
-    c.moveTo(cx - 24, hy - 6);
-    c.lineTo(cx - 6, hy + 1);
-    c.lineTo(cx - 12, hy + 8);
-    c.lineTo(cx - 22, hy + 4);
-    c.closePath();
-    c.moveTo(cx + 24, hy - 6);
-    c.lineTo(cx + 6, hy + 1);
-    c.lineTo(cx + 12, hy + 8);
-    c.lineTo(cx + 22, hy + 4);
+    c.moveTo(hx - 14, hy - 10);
+    c.lineTo(hx + 14, hy - 4);
+    c.lineTo(hx + 6, hy + 7);
+    c.lineTo(hx - 12, hy + 4);
     c.closePath();
     c.fill();
-    c.fillStyle = '#FF9C1A';
-    c.fillRect(cx - 18, hy - 1, 7, 4.5);
-    c.fillRect(cx + 11, hy - 1, 7, 4.5);
-    // Sharp white dragon fangs
-    c.fillStyle = '#FFF8E8';
-    for (const fx of [-14, -4, 6]) {
+    // Blazing molten slit-eye!
+    c.fillStyle = '#FF9C18';
+    c.beginPath();
+    c.moveTo(hx - 8, hy - 5);
+    c.lineTo(hx + 10, hy - 1);
+    c.lineTo(hx + 2, hy + 4);
+    c.closePath();
+    c.fill();
+    c.fillStyle = '#FFFCE2';
+    c.beginPath();
+    c.arc(hx + 2, hy - 1, 2.6, 0, Math.PI * 2);
+    c.fill();
+
+    // Irregular Curved Hooked Predator Bone Fangs (NOT uniform flat triangles!)
+    const drawCurvedFang = (fx: number, fy: number, len: number, curve: number) => {
+      c.fillStyle = '#FFF8E8';
       c.beginPath();
-      c.moveTo(cx + fx, hy + 20);
-      c.lineTo(cx + fx + 3.5, hy + 34);
-      c.lineTo(cx + fx + 7, hy + 20);
+      c.moveTo(fx - 3.2, fy);
+      c.quadraticCurveTo(fx + curve, fy + len * 0.65, fx + curve * 0.6, fy + len);
+      c.quadraticCurveTo(fx + 3.2 + curve * 0.3, fy + len * 0.5, fx + 3.2, fy);
       c.closePath();
       c.fill();
       c.strokeStyle = INK;
-      c.lineWidth = 2;
+      c.lineWidth = 1.9;
       c.stroke();
-    }
+    };
+    drawCurvedFang(hx + 40, hy + 11, 14, -4);
+    drawCurvedFang(hx + 26, hy + 12, 11, -3);
+    drawCurvedFang(hx + 12, hy + 11, 13, -3.5);
+    drawCurvedFang(hx - 2, hy + 10, 9, -2);
   });
 
   // 14. Colosseum Swordsman: Exalted spectral hoplite in plumed bronze helm, cuirass & glowing teal kopis blade
@@ -3711,82 +3977,179 @@ function drawAllRegularEnemies(ctx: CanvasRenderingContext2D): void {
     c.fill();
   });
 
-  // 19. VENOM SATYR CULTIST (Hunched Goat-Horned Cultist, Cloven Hooves, Snout & Brass Blowpipe — ZERO Cone!)
+  // 19. VENOM SATYR CULTIST (Hunched Hooded Cultist-Satyr w/ Spiraling Ram Horns, Tattered Mantle & Carved Obsidian-Bone Blowpipe — ZERO Red Cone!)
   withCell(ctx, 'enemy_venom_satyr', (c, w, h) => {
-    const cx = w * 0.46;
-    const baseY = h * 0.87;
-    // Digitigrade goat legs & cloven hooves
-    for (const [lx, rx] of [
-      [cx - 20, cx - 8],
-      [cx + 6, cx + 18],
-    ]) {
-      c.fillStyle = '#361E1E';
+    const cx = w * 0.44;
+    const baseY = h * 0.89;
+
+    // Shaggy Digitigrade Goat Legs & Split Cloven Hooves in Stalking Crouch!
+    for (const [lx, rx, front] of [
+      [cx - 26, cx - 12, false],
+      [cx + 6, cx + 22, true],
+    ] as const) {
+      paintChiaroscuroShape(
+        c,
+        () => {
+          c.beginPath();
+          c.moveTo(lx, baseY - 46);
+          c.lineTo(rx, baseY - 46);
+          c.lineTo(rx - 6, baseY - 22);
+          c.lineTo(rx + 6, baseY - 2);
+          c.lineTo(lx - 2, baseY + 2);
+          c.lineTo(lx - 10, baseY - 22);
+          c.closePath();
+        },
+        { x0: lx - 10, y0: baseY - 46, x1: rx + 6, y1: baseY + 2 },
+        front ? { lit: '#6E4C42', mid: '#3A2220', dark: INK } : { lit: '#4A302C', mid: '#241416', dark: INK },
+        { shadowPoolFrac: 0.44, hatch: false, inkW: 3.0 }
+      );
+      // Shaggy fur tuft at hock + dark cloven hoof
+      c.fillStyle = INK;
       c.beginPath();
-      c.moveTo(lx, baseY - 38);
-      c.lineTo(rx, baseY - 38);
-      c.lineTo(rx - 4, baseY - 16);
-      c.lineTo(rx + 4, baseY);
-      c.lineTo(lx - 2, baseY);
-      c.lineTo(lx - 6, baseY - 18);
+      c.moveTo(lx - 2, baseY - 6);
+      c.lineTo(rx + 6, baseY - 6);
+      c.lineTo(rx + 8, baseY + 2);
+      c.lineTo(lx - 3, baseY + 2);
       c.closePath();
       c.fill();
-      c.strokeStyle = INK;
-      c.lineWidth = 3.2;
-      c.stroke();
     }
-    // Tattered ragged crimson cultist mantle hunched forward!
+
+    // Hunched Multi-Fold Tattered Cultist Cloak & Draped Plague-Crimson Cowl (deep #09060E drapery troughs!)
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 34, baseY - 22);
-        c.bezierCurveTo(cx - 42, baseY - 68, cx - 24, baseY - 110, cx + 6, baseY - 116);
-        c.lineTo(cx + 30, baseY - 82);
-        c.lineTo(cx + 34, baseY - 26);
-        c.lineTo(cx + 12, baseY - 36);
-        c.lineTo(cx - 12, baseY - 20);
+        c.moveTo(cx - 44, baseY - 24);
+        c.bezierCurveTo(cx - 54, baseY - 68, cx - 36, baseY - 106, cx - 6, baseY - 122);
+        c.lineTo(cx + 22, baseY - 114);
+        c.bezierCurveTo(cx + 42, baseY - 94, cx + 40, baseY - 52, cx + 32, baseY - 22);
+        c.lineTo(cx + 16, baseY - 38);
+        c.lineTo(cx + 4, baseY - 14);
+        c.lineTo(cx - 14, baseY - 34);
+        c.lineTo(cx - 28, baseY - 14);
         c.closePath();
       },
-      { x0: cx - 40, y0: baseY - 116, x1: cx + 34, y1: baseY - 20 },
-      { lit: '#A82A3C', mid: '#4E1422', dark: INK, rim: '#A8F036' },
-      { shadowPoolFrac: 0.44, inkW: 3.8 }
+      { x0: cx - 52, y0: baseY - 122, x1: cx + 42, y1: baseY - 14 },
+      { lit: '#8E2838', mid: '#421220', dark: INK, rim: '#A4EE38' },
+      { shadowPoolFrac: 0.48, inkW: 3.6 }
     );
-    // Sinister horned goat snout emerging from crimson hood
-    for (const dir of [-1, 1] as const) {
-      c.fillStyle = '#D4C4A4';
-      c.beginPath();
-      c.moveTo(cx + dir * 10, baseY - 112);
-      c.quadraticCurveTo(cx + dir * 32, baseY - 134, cx + dir * 20, baseY - 144);
-      c.quadraticCurveTo(cx + dir * 18, baseY - 126, cx + dir * 4, baseY - 116);
-      c.closePath();
-      c.fill();
-      c.strokeStyle = INK;
-      c.lineWidth = 3;
-      c.stroke();
-    }
-    c.fillStyle = INK;
-    c.beginPath();
-    c.ellipse(cx + 6, baseY - 96, 16, 17, 0.2, 0, Math.PI * 2);
-    c.fill();
-    c.fillStyle = '#B8FF2E';
-    c.fillRect(cx + 1, baseY - 101, 6, 3.5);
-    c.fillRect(cx + 11, baseY - 100, 6, 3.5);
-    // Ornate curved brass venom blowpipe dripping glowing green poison!
-    c.strokeStyle = INK;
-    c.lineWidth = 9;
-    c.beginPath();
-    c.moveTo(cx + 10, baseY - 88);
-    c.lineTo(cx + 62, baseY - 80);
-    c.stroke();
-    c.strokeStyle = '#C89E3E';
-    c.lineWidth = 4.4;
-    c.stroke();
+    // Deep ink cloth folds + leather plague-belt & hanging venom vial
+    ctx.fillStyle = INK;
+    ctx.beginPath();
+    ctx.moveTo(cx - 22, baseY - 94);
+    ctx.quadraticCurveTo(cx - 30, baseY - 58, cx - 14, baseY - 34);
+    ctx.quadraticCurveTo(cx - 18, baseY - 62, cx - 12, baseY - 92);
+    ctx.closePath();
+    ctx.fill();
+    paintTaperedArc(c, cx - 34, baseY - 46, cx, baseY - 40, cx + 28, baseY - 48, 5.0, '#34261E');
     c.fillStyle = '#9CF024';
     c.beginPath();
-    c.arc(cx + 62, baseY - 76, 5, 0, Math.PI * 2);
+    c.arc(cx - 14, baseY - 36, 5.2, 0, Math.PI * 2);
     c.fill();
     c.strokeStyle = INK;
     c.lineWidth = 2;
+    c.stroke();
+
+    // Pointed Slumped Cultist Hood & Thick Spiraling Ridged Ram Horns curling out from temples!
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(cx - 32, baseY - 98);
+        c.quadraticCurveTo(cx - 20, baseY - 134, cx + 6, baseY - 134);
+        c.quadraticCurveTo(cx + 30, baseY - 126, cx + 32, baseY - 94);
+        c.quadraticCurveTo(cx + 12, baseY - 82, cx - 14, baseY - 86);
+        c.closePath();
+      },
+      { x0: cx - 32, y0: baseY - 134, x1: cx + 32, y1: baseY - 82 },
+      { lit: '#A83244', mid: '#4C1424', dark: INK, rim: '#B4FF48' },
+      { shadowPoolFrac: 0.46, hatch: false, inkW: 3.4 }
+    );
+
+    // Thick Swept Spiraling Curved Ram Horns (organic ridged curls — ZERO white stick antennae!)
+    const drawRamHorn = (ox: number, oy: number, dir: -1 | 1) => {
+      paintChiaroscuroShape(
+        c,
+        () => {
+          c.beginPath();
+          c.moveTo(ox, oy);
+          c.bezierCurveTo(ox + dir * 24, oy - 36, ox - dir * 24, oy - 48, ox - dir * 32, oy - 16);
+          c.bezierCurveTo(ox - dir * 36, oy - 2, ox - dir * 18, oy + 6, ox - dir * 14, oy - 6);
+          c.bezierCurveTo(ox - dir * 18, oy - 22, ox + dir * 4, oy - 24, ox - dir * 4, oy - 4);
+          c.closePath();
+        },
+        { x0: ox - 36, y0: oy - 44, x1: ox + 28, y1: oy + 6 },
+        { lit: '#EAE0C4', mid: '#9A886C', dark: '#2E221C', rim: '#FFF8DE' },
+        { shadowPoolFrac: 0.38, hatch: false, inkW: 2.8 }
+      );
+    };
+    drawRamHorn(cx + 16, baseY - 118, 1);
+    drawRamHorn(cx - 2, baseY - 116, -1);
+
+    // Shadowed Hood Cavern + Feral Goat Muzzle + Slanted Venomous Chartreuse Eyes!
+    c.fillStyle = INK;
+    c.beginPath();
+    c.moveTo(cx - 4, baseY - 116);
+    c.quadraticCurveTo(cx + 22, baseY - 116, cx + 26, baseY - 94);
+    c.quadraticCurveTo(cx + 12, baseY - 80, cx - 8, baseY - 92);
+    c.closePath();
+    c.fill();
+    c.fillStyle = '#B8FF2E';
+    c.beginPath();
+    c.moveTo(cx + 1, baseY - 105);
+    c.lineTo(cx + 9, baseY - 101);
+    c.lineTo(cx + 3, baseY - 99);
+    c.closePath();
+    c.moveTo(cx + 21, baseY - 104);
+    c.lineTo(cx + 13, baseY - 101);
+    c.lineTo(cx + 19, baseY - 99);
+    c.closePath();
+    c.fill();
+
+    // Hunched Clawed Hands + Dark Carved Gnarled Obsidian-Bone Dart Blowpipe dripping glowing venom!
+    c.save();
+    c.translate(cx + 16, baseY - 86);
+    c.rotate(0.14);
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(-4, -4);
+        c.lineTo(48, -6);
+        c.lineTo(54, -9); // flared carved bone muzzle!
+        c.lineTo(54, 9);
+        c.lineTo(48, 6);
+        c.lineTo(-4, 4);
+        c.closePath();
+      },
+      { x0: -4, y0: -9, x1: 54, y1: 9 },
+      { lit: '#6C564C', mid: '#2D2024', dark: INK, rim: '#C6FF48' },
+      { shadowPoolFrac: 0.4, hatch: false, inkW: 2.8 }
+    );
+    // Tarnished brass wrap rings & glowing green venom rune band
+    c.fillStyle = '#D4A03C';
+    c.fillRect(10, -5, 5, 10);
+    c.fillRect(32, -5.5, 5, 11);
+    // Dripping toxic emerald venom droplet at muzzle
+    c.fillStyle = '#9CF024';
+    c.beginPath();
+    c.moveTo(52, 8);
+    c.quadraticCurveTo(58, 16, 52, 22);
+    c.quadraticCurveTo(46, 16, 52, 8);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.8;
+    c.stroke();
+    c.restore();
+
+    // Hunched clawed cultist hand gripping blowpipe
+    c.fillStyle = '#6A4842';
+    c.beginPath();
+    c.ellipse(cx + 28, baseY - 82, 9, 7, 0.2, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 2.6;
     c.stroke();
   });
 
@@ -3982,8 +4345,11 @@ function drawAllRegularEnemies(ctx: CanvasRenderingContext2D): void {
 // ============================================================================
 
 function drawAllBosses(ctx: CanvasRenderingContext2D): void {
-  // Helper for sculpted tattered Gothic Fury Wings (shared anatomy, individually styled per sister!)
-  const drawFuryWing = (
+  /**
+   * Sculpted Layered Feathered Harpy-Bat Wing (articulated wing-arm, clawed wing-thumb,
+   * 6 overlapping tapered flight feathers/tattered membranes + inked quill ribs — ZERO folded-paper trapezoids!).
+   */
+  const drawFeatheredHarpyWing = (
     c: CanvasRenderingContext2D,
     ox: number,
     oy: number,
@@ -3992,255 +4358,358 @@ function drawAllBosses(ctx: CanvasRenderingContext2D): void {
     lift: number,
     cols: { lit: string; mid: string; rim: string }
   ) => {
+    // Rich scalloped dark bat-harpy inner webbing connecting feather ribs seamlessly (no disconnected palm-frond gaps!)
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(ox + dir * 14, oy);
-        c.bezierCurveTo(ox + dir * (68 * spread), oy - (94 + lift), ox + dir * (118 * spread), oy - (78 + lift), ox + dir * (142 * spread), oy - (38 + lift * 0.6));
-        c.quadraticCurveTo(ox + dir * (116 * spread), oy + 4, ox + dir * (126 * spread), oy + 40);
-        c.quadraticCurveTo(ox + dir * (90 * spread), oy + 22, ox + dir * (84 * spread), oy + 68);
-        c.quadraticCurveTo(ox + dir * (52 * spread), oy + 42, ox + dir * (44 * spread), oy + 86);
-        c.lineTo(ox + dir * 14, oy + 44);
+        c.moveTo(ox + dir * 14, oy - 4);
+        c.bezierCurveTo(
+          ox + dir * (74 * spread),
+          oy - (96 + lift),
+          ox + dir * (114 * spread),
+          oy - (82 + lift * 0.85),
+          ox + dir * (142 * spread),
+          oy - (52 + lift * 0.7)
+        );
+        c.quadraticCurveTo(ox + dir * (116 * spread), oy - (14 + lift * 0.3), ox + dir * (138 * spread), oy + 12 - lift * 0.15);
+        c.quadraticCurveTo(ox + dir * (100 * spread), oy + 14, ox + dir * (114 * spread), oy + 46);
+        c.quadraticCurveTo(ox + dir * (78 * spread), oy + 36, ox + dir * (84 * spread), oy + 72);
+        c.quadraticCurveTo(ox + dir * (48 * spread), oy + 52, ox + dir * (44 * spread), oy + 84);
+        c.lineTo(ox + dir * 14, oy + 40);
         c.closePath();
       },
-      { x0: ox - 142, y0: oy - 100, x1: ox + 142, y1: oy + 86 },
+      { x0: ox - 146, y0: oy - 104, x1: ox + 146, y1: oy + 84 },
       { lit: cols.lit, mid: cols.mid, dark: INK, rim: cols.rim },
-      { shadowPoolFrac: 0.46, inkW: 4.8 }
+      { shadowPoolFrac: 0.48, inkW: 4.0 }
     );
-    // Wing bone ribs
-    c.strokeStyle = INK;
-    c.lineWidth = 4;
-    c.beginPath();
-    c.moveTo(ox + dir * 24, oy + 2);
-    c.lineTo(ox + dir * (118 * spread), oy + 36);
-    c.moveTo(ox + dir * 24, oy + 8);
-    c.lineTo(ox + dir * (80 * spread), oy + 64);
-    c.stroke();
+
+    // 5 sculpted primary razor flight feathers & inked quill ribs layered atop webbing!
+    const feathers: readonly [number, number, number, number, number, number][] = [
+      [18, -6, 76, -98 - lift, 148, -60 - lift * 0.8],
+      [24, 0, 86, -70 - lift * 0.65, 148, -22 - lift * 0.45],
+      [26, 8, 84, -36 - lift * 0.35, 136, 16 - lift * 0.15],
+      [24, 16, 72, -4, 116, 48],
+      [20, 24, 56, 22, 86, 72],
+    ];
+    for (let i = feathers.length - 1; i >= 0; i--) {
+      const [sx, sy, mcx, mcy, tx, ty] = feathers[i];
+      paintComicBladeLock(
+        c,
+        ox + dir * (sx * spread),
+        oy + sy,
+        ox + dir * (mcx * spread),
+        oy + mcy - 10,
+        ox + dir * (tx * spread),
+        oy + ty,
+        ox + dir * (mcx * spread * 0.88),
+        oy + mcy + 16,
+        { lit: i < 2 ? cols.lit : cols.mid, mid: cols.mid, dark: INK, rim: i === 0 ? cols.rim : undefined },
+        2.6
+      );
+      paintTaperedArc(
+        c,
+        ox + dir * (sx * spread),
+        oy + sy,
+        ox + dir * (mcx * spread * 0.94),
+        oy + mcy + 2,
+        ox + dir * (tx * spread * 0.92),
+        oy + ty,
+        2.2,
+        INK
+      );
+    }
+
+    // Articulated leading bony wing-arm & curved razor wing-thumb claw
+    paintTaperedArc(
+      c,
+      ox + dir * 12,
+      oy + 4,
+      ox + dir * (66 * spread),
+      oy - (72 + lift * 0.8),
+      ox + dir * (114 * spread),
+      oy - (74 + lift * 0.9),
+      9.0,
+      INK
+    );
+    paintTaperedArc(
+      c,
+      ox + dir * 14,
+      oy + 2,
+      ox + dir * (66 * spread),
+      oy - (74 + lift * 0.8),
+      ox + dir * (112 * spread),
+      oy - (76 + lift * 0.9),
+      4.0,
+      cols.rim
+    );
+    paintComicBladeLock(
+      c,
+      ox + dir * (78 * spread),
+      oy - (68 + lift * 0.8),
+      ox + dir * (84 * spread),
+      oy - (96 + lift),
+      ox + dir * (72 * spread),
+      oy - (106 + lift),
+      ox + dir * (66 * spread),
+      oy - (84 + lift * 0.9),
+      { lit: '#FFF0B8', mid: '#B87C28', dark: INK },
+      2.4
+    );
   };
 
-  // BOSS 1: WARDEN MALICE (Gothic Bat-Winged Executioner w/ Coiled Barbed Crimson Whip!)
+  // BOSS 1: WARDEN MALICE (Feathered Harpy-Bat Executioner w/ Sharp 3/4 Fierce Visage & Dynamic Coiled Barbed Whip!)
   withCell(ctx, 'boss_warden_malice', (c, w, h) => {
-    const cx = w * 0.5;
-    const baseY = h * 0.87;
-    const halo = c.createRadialGradient(cx, baseY - 150, 10, cx, baseY - 150, 100);
-    halo.addColorStop(0, 'rgba(210, 32, 160, 0.45)');
+    const cx = w * 0.48;
+    const baseY = h * 0.89;
+    const halo = c.createRadialGradient(cx, baseY - 156, 10, cx, baseY - 156, 108);
+    halo.addColorStop(0, 'rgba(210, 32, 160, 0.42)');
     halo.addColorStop(1, 'rgba(14, 4, 22, 0)');
     c.fillStyle = halo;
     c.beginPath();
-    c.arc(cx, baseY - 150, 100, 0, Math.PI * 2);
+    c.arc(cx, baseY - 156, 108, 0, Math.PI * 2);
     c.fill();
 
-    drawFuryWing(c, cx, baseY - 150, -1, 1.0, 12, { lit: '#5E1E78', mid: '#240A36', rim: '#FF46B8' });
-    drawFuryWing(c, cx, baseY - 150, 1, 0.92, -4, { lit: '#4A1664', mid: '#1C082A', rim: '#FF46B8' });
+    // Asymmetric dramatic feathered wings (left swept high, right flared back for whip-strike!)
+    drawFeatheredHarpyWing(c, cx, baseY - 154, -1, 0.98, 18, { lit: '#6C228A', mid: '#260B3A', rim: '#FF54C8' });
+    drawFeatheredHarpyWing(c, cx, baseY - 150, 1, 0.9, -10, { lit: '#541870', mid: '#1C082C', rim: '#FF54C8' });
 
-    // Armored thigh-high boots
-    for (const [lx, rx] of [
-      [cx - 20, cx - 6],
-      [cx + 6, cx + 22],
-    ]) {
+    // Dynamic Agile Warrior Stance: Tapered Sculpted Thigh-High Armored Boots!
+    const drawBoot = (hx: number, hy: number, kx: number, ky: number, fx: number, fy: number) => {
       paintChiaroscuroShape(
         c,
         () => {
           c.beginPath();
-          c.moveTo(lx, baseY - 78);
-          c.lineTo(rx, baseY - 78);
-          c.lineTo(rx + 2, baseY + 2);
-          c.lineTo(lx - 2, baseY + 2);
+          c.moveTo(hx - 8, hy);
+          c.lineTo(hx + 8, hy);
+          c.quadraticCurveTo(kx + 8, (hy + ky) * 0.5, kx + 6, ky);
+          c.lineTo(fx + 5, fy);
+          c.lineTo(fx - 7, fy);
+          c.quadraticCurveTo(kx - 9, (hy + ky) * 0.5, hx - 8, hy);
           c.closePath();
         },
-        { x0: lx - 2, y0: baseY - 78, x1: rx + 2, y1: baseY + 2 },
-        { lit: '#462258', mid: '#1B0B28', dark: INK },
-        { shadowPoolFrac: 0.45, hatch: false, inkW: 3.8 }
+        { x0: Math.min(hx, fx) - 9, y0: hy, x1: Math.max(hx, fx) + 9, y1: fy },
+        { lit: '#5C2C72', mid: '#200D32', dark: INK, rim: '#FF70DE' },
+        { shadowPoolFrac: 0.44, hatch: false, inkW: 3.4 }
       );
-    }
+    };
+    drawBoot(cx - 12, baseY - 94, cx - 22, baseY - 46, cx - 26, baseY + 2);
+    drawBoot(cx + 12, baseY - 94, cx + 18, baseY - 46, cx + 28, baseY + 2);
 
-    // Flowing tattered crimson-violet battle skirt & corset
+    // Flowing Asymmetric Split Tattered Crimson-Violet Executioner Skirt w/ Heavy #09060E Inner Drapery!
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 24, baseY - 104);
-        c.lineTo(cx + 22, baseY - 104);
-        c.bezierCurveTo(cx + 48, baseY - 64, cx + 56, baseY - 24, cx + 44, baseY + 4);
-        c.lineTo(cx + 22, baseY - 28);
-        c.lineTo(cx, baseY - 48);
-        c.lineTo(cx - 22, baseY - 18);
-        c.lineTo(cx - 46, baseY);
+        c.moveTo(cx - 22, baseY - 106);
+        c.lineTo(cx + 20, baseY - 106);
+        c.bezierCurveTo(cx + 52, baseY - 68, cx + 58, baseY - 26, cx + 48, baseY + 4);
+        c.lineTo(cx + 26, baseY - 28);
+        c.lineTo(cx + 2, baseY - 56);
+        c.lineTo(cx - 24, baseY - 20);
+        c.lineTo(cx - 50, baseY - 2);
+        c.bezierCurveTo(cx - 48, baseY - 44, cx - 36, baseY - 78, cx - 22, baseY - 106);
         c.closePath();
       },
-      { x0: cx - 46, y0: baseY - 104, x1: cx + 54, y1: baseY + 4 },
-      { lit: '#B8184C', mid: '#4E0A2A', dark: INK, rim: '#FF60D8' },
-      { shadowPoolFrac: 0.44, inkW: 4.4 }
+      { x0: cx - 50, y0: baseY - 106, x1: cx + 56, y1: baseY + 4 },
+      { lit: '#CC1C54', mid: '#560B2E', dark: INK, rim: '#FF6AE0' },
+      { shadowPoolFrac: 0.46, inkW: 4.0 }
     );
+    // Sculpted Armored Corset Bodice & Swept Spiked Pauldrons
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 24, baseY - 150);
-        c.lineTo(cx + 24, baseY - 150);
-        c.lineTo(cx + 14, baseY - 98);
+        c.moveTo(cx - 26, baseY - 154);
+        c.quadraticCurveTo(cx, baseY - 160, cx + 26, baseY - 154);
+        c.quadraticCurveTo(cx + 22, baseY - 124, cx + 14, baseY - 102);
         c.lineTo(cx, baseY - 88);
-        c.lineTo(cx - 14, baseY - 98);
+        c.lineTo(cx - 14, baseY - 102);
+        c.quadraticCurveTo(cx - 22, baseY - 124, cx - 26, baseY - 154);
         c.closePath();
       },
-      { x0: cx - 24, y0: baseY - 150, x1: cx + 24, y1: baseY - 88 },
-      { lit: '#4C2062', mid: '#1D0A28', dark: INK },
-      { shadowPoolFrac: 0.44, hatch: false, inkW: 4.0 }
+      { x0: cx - 26, y0: baseY - 158, x1: cx + 26, y1: baseY - 88 },
+      { lit: '#5E2878', mid: '#200B32', dark: INK, rim: '#FF70E0' },
+      { shadowPoolFrac: 0.42, hatch: false, inkW: 3.6 }
     );
-    // Gold filigree V-trim + swept spiked pauldron
-    c.strokeStyle = '#F0B642';
-    c.lineWidth = 2.8;
-    c.beginPath();
-    c.moveTo(cx - 17, baseY - 142);
-    c.lineTo(cx, baseY - 104);
-    c.lineTo(cx + 17, baseY - 142);
-    c.stroke();
+    paintTaperedArc(c, cx - 18, baseY - 146, cx, baseY - 106, cx + 18, baseY - 146, 3.6, '#F5C44E');
+    // Extended Whip-Arm & Swept Spiked Shoulder Guard
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(cx + 18, baseY - 148);
+        c.quadraticCurveTo(cx + 46, baseY - 142, cx + 56, baseY - 114);
+        c.lineTo(cx + 44, baseY - 108);
+        c.quadraticCurveTo(cx + 34, baseY - 126, cx + 14, baseY - 130);
+        c.closePath();
+      },
+      { x0: cx + 14, y0: baseY - 148, x1: cx + 56, y1: baseY - 108 },
+      { lit: '#E8D4F6', mid: '#9A78B8', dark: '#361A52' },
+      { shadowPoolFrac: 0.36, hatch: false, inkW: 3.0 }
+    );
 
-    // Coiled glowing barbed crimson whip
+    // Dynamic Snapping Coiled Barbed Crimson-Magenta Executioner Whip!
+    c.save();
     c.strokeStyle = INK;
-    c.lineWidth = 9.5;
+    c.lineWidth = 10;
     c.beginPath();
-    c.moveTo(cx + 26, baseY - 118);
-    c.bezierCurveTo(cx + 128, baseY - 104, cx + 116, baseY - 10, cx + 44, baseY - 16);
+    c.moveTo(cx + 50, baseY - 112);
+    c.bezierCurveTo(cx + 132, baseY - 124, cx + 128, baseY - 18, cx + 52, baseY - 14);
+    c.bezierCurveTo(cx + 10, baseY - 12, cx + 24, baseY - 56, cx + 68, baseY - 58);
     c.stroke();
-    c.strokeStyle = '#FF2474';
-    c.lineWidth = 4;
+    c.strokeStyle = '#FF2074';
+    c.lineWidth = 4.5;
     c.stroke();
+    c.strokeStyle = '#FFC2E6';
+    c.lineWidth = 1.6;
+    c.stroke();
+    c.restore();
 
-    // Sculpted pale 3/4 face + dark violet hair + curved twin obsidian-gold horns
-    const hy = baseY - 174;
-    c.fillStyle = '#180828';
+    // Sharp 3/4 Sculpted Pale Aristocratic Executioner Face, Cascading Raven Locks & Twin Curved Horns!
+    const hy = baseY - 180;
+    paintComicBladeLock(c, cx - 18, hy - 14, cx - 42, hy + 12, cx - 34, hy + 52, cx - 16, hy + 24, { lit: '#4A1E68', mid: '#1B0A2C', dark: INK, rim: '#FF66DF' }, 3.0);
+    paintComicBladeLock(c, cx + 16, hy - 14, cx + 44, hy + 18, cx + 36, hy + 58, cx + 18, hy + 26, { lit: '#3C1654', mid: '#140622', dark: INK }, 3.0);
+
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(cx - 15, hy - 14);
+        c.quadraticCurveTo(cx, hy - 24, cx + 15, hy - 13);
+        c.lineTo(cx + 14, hy + 6);
+        c.lineTo(cx + 3, hy + 22); // sharp aristocratic 3/4 jaw!
+        c.lineTo(cx - 12, hy + 10);
+        c.closePath();
+      },
+      { x0: cx - 15, y0: hy - 24, x1: cx + 15, y1: hy + 22 },
+      { lit: '#F7ECFF', mid: '#C8B0DE', dark: '#4C2E6E' },
+      { shadowPoolFrac: 0.36, hatch: false, inkW: 3.0 }
+    );
+    // Sharp comic brow shadow + fiercely slanted glowing crimson eyes + dark sneer
+    c.fillStyle = INK;
     c.beginPath();
-    c.moveTo(cx - 26, hy + 28);
-    c.bezierCurveTo(cx - 34, hy - 20, cx - 16, hy - 36, cx + 4, hy - 34);
-    c.bezierCurveTo(cx + 28, hy - 30, cx + 38, hy + 4, cx + 24, hy + 46);
+    c.moveTo(cx - 13, hy - 7);
+    c.lineTo(cx + 13, hy - 6);
+    c.lineTo(cx + 11, hy + 1);
+    c.lineTo(cx - 11, hy + 1);
     c.closePath();
     c.fill();
-    c.strokeStyle = INK;
-    c.lineWidth = 4;
-    c.stroke();
-
-    paintChiaroscuroShape(
-      c,
-      () => {
-        c.beginPath();
-        c.moveTo(cx - 13, hy - 12);
-        c.quadraticCurveTo(cx, hy - 20, cx + 13, hy - 12);
-        c.lineTo(cx + 11, hy + 10);
-        c.lineTo(cx - 1, hy + 20);
-        c.lineTo(cx - 12, hy + 9);
-        c.closePath();
-      },
-      { x0: cx - 14, y0: hy - 20, x1: cx + 14, y1: hy + 20 },
-      { lit: '#F2E4FA', mid: '#C8B0DE', dark: '#543674' },
-      { shadowPoolFrac: 0.36, hatch: false, inkW: 3.4 }
-    );
+    c.fillStyle = '#FF1A60';
+    c.beginPath();
+    c.moveTo(cx - 11, hy - 4);
+    c.lineTo(cx - 2, hy - 1);
+    c.lineTo(cx - 9, hy + 1);
+    c.closePath();
+    c.moveTo(cx + 11, hy - 4);
+    c.lineTo(cx + 3, hy - 1);
+    c.lineTo(cx + 9, hy + 1);
+    c.closePath();
+    c.fill();
+    paintTaperedArc(c, cx - 5, hy + 11, cx + 1, hy + 13, cx + 6, hy + 10, 2.0, '#7E0E38');
+    // Swept asymmetrical bang crossing forehead
+    paintComicBladeLock(c, cx - 14, hy - 18, cx + 4, hy - 14, cx + 22, hy + 4, cx + 6, hy - 6, { lit: '#5E2482', mid: '#1E0A32', dark: INK, rim: '#FF70E4' }, 2.6);
+    // Twin curved ridged obsidian-gold executioner horns
     for (const dir of [-1, 1] as const) {
-      c.fillStyle = '#E8AE38';
-      c.beginPath();
-      c.moveTo(cx + dir * 8, hy - 16);
-      c.quadraticCurveTo(cx + dir * 30, hy - 30, cx + dir * 24, hy - 56);
-      c.quadraticCurveTo(cx + dir * 16, hy - 34, cx + dir * 2, hy - 20);
-      c.closePath();
-      c.fill();
-      c.strokeStyle = INK;
-      c.lineWidth = 3.2;
-      c.stroke();
+      paintComicBladeLock(
+        c,
+        cx + dir * 10,
+        hy - 16,
+        cx + dir * 34,
+        hy - 30,
+        cx + dir * 28,
+        hy - 60,
+        cx + dir * 18,
+        hy - 36,
+        { lit: '#FFF0A8', mid: '#D69228', dark: '#36143E', rim: '#FFFFFF' },
+        2.8
+      );
     }
-    c.fillStyle = '#FF1C5E';
-    c.fillRect(cx - 10, hy - 3, 7, 3.5);
-    c.fillRect(cx + 3, hy - 3, 7, 3.5);
   });
 
-  // BOSS 2: WARDEN FURY (Bespoke Scorching Crimson Berserker w/ Twin Serrated Saw-Whips & Spiked Flame Pauldrons!)
+  // BOSS 2: WARDEN FURY (Blazing Feathered Berserker w/ Dynamic Jagged Flame Hair, Armored Arms & Twin Spinning Saw-Chakrams!)
   withCell(ctx, 'boss_warden_fury', (c, w, h) => {
     const cx = w * 0.5;
-    const baseY = h * 0.87;
-    const aura = c.createRadialGradient(cx, baseY - 140, 12, cx, baseY - 140, 108);
-    aura.addColorStop(0, 'rgba(255, 86, 28, 0.48)');
+    const baseY = h * 0.89;
+    const aura = c.createRadialGradient(cx, baseY - 144, 12, cx, baseY - 144, 112);
+    aura.addColorStop(0, 'rgba(255, 86, 28, 0.45)');
     aura.addColorStop(1, 'rgba(30, 4, 8, 0)');
     c.fillStyle = aura;
     c.beginPath();
-    c.arc(cx, baseY - 140, 108, 0, Math.PI * 2);
+    c.arc(cx, baseY - 144, 112, 0, Math.PI * 2);
     c.fill();
 
-    // Jagged flame-rimmed bat wings swept aggressively upward
-    drawFuryWing(c, cx, baseY - 142, -1, 0.96, 24, { lit: '#8C1418', mid: '#38080E', rim: '#FF7824' });
-    drawFuryWing(c, cx, baseY - 142, 1, 0.96, 16, { lit: '#781016', mid: '#2E060C', rim: '#FF7824' });
+    drawFeatheredHarpyWing(c, cx, baseY - 148, -1, 0.96, 26, { lit: '#9C181C', mid: '#3A080E', rim: '#FF8428' });
+    drawFeatheredHarpyWing(c, cx, baseY - 144, 1, 0.96, 14, { lit: '#821218', mid: '#2E060C', rim: '#FF8428' });
 
-    // Wide berserker stance legs + crimson war-greaves
+    // Wide Lunging Berserker Greaved Legs!
     for (const dir of [-1, 1] as const) {
       paintChiaroscuroShape(
         c,
         () => {
           c.beginPath();
-          c.moveTo(cx + dir * 10, baseY - 76);
-          c.lineTo(cx + dir * 26, baseY - 76);
-          c.lineTo(cx + dir * 36, baseY);
-          c.lineTo(cx + dir * 18, baseY);
+          c.moveTo(cx + dir * 10, baseY - 82);
+          c.lineTo(cx + dir * 26, baseY - 82);
+          c.quadraticCurveTo(cx + dir * 38, baseY - 40, cx + dir * 38, baseY + 2);
+          c.lineTo(cx + dir * 18, baseY + 2);
+          c.quadraticCurveTo(cx + dir * 20, baseY - 38, cx + dir * 10, baseY - 82);
           c.closePath();
         },
-        { x0: cx - 36, y0: baseY - 76, x1: cx + 36, y1: baseY },
-        { lit: '#C82228', mid: '#5A0C14', dark: INK },
-        { shadowPoolFrac: 0.44, hatch: false, inkW: 3.8 }
+        { x0: cx - 38, y0: baseY - 82, x1: cx + 38, y1: baseY + 2 },
+        { lit: '#D4262A', mid: '#5A0C14', dark: INK, rim: '#FFB054' },
+        { shadowPoolFrac: 0.44, hatch: false, inkW: 3.6 }
       );
     }
 
-    // Spiked Scorched-Bronze & Crimson Corset + Shredded Ember Tassets
+    // Shredded Ember-Trimmed Battle Corset & Jagged War Tassets
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 28, baseY - 144);
-        c.lineTo(cx + 28, baseY - 144);
-        c.lineTo(cx + 42, baseY - 22);
-        c.lineTo(cx + 12, baseY - 46);
-        c.lineTo(cx, baseY - 20);
-        c.lineTo(cx - 12, baseY - 46);
-        c.lineTo(cx - 42, baseY - 22);
+        c.moveTo(cx - 28, baseY - 148);
+        c.lineTo(cx + 28, baseY - 148);
+        c.quadraticCurveTo(cx + 22, baseY - 108, cx + 44, baseY - 20);
+        c.lineTo(cx + 16, baseY - 48);
+        c.lineTo(cx, baseY - 16);
+        c.lineTo(cx - 16, baseY - 48);
+        c.lineTo(cx - 44, baseY - 20);
+        c.quadraticCurveTo(cx - 22, baseY - 108, cx - 28, baseY - 148);
         c.closePath();
       },
-      { x0: cx - 42, y0: baseY - 144, x1: cx + 42, y1: baseY - 20 },
-      { lit: '#EB2824', mid: '#780E14', dark: INK, rim: '#FFAE38' },
-      { shadowPoolFrac: 0.44, inkW: 4.4 }
+      { x0: cx - 44, y0: baseY - 148, x1: cx + 44, y1: baseY - 16 },
+      { lit: '#F02C24', mid: '#780E14', dark: INK, rim: '#FFAE38' },
+      { shadowPoolFrac: 0.44, inkW: 4.0 }
     );
 
-    // Massive Spiked Flame-Orange Pauldrons (asymmetric jagged blades!)
+    // Swept Jagged Flame-Pauldrons, Curved Muscular Arms & Blazing Saw-Chakrams!
     for (const dir of [-1, 1] as const) {
-      paintChiaroscuroShape(
+      paintComicBladeLock(
         c,
-        () => {
-          c.beginPath();
-          c.moveTo(cx + dir * 14, baseY - 144);
-          c.lineTo(cx + dir * 56, baseY - 166);
-          c.lineTo(cx + dir * 48, baseY - 134);
-          c.lineTo(cx + dir * 60, baseY - 124);
-          c.lineTo(cx + dir * 20, baseY - 118);
-          c.closePath();
-        },
-        { x0: cx - 60, y0: baseY - 166, x1: cx + 60, y1: baseY - 118 },
-        { lit: '#FFA838', mid: '#C83218', dark: '#2E080A', rim: '#FFF2A8' },
-        { shadowPoolFrac: 0.36, hatch: false, inkW: 3.8 }
+        cx + dir * 18,
+        baseY - 142,
+        cx + dir * 56,
+        baseY - 172,
+        cx + dir * 64,
+        baseY - 156,
+        cx + dir * 48,
+        baseY - 122,
+        { lit: '#FFB83C', mid: '#C82E18', dark: '#2E080A', rim: '#FFF4B8' },
+        3.2
       );
-      // Bent Armored Berserker Arms + Gauntlets wielding Jagged Spinning Saw-Chakrams!
       paintChiaroscuroShape(
         c,
         () => {
           c.beginPath();
-          c.moveTo(cx + dir * 24, baseY - 126);
-          c.lineTo(cx + dir * 58, baseY - 102);
-          c.lineTo(cx + dir * 74, baseY - 62);
+          c.moveTo(cx + dir * 24, baseY - 130);
+          c.quadraticCurveTo(cx + dir * 60, baseY - 110, cx + dir * 74, baseY - 62);
           c.lineTo(cx + dir * 58, baseY - 56);
-          c.lineTo(cx + dir * 42, baseY - 92);
-          c.lineTo(cx + dir * 20, baseY - 108);
+          c.quadraticCurveTo(cx + dir * 44, baseY - 94, cx + dir * 20, baseY - 110);
           c.closePath();
         },
-        { x0: cx - 76, y0: baseY - 126, x1: cx + 76, y1: baseY - 56 },
-        { lit: '#F2C4A8', mid: '#A83224', dark: '#2E0A10' },
-        { shadowPoolFrac: 0.36, hatch: false, inkW: 3.6 }
+        { x0: cx - 76, y0: baseY - 130, x1: cx + 76, y1: baseY - 56 },
+        { lit: '#F5C4A8', mid: '#B03426', dark: '#2E0A10' },
+        { shadowPoolFrac: 0.36, hatch: false, inkW: 3.4 }
       );
-      // Blazing Serrated Saw-Whip Lash & Toothed Saw-Chakram!
       c.strokeStyle = INK;
       c.lineWidth = 7;
       c.beginPath();
@@ -4266,7 +4735,7 @@ function drawAllBosses(ctx: CanvasRenderingContext2D): void {
       c.closePath();
       c.fill();
       c.strokeStyle = INK;
-      c.lineWidth = 2.8;
+      c.lineWidth = 2.6;
       c.stroke();
       c.fillStyle = '#E0222E';
       c.beginPath();
@@ -4274,76 +4743,87 @@ function drawAllBosses(ctx: CanvasRenderingContext2D): void {
       c.fill();
     }
 
-    // Wild Blazing Crimson Spiky Hair + Fierce Visage + Twin Horned Tiara!
-    const hy = baseY - 170;
+    // Wild Cohesive Blazing Crimson Flame-Hair Crown + Sharp 3/4 Snarling Face!
+    const hy = baseY - 174;
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 28, hy + 16);
-        c.lineTo(cx - 48, hy - 14);
-        c.lineTo(cx - 26, hy - 26);
-        c.lineTo(cx - 32, hy - 50);
-        c.lineTo(cx - 8, hy - 34);
-        c.lineTo(cx + 8, hy - 54);
-        c.lineTo(cx + 22, hy - 32);
-        c.lineTo(cx + 46, hy - 20);
-        c.lineTo(cx + 28, hy + 16);
+        c.moveTo(cx - 24, hy + 10);
+        c.quadraticCurveTo(cx - 34, hy - 22, cx, hy - 34);
+        c.quadraticCurveTo(cx + 34, hy - 22, cx + 24, hy + 10);
         c.closePath();
       },
-      { x0: cx - 48, y0: hy - 54, x1: cx + 46, y1: hy + 16 },
-      { lit: '#FF6A28', mid: '#B01620', dark: '#2A050C', rim: '#FFE078' },
-      { shadowPoolFrac: 0.36, hatch: false, inkW: 3.8 }
+      { x0: cx - 34, y0: hy - 34, x1: cx + 34, y1: hy + 10 },
+      { lit: '#FF6A28', mid: '#9A121C', dark: '#24040A', rim: '#FFE688' },
+      { shadowPoolFrac: 0.4, hatch: false, inkW: 3.0 }
     );
+    const fHair = { lit: '#FF7828', mid: '#B41620', dark: '#2A050C', rim: '#FFE688' };
+    paintComicBladeLock(c, cx - 16, hy - 10, cx - 44, hy - 16, cx - 50, hy - 34, cx - 26, hy - 28, fHair, 2.4);
+    paintComicBladeLock(c, cx - 8, hy - 20, cx - 28, hy - 44, cx - 16, hy - 58, cx - 4, hy - 34, fHair, 2.4);
+    paintComicBladeLock(c, cx + 6, hy - 20, cx + 18, hy - 46, cx + 32, hy - 54, cx + 22, hy - 30, fHair, 2.4);
+    paintComicBladeLock(c, cx + 16, hy - 10, cx + 44, hy - 16, cx + 48, hy - 2, cx + 28, hy + 2, fHair, 2.4);
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
         c.moveTo(cx - 15, hy - 12);
-        c.quadraticCurveTo(cx, hy - 20, cx + 15, hy - 12);
-        c.lineTo(cx + 12, hy + 11);
-        c.lineTo(cx, hy + 21);
-        c.lineTo(cx - 12, hy + 11);
+        c.quadraticCurveTo(cx, hy - 22, cx + 15, hy - 12);
+        c.lineTo(cx + 13, hy + 10);
+        c.lineTo(cx, hy + 22);
+        c.lineTo(cx - 13, hy + 10);
         c.closePath();
       },
-      { x0: cx - 15, y0: hy - 20, x1: cx + 15, y1: hy + 21 },
+      { x0: cx - 15, y0: hy - 22, x1: cx + 15, y1: hy + 22 },
       { lit: '#F7E2DC', mid: '#D4A8A4', dark: '#6E3C42' },
-      { shadowPoolFrac: 0.32, hatch: false, inkW: 3.2 }
+      { shadowPoolFrac: 0.34, hatch: false, inkW: 3.0 }
     );
     c.fillStyle = INK;
     c.fillRect(cx - 13, hy - 6, 26, 7);
     c.fillStyle = '#FFC224';
-    c.fillRect(cx - 10, hy - 4, 6.5, 3.5);
-    c.fillRect(cx + 3.5, hy - 4, 6.5, 3.5);
+    c.beginPath();
+    c.moveTo(cx - 11, hy - 4);
+    c.lineTo(cx - 3, hy - 1);
+    c.lineTo(cx - 9, hy + 1);
+    c.closePath();
+    c.moveTo(cx + 11, hy - 4);
+    c.lineTo(cx + 3, hy - 1);
+    c.lineTo(cx + 9, hy + 1);
+    c.closePath();
+    c.fill();
   });
 
-  // BOSS 3: WARDEN MURDER (Bespoke Hooded Bronze-Masked Phantom Executioner w/ Emerald-Black Shroud & Twin Sickle-Cleavers!)
+  // BOSS 3: WARDEN MURDER (Feathered Emerald-Black Phantom Executioner w/ Ragged Shroud, Engraved Death Mask & Twin Crescent Scythes!)
   withCell(ctx, 'boss_warden_murder', (c, w, h) => {
     const cx = w * 0.5;
-    const baseY = h * 0.87;
-    drawFuryWing(c, cx, baseY - 148, -1, 0.94, 4, { lit: '#1F5C4E', mid: '#0C2824', rim: '#52F5B4' });
-    drawFuryWing(c, cx, baseY - 148, 1, 0.94, 4, { lit: '#1B4E44', mid: '#0A201E', rim: '#52F5B4' });
+    const baseY = h * 0.89;
+    drawFeatheredHarpyWing(c, cx, baseY - 150, -1, 0.94, 8, { lit: '#226B5A', mid: '#0C2824', rim: '#5EFFC2' });
+    drawFeatheredHarpyWing(c, cx, baseY - 150, 1, 0.94, 4, { lit: '#1B564A', mid: '#0A201E', rim: '#5EFFC2' });
 
-    // Ragged emerald-obsidian hooded shroud flowing down to jagged tatters
+    // Multi-Fold Ragged Emerald-Obsidian Hooded Executioner Shroud w/ Heavy #09060E Inner Shadow Folds!
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 26, baseY - 160);
-        c.quadraticCurveTo(cx, baseY - 210, cx + 26, baseY - 160);
-        c.lineTo(cx + 48, baseY - 8);
-        c.lineTo(cx + 22, baseY - 34);
-        c.lineTo(cx + 4, baseY + 2);
+        c.moveTo(cx - 26, baseY - 166);
+        c.quadraticCurveTo(cx, baseY - 216, cx + 26, baseY - 166);
+        c.bezierCurveTo(cx + 42, baseY - 108, cx + 56, baseY - 46, cx + 50, baseY - 4);
+        c.lineTo(cx + 24, baseY - 34);
+        c.lineTo(cx + 4, baseY + 4);
         c.lineTo(cx - 16, baseY - 28);
-        c.lineTo(cx - 48, baseY - 4);
+        c.lineTo(cx - 50, baseY - 2);
+        c.bezierCurveTo(cx - 54, baseY - 48, cx - 40, baseY - 108, cx - 26, baseY - 166);
         c.closePath();
       },
-      { x0: cx - 48, y0: baseY - 208, x1: cx + 48, y1: baseY + 2 },
-      { lit: '#2A6A5B', mid: '#122E2B', dark: INK, rim: '#68FFC6' },
-      { shadowPoolFrac: 0.48, inkW: 4.6 }
+      { x0: cx - 52, y0: baseY - 214, x1: cx + 52, y1: baseY + 4 },
+      { lit: '#2C7462', mid: '#122E2B', dark: INK, rim: '#6EFFCA' },
+      { shadowPoolFrac: 0.48, inkW: 4.2 }
     );
+    // Deep ink vertical drapery troughs
+    paintTaperedArc(c, cx - 14, baseY - 126, cx - 24, baseY - 72, cx - 16, baseY - 28, 7.5, INK);
+    paintTaperedArc(c, cx + 16, baseY - 126, cx + 28, baseY - 72, cx + 24, baseY - 34, 8.5, INK);
 
-    // Twin Wicked Curved Crescent Sickle-Cleavers!
+    // Twin Wicked Curved Crescent Sickle-Cleavers gripped by shrouded arms!
     for (const dir of [-1, 1] as const) {
       c.save();
       c.translate(cx + dir * 48, baseY - 94);
@@ -4354,20 +4834,20 @@ function drawAllBosses(ctx: CanvasRenderingContext2D): void {
           c.beginPath();
           c.moveTo(-10, 26);
           c.lineTo(-4, -18);
-          c.bezierCurveTo(24, -46, 56, -24, 46, 22);
+          c.bezierCurveTo(24, -46, 58, -24, 48, 22);
           c.quadraticCurveTo(32, -8, 6, -4);
           c.lineTo(2, 26);
           c.closePath();
         },
-        { x0: -10, y0: -40, x1: 52, y1: 26 },
+        { x0: -10, y0: -40, x1: 54, y1: 26 },
         { lit: '#E4FFF4', mid: '#6E9C94', dark: '#182A2A', rim: '#78FFCC' },
-        { shadowPoolFrac: 0.36, hatch: false, inkW: 3.8 }
+        { shadowPoolFrac: 0.36, hatch: false, inkW: 3.6 }
       );
       c.restore();
     }
 
-    // Haunting Engraved Bronze Executioner Mask inside Pitch-Black Hood Cavern!
-    const hy = baseY - 168;
+    // Haunting Engraved Bronze Executioner Death Mask inside Pitch-Black Hood Cavern!
+    const hy = baseY - 170;
     c.fillStyle = INK;
     c.beginPath();
     c.ellipse(cx, hy, 22, 26, 0, 0, Math.PI * 2);
@@ -4379,166 +4859,208 @@ function drawAllBosses(ctx: CanvasRenderingContext2D): void {
         c.moveTo(cx - 15, hy - 14);
         c.lineTo(cx + 15, hy - 14);
         c.lineTo(cx + 12, hy + 12);
-        c.lineTo(cx, hy + 22);
+        c.lineTo(cx, hy + 23);
         c.lineTo(cx - 12, hy + 12);
         c.closePath();
       },
-      { x0: cx - 15, y0: hy - 14, x1: cx + 15, y1: hy + 22 },
+      { x0: cx - 15, y0: hy - 14, x1: cx + 15, y1: hy + 23 },
       { lit: '#F2E0B0', mid: '#B08C48', dark: '#3E2B12' },
-      { shadowPoolFrac: 0.42, hatch: false, inkW: 3.4 }
+      { shadowPoolFrac: 0.42, hatch: false, inkW: 3.2 }
     );
-    // Razor glowing blood-red mask slits
     c.fillStyle = '#FF2040';
-    c.fillRect(cx - 10, hy - 4, 7, 3.5);
-    c.fillRect(cx + 3, hy - 4, 7, 3.5);
+    c.beginPath();
+    c.moveTo(cx - 11, hy - 5);
+    c.lineTo(cx - 2, hy - 2);
+    c.lineTo(cx - 9, hy + 1);
+    c.closePath();
+    c.moveTo(cx + 11, hy - 5);
+    c.lineTo(cx + 2, hy - 2);
+    c.lineTo(cx + 9, hy + 1);
+    c.closePath();
+    c.fill();
   });
 
-  // BOSS 4: BONE LEVIATHAN (Colossal Articulated Obsidian-Ivory Serpent Dragon + Furnace Ribcage + Bronze Chains + Horned Skull!)
+  // BOSS 4: BONE LEVIATHAN (Colossal Fierce Horned Obsidian-Bone Drake Monarch + Shattered Magma-Furnace Ribcage + Curved Predator Fangs!)
   withCell(ctx, 'boss_bone_leviathan', (c, w, h) => {
     const cx = w * 0.5;
-    const baseY = h * 0.88;
+    const baseY = h * 0.89;
 
-    // Blazing molten magma swirl base
-    const lava = c.createRadialGradient(cx, baseY - 12, 14, cx, baseY - 12, 122);
-    lava.addColorStop(0, '#FFAE24');
+    // Blazing molten magma cauldron swirl base
+    const lava = c.createRadialGradient(cx, baseY - 12, 14, cx, baseY - 12, 124);
+    lava.addColorStop(0, '#FFB228');
     lava.addColorStop(0.48, 'rgba(225, 48, 12, 0.65)');
     lava.addColorStop(1, 'rgba(80, 10, 8, 0)');
     c.fillStyle = lava;
     c.beginPath();
-    c.ellipse(cx, baseY - 12, 122, 46, 0, 0, Math.PI * 2);
+    c.ellipse(cx, baseY - 12, 124, 44, 0, 0, Math.PI * 2);
     c.fill();
 
-    // Articulated Segmented Obsidian-Bone Spinal Column + Jagged Dorsal Spikes
+    // Jagged Dorsal Spinal Column Fins flaring out behind ribcage
+    for (let i = 0; i < 4; i++) {
+      const sy = baseY - 38 - i * 32;
+      paintComicBladeLock(c, cx - 42, sy, cx - 76, sy - 16, cx - 84, sy - 4, cx - 58, sy + 12, { lit: '#FAF0D6', mid: '#8C7A68', dark: '#2E1818', rim: '#FFB660' }, 2.8);
+      paintComicBladeLock(c, cx + 42, sy, cx + 76, sy - 16, cx + 84, sy - 4, cx + 58, sy + 12, { lit: '#C4B094', mid: '#58443C', dark: INK }, 2.8);
+    }
+
+    // Shattered Obsidian-Bone Torso Column
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 48, baseY);
-        c.bezierCurveTo(cx - 72, baseY - 72, cx - 26, baseY - 130, cx - 30, baseY - 184);
-        c.lineTo(cx + 30, baseY - 184);
-        c.bezierCurveTo(cx + 42, baseY - 124, cx + 70, baseY - 68, cx + 50, baseY);
+        c.moveTo(cx - 50, baseY);
+        c.bezierCurveTo(cx - 72, baseY - 72, cx - 32, baseY - 134, cx - 30, baseY - 186);
+        c.lineTo(cx + 30, baseY - 186);
+        c.bezierCurveTo(cx + 42, baseY - 126, cx + 72, baseY - 68, cx + 52, baseY);
         c.closePath();
       },
-      { x0: cx - 68, y0: baseY - 184, x1: cx + 68, y1: baseY },
-      { lit: '#642A26', mid: '#2A0E12', dark: INK, rim: '#FF9442' },
-      { shadowPoolFrac: 0.44, inkW: 5.0 }
+      { x0: cx - 68, y0: baseY - 186, x1: cx + 68, y1: baseY },
+      { lit: '#642A26', mid: '#260C10', dark: INK, rim: '#FF9442' },
+      { shadowPoolFrac: 0.46, inkW: 4.8 }
     );
 
-    // Incandescent Molten Magma Furnace Core glowing inside cavernous shadowed ribcage!
-    const coreG = c.createRadialGradient(cx, baseY - 82, 6, cx, baseY - 82, 42);
-    coreG.addColorStop(0, '#FFF8B8');
+    // Incandescent Molten Furnace Heart blazing inside shadowed ribcage!
+    const coreG = c.createRadialGradient(cx, baseY - 82, 6, cx, baseY - 82, 46);
+    coreG.addColorStop(0, '#FFFAC0');
     coreG.addColorStop(0.45, '#FF6A14');
     coreG.addColorStop(1, 'rgba(180, 20, 8, 0)');
     c.fillStyle = coreG;
     c.beginPath();
-    c.ellipse(cx, baseY - 82, 34, 62, 0, 0, Math.PI * 2);
+    c.ellipse(cx, baseY - 82, 36, 64, 0, 0, Math.PI * 2);
     c.fill();
 
-    // 5 Pairs of Heavy Articulated Curved Ivory Rib Plates + Bronze Collar Chains!
+    // 5 Pairs of Heavy Razor-Curved Ivory Rib Blades + Heavy Draped Bronze Collar Chains!
     for (let i = 0; i < 5; i++) {
-      const ry = baseY - 24 - i * 27;
-      const rw = 56 - i * 5;
+      const ry = baseY - 22 - i * 27;
+      const rw = 60 - i * 5;
       for (const dir of [-1, 1] as const) {
         paintChiaroscuroShape(
           c,
           () => {
             c.beginPath();
-            c.moveTo(cx + dir * rw, ry + 8);
-            c.quadraticCurveTo(cx + dir * (rw * 0.54), ry - 14, cx + dir * 10, ry - 4);
-            c.lineTo(cx + dir * 12, ry + 10);
-            c.quadraticCurveTo(cx + dir * (rw * 0.52), ry + 2, cx + dir * (rw - 4), ry + 16);
+            c.moveTo(cx + dir * rw, ry + 10);
+            c.quadraticCurveTo(cx + dir * (rw * 0.56), ry - 16, cx + dir * 12, ry - 6);
+            c.lineTo(cx + dir * 16, ry + 10);
+            c.quadraticCurveTo(cx + dir * (rw * 0.54), ry + 2, cx + dir * (rw - 6), ry + 18);
             c.closePath();
           },
-          { x0: cx - rw, y0: ry - 14, x1: cx + rw, y1: ry + 16 },
-          { lit: '#FAF0D8', mid: '#C8B89C', dark: '#4A3C36' },
-          { shadowPoolFrac: 0.4, hatch: false, inkW: 3.4 }
+          { x0: cx - rw, y0: ry - 16, x1: cx + rw, y1: ry + 18 },
+          { lit: '#FAF0D8', mid: '#C8B89C', dark: '#463630' },
+          { shadowPoolFrac: 0.42, hatch: false, inkW: 3.2 }
         );
       }
     }
+    paintTaperedArc(c, cx - 40, baseY - 146, cx, baseY - 120, cx + 40, baseY - 146, 8.0, INK);
+    paintTaperedArc(c, cx - 38, baseY - 146, cx, baseY - 122, cx + 38, baseY - 146, 4.2, '#E8AE38');
 
-    // Heavy Tarnished-Bronze Collar Chains draped around dragon neck!
-    c.strokeStyle = '#E5AA38';
-    c.lineWidth = 7;
-    c.beginPath();
-    c.moveTo(cx - 38, baseY - 146);
-    c.quadraticCurveTo(cx, baseY - 122, cx + 38, baseY - 146);
-    c.stroke();
-    c.strokeStyle = INK;
-    c.lineWidth = 2.8;
-    c.stroke();
-
-    // Massive Horned Draconic Skull w/ Swept Obsidian Crown Horns, Hinged Serrated Jaw & Mignola Brow Cavern (fits cleanly inside cell!)
-    const hy = baseY - 184;
+    // Ferocious Jagged Horned Draconic Skull w/ Swept Crown Horns, Hinged Magma Jaw & Curved Interlocking Fangs!
+    const hy = baseY - 186;
     for (const dir of [-1, 1] as const) {
-      paintChiaroscuroShape(
+      paintComicBladeLock(
         c,
-        () => {
-          c.beginPath();
-          c.moveTo(cx + dir * 24, hy - 16);
-          c.quadraticCurveTo(cx + dir * 78, hy - 28, cx + dir * 92, hy - 68);
-          c.quadraticCurveTo(cx + dir * 60, hy - 48, cx + dir * 34, hy - 38);
-          c.closePath();
-        },
-        { x0: cx - 94, y0: hy - 68, x1: cx + 94, y1: hy - 16 },
-        { lit: '#7E423C', mid: '#381A22', dark: INK, rim: '#FFC474' },
-        { shadowPoolFrac: 0.36, hatch: false, inkW: 4.4 }
+        cx + dir * 24,
+        hy - 18,
+        cx + dir * 82,
+        hy - 32,
+        cx + dir * 96,
+        hy - 72,
+        cx + dir * 60,
+        hy - 50,
+        { lit: '#8E4842', mid: '#381A22', dark: INK, rim: '#FFC878' },
+        3.8
+      );
+      paintComicBladeLock(
+        c,
+        cx + dir * 32,
+        hy - 4,
+        cx + dir * 70,
+        hy - 12,
+        cx + dir * 78,
+        hy - 34,
+        cx + dir * 50,
+        hy - 20,
+        { lit: '#6C3432', mid: '#261018', dark: INK },
+        3.2
       );
     }
 
-    // Glowing molten lower jaw cavern
+    // Roaring Incandescent Magma Lower Jaw Cavern
     c.fillStyle = '#FF5A14';
     c.beginPath();
-    c.ellipse(cx, hy + 36, 26, 18, 0, 0, Math.PI * 2);
+    c.moveTo(cx - 32, hy + 20);
+    c.lineTo(cx + 32, hy + 20);
+    c.lineTo(cx + 22, hy + 56);
+    c.lineTo(cx, hy + 64);
+    c.lineTo(cx - 22, hy + 56);
+    c.closePath();
     c.fill();
     c.strokeStyle = INK;
-    c.lineWidth = 4;
+    c.lineWidth = 4.0;
     c.stroke();
+    c.fillStyle = '#FFF4A8';
+    c.beginPath();
+    c.ellipse(cx, hy + 38, 16, 12, 0, 0, Math.PI * 2);
+    c.fill();
 
-    // Chiseled Bony Draconic Cranium & Armored Snout
+    // Angular Cracked Draconic Obsidian-Bone Cranium & Flared Armored Snout
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 58, hy - 22);
-        c.quadraticCurveTo(cx, hy - 62, cx + 58, hy - 22);
-        c.lineTo(cx + 46, hy + 22);
-        c.lineTo(cx + 24, hy + 46);
-        c.lineTo(cx, hy + 52);
-        c.lineTo(cx - 24, hy + 46);
-        c.lineTo(cx - 46, hy + 22);
+        c.moveTo(cx - 60, hy - 20);
+        c.lineTo(cx - 34, hy - 54);
+        c.lineTo(cx, hy - 62);
+        c.lineTo(cx + 34, hy - 54);
+        c.lineTo(cx + 60, hy - 20);
+        c.lineTo(cx + 46, hy + 18);
+        c.lineTo(cx + 32, hy + 40);
+        c.lineTo(cx, hy + 46);
+        c.lineTo(cx - 32, hy + 40);
+        c.lineTo(cx - 46, hy + 18);
         c.closePath();
       },
-      { x0: cx - 58, y0: hy - 62, x1: cx + 58, y1: hy + 52 },
-      { lit: '#FFF6E2', mid: '#CBBCA0', dark: '#54463E', rim: '#FFC878' },
-      { shadowPoolFrac: 0.4, inkW: 5.0 }
+      { x0: cx - 60, y0: hy - 62, x1: cx + 60, y1: hy + 46 },
+      { lit: '#FFF6E2', mid: '#C8B89C', dark: '#4A3C36', rim: '#FFCE80' },
+      { shadowPoolFrac: 0.4, inkW: 4.6 }
     );
-    // Heavy Mignola Brow Shadow Mask & Blazing Molten Eye-Sockets!
+    // Glowing magma brow fissure cracks & deeply shadowed predatory eye-sockets!
+    paintTaperedArc(c, cx - 22, hy - 44, cx - 6, hy - 26, cx + 12, hy - 34, 2.8, '#FF5A14');
     c.fillStyle = INK;
     c.beginPath();
-    c.moveTo(cx - 44, hy - 14);
-    c.lineTo(cx - 10, hy - 1);
-    c.lineTo(cx - 18, hy + 13);
-    c.lineTo(cx - 40, hy + 6);
+    c.moveTo(cx - 46, hy - 14);
+    c.lineTo(cx - 8, hy + 1);
+    c.lineTo(cx - 18, hy + 14);
+    c.lineTo(cx - 42, hy + 6);
     c.closePath();
-    c.moveTo(cx + 44, hy - 14);
-    c.lineTo(cx + 10, hy - 1);
-    c.lineTo(cx + 18, hy + 13);
-    c.lineTo(cx + 40, hy + 6);
+    c.moveTo(cx + 46, hy - 14);
+    c.lineTo(cx + 8, hy + 1);
+    c.lineTo(cx + 18, hy + 14);
+    c.lineTo(cx + 42, hy + 6);
     c.closePath();
     c.fill();
     c.fillStyle = '#FFA41C';
-    c.fillRect(cx - 32, hy - 4, 12, 7);
-    c.fillRect(cx + 20, hy - 4, 12, 7);
-    c.fillStyle = '#FFFCE0';
-    c.fillRect(cx - 29, hy - 2, 5, 3);
-    c.fillRect(cx + 23, hy - 2, 5, 3);
-    // Serrated jagged fangs
-    c.fillStyle = '#FFF8E8';
-    for (const fx of [-26, -14, -2, 10, 22]) {
+    c.beginPath();
+    c.moveTo(cx - 38, hy - 7);
+    c.lineTo(cx - 14, hy + 1);
+    c.lineTo(cx - 26, hy + 7);
+    c.closePath();
+    c.moveTo(cx + 38, hy - 7);
+    c.lineTo(cx + 14, hy + 1);
+    c.lineTo(cx + 26, hy + 7);
+    c.closePath();
+    c.fill();
+    // Curved Asymmetric Hooked Predator Fangs!
+    for (const [fx, len, curve] of [
+      [-28, 22, 5],
+      [-14, 15, 2],
+      [0, 12, 0],
+      [14, 15, -2],
+      [28, 22, -5],
+    ]) {
+      c.fillStyle = '#FFF8E8';
       c.beginPath();
-      c.moveTo(cx + fx - 4, hy + 32);
-      c.lineTo(cx + fx, hy + 52);
-      c.lineTo(cx + fx + 4, hy + 32);
+      c.moveTo(cx + fx - 4.5, hy + 30);
+      c.quadraticCurveTo(cx + fx + curve, hy + 30 + len * 0.65, cx + fx + curve * 0.7, hy + 30 + len);
+      c.quadraticCurveTo(cx + fx + 4.5 + curve * 0.2, hy + 30 + len * 0.5, cx + fx + 4.5, hy + 30);
       c.closePath();
       c.fill();
       c.strokeStyle = INK;
@@ -4547,729 +5069,897 @@ function drawAllBosses(ctx: CanvasRenderingContext2D): void {
     }
   });
 
-  // BOSS 5: COLOSSEUM BULL (Massive Muscular Minotaur Juggernaut, Curved Ivory Horns, Harness, Shackles & Colossal Labrys Axe — ZERO Brown Box!)
+  // BOSS 5: COLOSSEUM BULL (Hulking Anatomical Minotaur Juggernaut, Lowered Horned Bull Head, Studded Leather Harness & Massive Inked Labrys — ZERO Square Chest / Yellow X!)
   withCell(ctx, 'boss_colosseum_bull', (c, w, h) => {
-    const cx = w * 0.47;
-    const baseY = h * 0.88;
+    const cx = w * 0.45;
+    const baseY = h * 0.89;
 
-    // Colossal Cel-Shaded Double-Headed Labrys Battle-Axe angled dynamically behind shoulder!
+    // Colossal Battle-Notched Double-Bladed Inked Labrys Greataxe slung dynamically across back/shoulder!
     c.save();
-    c.translate(cx + 68, baseY - 128);
-    c.rotate(0.32);
-    c.fillStyle = '#5C321C';
-    c.fillRect(-7, -108, 14, 214);
-    c.strokeStyle = INK;
-    c.lineWidth = 4.2;
-    c.strokeRect(-7, -108, 14, 214);
+    c.translate(cx + 72, baseY - 128);
+    c.rotate(0.36);
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(-54, -92);
-        c.quadraticCurveTo(0, -56, 54, -92);
-        c.lineTo(62, -18);
-        c.quadraticCurveTo(0, -48, -62, -18);
+        c.moveTo(-7, -118);
+        c.lineTo(7, -118);
+        c.lineTo(9, 108);
+        c.lineTo(-9, 108);
         c.closePath();
       },
-      { x0: -62, y0: -92, x1: 62, y1: -18 },
-      { lit: '#FFF8D0', mid: '#E8B23E', dark: '#542C08', rim: '#FFFFFF' },
-      { shadowPoolFrac: 0.36, inkW: 4.4 }
+      { x0: -9, y0: -118, x1: 9, y1: 108 },
+      { lit: '#7C4828', mid: '#422014', dark: INK },
+      { shadowPoolFrac: 0.42, hatch: false, inkW: 3.8 }
     );
+    // Massive Sweeping Crescent Double-Headed Labrys Steel Blades w/ Battle Notches & Crimson Runes!
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(-64, -104);
+        c.quadraticCurveTo(-24, -68, 0, -64);
+        c.quadraticCurveTo(24, -68, 64, -104);
+        c.bezierCurveTo(78, -68, 76, -34, 62, -6);
+        c.quadraticCurveTo(26, -42, 0, -38);
+        c.quadraticCurveTo(-26, -42, -62, -6);
+        c.bezierCurveTo(-76, -34, -78, -68, -64, -104);
+        c.closePath();
+      },
+      { x0: -76, y0: -104, x1: 76, y1: -6 },
+      { lit: '#FFF8D8', mid: '#C8A66E', dark: '#36221C', rim: '#FFFFFF' },
+      { shadowPoolFrac: 0.4, inkW: 4.4 }
+    );
+    // Gleaming honed crescent blade edges & crimson bull-rune inlay
+    paintTaperedArc(c, -60, -96, -70, -56, -58, -14, 4.2, '#FFFFFF');
+    paintTaperedArc(c, 60, -96, 70, -56, 58, -14, 4.2, '#FFF2B8');
+    c.fillStyle = '#D62030';
+    c.beginPath();
+    c.arc(0, -52, 9, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 2.8;
+    c.stroke();
     c.restore();
 
-    // Muscular Digitigrade Bull Legs + Heavy Iron Ankle Shackles + Cloven Hooves
-    for (const dir of [-1, 1] as const) {
+    // Muscular Digitigrade Bull Legs in Raging Charge Stance + Shaggy Fur Hocks & Split Obsidian Hooves!
+    const drawBullLeg = (hipX: number, kneeX: number, hoofX: number, front: boolean) => {
       paintChiaroscuroShape(
         c,
         () => {
           c.beginPath();
-          c.moveTo(cx + dir * 16, baseY - 66);
-          c.lineTo(cx + dir * 50, baseY - 66);
-          c.lineTo(cx + dir * 60, baseY - 14);
-          c.lineTo(cx + dir * 54, baseY + 2);
-          c.lineTo(cx + dir * 24, baseY + 2);
-          c.lineTo(cx + dir * 28, baseY - 18);
+          c.moveTo(hipX - 20, baseY - 78);
+          c.lineTo(hipX + 20, baseY - 78);
+          c.quadraticCurveTo(kneeX + 22, baseY - 46, kneeX + 12, baseY - 26);
+          c.lineTo(hoofX + 16, baseY - 4);
+          c.lineTo(hoofX - 16, baseY - 4);
+          c.lineTo(kneeX - 18, baseY - 26);
+          c.quadraticCurveTo(hipX - 24, baseY - 48, hipX - 20, baseY - 78);
           c.closePath();
         },
-        { x0: cx - 60, y0: baseY - 66, x1: cx + 60, y1: baseY + 2 },
-        { lit: '#9C5A3E', mid: '#4E241A', dark: INK },
-        { shadowPoolFrac: 0.44, inkW: 4.4 }
+        { x0: Math.min(hipX, hoofX) - 24, y0: baseY - 78, x1: Math.max(hipX, hoofX) + 24, y1: baseY },
+        front ? { lit: '#A86242', mid: '#5A2C1E', dark: INK } : { lit: '#7E442E', mid: '#3A1A14', dark: INK },
+        { shadowPoolFrac: 0.45, hatch: false, inkW: 4.0 }
       );
-    }
-
-    // Massive Hunched Muscular Minotaur Shoulders, Scarred Bronze-Hide Pectorals & Heavy Deltoids!
-    paintChiaroscuroShape(
-      c,
-      () => {
-        c.beginPath();
-        c.moveTo(cx - 42, baseY - 60);
-        c.bezierCurveTo(cx - 94, baseY - 94, cx - 98, baseY - 166, cx - 44, baseY - 184);
-        c.quadraticCurveTo(cx, baseY - 202, cx + 44, baseY - 184);
-        c.bezierCurveTo(cx + 98, baseY - 166, cx + 94, baseY - 94, cx + 42, baseY - 60);
-        c.closePath();
-      },
-      { x0: cx - 96, y0: baseY - 196, x1: cx + 96, y1: baseY - 60 },
-      { lit: '#CC7E58', mid: '#783B28', dark: '#240E0E', rim: '#FFE0A4' },
-      { shadowPoolFrac: 0.42, inkW: 5.0 }
-    );
-    // Sculpted anatomical muscle-shadow ink lines across chest & shoulders
-    paintTaperedArc(ctx, cx - 54, baseY - 114, cx - 24, baseY - 96, cx - 4, baseY - 116, 4.2, INK);
-    paintTaperedArc(ctx, cx + 54, baseY - 114, cx + 24, baseY - 96, cx + 4, baseY - 116, 4.2, INK);
-
-    // Diagonal Leather & Riveted Bronze War Harness + Iron Wrist Shackles!
-    c.strokeStyle = INK;
-    c.lineWidth = 15;
-    c.beginPath();
-    c.moveTo(cx - 64, baseY - 166);
-    c.lineTo(cx + 42, baseY - 66);
-    c.moveTo(cx + 64, baseY - 166);
-    c.lineTo(cx - 42, baseY - 66);
-    c.stroke();
-    c.strokeStyle = '#D69A38';
-    c.lineWidth = 8.5;
-    c.stroke();
-
-    // Pleated Crimson-and-Gold Gladiator War Kilt (layered armored pteruges — NOT a pink loincloth!)
-    paintChiaroscuroShape(
-      c,
-      () => {
-        c.beginPath();
-        c.moveTo(cx - 48, baseY - 66);
-        c.lineTo(cx + 48, baseY - 66);
-        c.lineTo(cx + 52, baseY - 24);
-        c.lineTo(cx + 22, baseY - 30);
-        c.lineTo(cx, baseY - 14);
-        c.lineTo(cx - 22, baseY - 30);
-        c.lineTo(cx - 52, baseY - 24);
-        c.closePath();
-      },
-      { x0: cx - 52, y0: baseY - 66, x1: cx + 52, y1: baseY - 14 },
-      { lit: '#D42232', mid: '#780E1C', dark: INK, rim: '#F5C452' },
-      { shadowPoolFrac: 0.42, inkW: 4.2 }
-    );
-    // Gold belt buckle
-    c.fillStyle = '#F5C44E';
-    c.fillRect(cx - 48, baseY - 72, 96, 12);
-    c.strokeStyle = INK;
-    c.lineWidth = 3.6;
-    c.strokeRect(cx - 48, baseY - 72, 96, 12);
-
-    // Sweeping Curved Ivory Bull Horns Banded in Bronze (fits cleanly inside cell!)
-    const hy = baseY - 172;
-    for (const dir of [-1, 1] as const) {
-      paintChiaroscuroShape(
-        c,
-        () => {
-          c.beginPath();
-          c.moveTo(cx + dir * 24, hy - 12);
-          c.quadraticCurveTo(cx + dir * 94, hy - 14, cx + dir * 78, hy - 74);
-          c.quadraticCurveTo(cx + dir * 60, hy - 34, cx + dir * 18, hy - 26);
-          c.closePath();
-        },
-        { x0: cx - 92, y0: hy - 74, x1: cx + 92, y1: hy - 10 },
-        { lit: '#FFF8E4', mid: '#D4C2A2', dark: '#544234', rim: '#FFFFFF' },
-        { shadowPoolFrac: 0.32, hatch: false, inkW: 4.2 }
-      );
-      c.strokeStyle = '#E8AE38';
-      c.lineWidth = 6;
+      // Heavy split cloven obsidian hoof
+      c.fillStyle = INK;
       c.beginPath();
-      c.moveTo(cx + dir * 46, hy - 30);
-      c.lineTo(cx + dir * 54, hy - 18);
+      c.moveTo(hoofX - 16, baseY - 12);
+      c.lineTo(hoofX + 16, baseY - 12);
+      c.lineTo(hoofX + 20, baseY + 4);
+      c.lineTo(hoofX + 3, baseY + 4);
+      c.lineTo(hoofX, baseY - 4);
+      c.lineTo(hoofX - 3, baseY + 4);
+      c.lineTo(hoofX - 20, baseY + 4);
+      c.closePath();
+      c.fill();
+    };
+    drawBullLeg(cx - 26, cx - 44, cx - 36, false);
+    drawBullLeg(cx + 28, cx + 44, cx + 40, true);
+
+    // Towering Hunched Anatomical Minotaur Back Hump, Sculpted Pectorals & Tapered Athletic Waist (ZERO brown box!)
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(cx - 38, baseY - 66);
+        c.bezierCurveTo(cx - 88, baseY - 96, cx - 104, baseY - 166, cx - 54, baseY - 196);
+        c.quadraticCurveTo(cx - 4, baseY - 224, cx + 48, baseY - 194); // towering hunched bull-neck trapezius hump!
+        c.bezierCurveTo(cx + 98, baseY - 164, cx + 88, baseY - 96, cx + 38, baseY - 66);
+        c.closePath();
+      },
+      { x0: cx - 102, y0: baseY - 222, x1: cx + 98, y1: baseY - 66 },
+      { lit: '#CC7D56', mid: '#783B28', dark: '#240E0E', rim: '#FFE0A4' },
+      { shadowPoolFrac: 0.44, inkW: 4.8 }
+    );
+    // Deep anatomical pectoral, latissimus, abdominal & fur-ridge comic ink sculpting!
+    paintTaperedArc(c, cx - 56, baseY - 132, cx - 26, baseY - 110, cx - 4, baseY - 128, 4.5, INK);
+    paintTaperedArc(c, cx + 56, baseY - 132, cx + 26, baseY - 110, cx + 4, baseY - 128, 4.5, INK);
+    paintTaperedArc(c, cx, baseY - 132, cx, baseY - 104, cx, baseY - 76, 3.6, INK);
+    paintTaperedArc(c, cx - 28, baseY - 102, cx - 12, baseY - 94, cx - 2, baseY - 100, 3.0, '#361412');
+    paintTaperedArc(c, cx + 28, baseY - 102, cx + 12, baseY - 94, cx + 2, baseY - 100, 3.0, INK);
+
+    // Asymmetric Studded Dark-Leather Gladiator Battle Strap + Hammered Bronze Shoulder Guard (ZERO cartoon yellow X!)
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(cx - 72, baseY - 170);
+        c.lineTo(cx - 48, baseY - 182);
+        c.lineTo(cx + 42, baseY - 72);
+        c.lineTo(cx + 22, baseY - 62);
+        c.closePath();
+      },
+      { x0: cx - 72, y0: baseY - 182, x1: cx + 42, y1: baseY - 62 },
+      { lit: '#5A3A2E', mid: '#2E1A18', dark: INK },
+      { shadowPoolFrac: 0.4, hatch: false, inkW: 3.4 }
+    );
+    // Tarnished bronze studs along diagonal leather harness
+    for (let s = 0; s < 5; s++) {
+      const t = (s + 0.6) / 5.4;
+      const sx = cx - 58 + t * 88;
+      const sy = baseY - 172 + t * 98;
+      c.fillStyle = '#E5AF42';
+      c.beginPath();
+      c.arc(sx, sy, 4.2, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 1.8;
       c.stroke();
     }
+    // Battered asymmetric bronze arena pauldron on left deltoid
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(cx - 94, baseY - 134);
+        c.bezierCurveTo(cx - 102, baseY - 174, cx - 68, baseY - 194, cx - 40, baseY - 174);
+        c.lineTo(cx - 52, baseY - 132);
+        c.closePath();
+      },
+      { x0: cx - 102, y0: baseY - 192, x1: cx - 40, y1: baseY - 132 },
+      { lit: '#F2C662', mid: '#9A6420', dark: '#2E1608', rim: '#FFF8D0' },
+      { shadowPoolFrac: 0.42, hatch: false, inkW: 4.0 }
+    );
 
-    // Muscular Outstretched Forearms & Chained Iron Gauntlets gripping Labrys Axe!
+    // Shredded Crimson Gladiator Battle Kilt & Heavy Iron-Buckled Arena Belt
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(cx - 46, baseY - 68);
+        c.lineTo(cx + 46, baseY - 68);
+        c.lineTo(cx + 54, baseY - 22);
+        c.lineTo(cx + 26, baseY - 34);
+        c.lineTo(cx + 4, baseY - 12);
+        c.lineTo(cx - 22, baseY - 34);
+        c.lineTo(cx - 52, baseY - 22);
+        c.closePath();
+      },
+      { x0: cx - 52, y0: baseY - 68, x1: cx + 54, y1: baseY - 12 },
+      { lit: '#C81E2E', mid: '#6E0C1A', dark: INK, rim: '#F2BA4E' },
+      { shadowPoolFrac: 0.44, inkW: 4.0 }
+    );
+    paintTaperedArc(c, cx - 46, baseY - 68, cx, baseY - 62, cx + 46, baseY - 68, 9.5, '#C48A2C');
+    paintTaperedArc(c, cx - 46, baseY - 68, cx, baseY - 62, cx + 46, baseY - 68, 3.0, INK);
+
+    // Massive Curved Muscular Minotaur Forearms, Broken Iron Shackles & Clenched Gauntlets!
     for (const dir of [-1, 1] as const) {
       paintChiaroscuroShape(
         c,
         () => {
           c.beginPath();
-          c.moveTo(cx + dir * 64, baseY - 146);
-          c.quadraticCurveTo(cx + dir * 102, baseY - 124, cx + dir * 94, baseY - 80);
-          c.lineTo(cx + dir * 68, baseY - 76);
-          c.quadraticCurveTo(cx + dir * 74, baseY - 106, cx + dir * 52, baseY - 122);
+          c.moveTo(cx + dir * 60, baseY - 148);
+          c.bezierCurveTo(cx + dir * 106, baseY - 126, cx + dir * 108, baseY - 82, cx + dir * 88, baseY - 66);
+          c.lineTo(cx + dir * 64, baseY - 74);
+          c.quadraticCurveTo(cx + dir * 74, baseY - 102, cx + dir * 50, baseY - 120);
           c.closePath();
         },
-        { x0: cx - 102, y0: baseY - 146, x1: cx + 102, y1: baseY - 76 },
-        { lit: '#CC7E58', mid: '#783B28', dark: '#240E0E', rim: '#FFE0A4' },
-        { shadowPoolFrac: 0.36, hatch: false, inkW: 4.2 }
+        { x0: cx - 106, y0: baseY - 148, x1: cx + 106, y1: baseY - 66 },
+        { lit: '#CC7D56', mid: '#783B28', dark: '#240E0E', rim: '#FFE0A4' },
+        { shadowPoolFrac: 0.38, hatch: false, inkW: 4.0 }
       );
-      // Heavy iron wrist shackle cuff
-      c.fillStyle = '#4A5260';
-      c.fillRect(cx + dir * 78 - 14, baseY - 88, 28, 12);
-      c.strokeStyle = INK;
-      c.lineWidth = 3;
-      c.strokeRect(cx + dir * 78 - 14, baseY - 88, 28, 12);
+      // Tapered iron wrist cuff shackle
+      paintTaperedArc(c, cx + dir * 64, baseY - 82, cx + dir * 78, baseY - 76, cx + dir * 92, baseY - 82, 10, '#4E5664');
+      paintTaperedArc(c, cx + dir * 64, baseY - 82, cx + dir * 78, baseY - 76, cx + dir * 92, baseY - 82, 3, INK);
     }
 
-    // Fierce Sculpted Snorting Minotaur Snout + Golden Nose Ring + Glowing Amber Eyes!
+    // Lowered Fierce Bovine Minotaur Head, Sweeping Ridged Ivory Bull Horns, Flared Snout & Tarnished Nose-Ring!
+    const hy = baseY - 170;
+    for (const dir of [-1, 1] as const) {
+      paintComicBladeLock(
+        c,
+        cx + dir * 24,
+        hy - 12,
+        cx + dir * 98,
+        hy - 12,
+        cx + dir * 84,
+        hy - 80,
+        cx + dir * 62,
+        hy - 36,
+        { lit: '#FFF8E4', mid: '#CFC0A0', dark: '#4A382C', rim: '#FFFFFF' },
+        3.8
+      );
+      // Horn battle-ring band
+      paintTaperedArc(c, cx + dir * 50, hy - 34, cx + dir * 56, hy - 26, cx + dir * 60, hy - 18, 5.5, '#D89E32');
+    }
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 34, hy - 20);
-        c.quadraticCurveTo(cx, hy - 42, cx + 34, hy - 20);
-        c.lineTo(cx + 26, hy + 28);
-        c.lineTo(cx, hy + 38);
-        c.lineTo(cx - 26, hy + 28);
+        c.moveTo(cx - 38, hy - 22);
+        c.quadraticCurveTo(cx, hy - 48, cx + 38, hy - 22);
+        c.lineTo(cx + 34, hy + 6);
+        c.lineTo(cx + 22, hy + 34); // heavy bovine muzzle!
+        c.lineTo(cx, hy + 42);
+        c.lineTo(cx - 22, hy + 34);
+        c.lineTo(cx - 34, hy + 6);
         c.closePath();
       },
-      { x0: cx - 34, y0: hy - 42, x1: cx + 34, y1: hy + 38 },
-      { lit: '#9C563C', mid: '#562A1E', dark: INK },
-      { shadowPoolFrac: 0.44, inkW: 4.4 }
+      { x0: cx - 38, y0: hy - 48, x1: cx + 38, y1: hy + 42 },
+      { lit: '#9C563C', mid: '#52261C', dark: INK, rim: '#FFCC88' },
+      { shadowPoolFrac: 0.44, inkW: 4.2 }
     );
-    c.strokeStyle = '#F5CC54';
-    c.lineWidth = 5.2;
+    // Deep shadowed overhanging furry brow + blazing fierce amber bull-eyes!
+    c.fillStyle = INK;
     c.beginPath();
-    c.arc(cx, hy + 26, 11, 0, Math.PI * 2);
-    c.stroke();
-    c.fillStyle = '#FF6A24';
-    c.fillRect(cx - 17, hy - 7, 10, 5.5);
-    c.fillRect(cx + 7, hy - 7, 10, 5.5);
-  });
-
-  // BOSS 6: COLOSSEUM SPEARLORD (Regal Golden-Armored Champion w/ Plumed Corinthian Helm, Sun-Spear Aspis Shield & Diagonal War-Spear — ZERO Tan Box!)
-  withCell(ctx, 'boss_colosseum_spearlord', (c, w, h) => {
-    const cx = w * 0.5;
-    const baseY = h * 0.88;
-
-    // Elongated Gleaming Bronze War-Spear held diagonally in heroic stance!
-    c.save();
-    c.strokeStyle = INK;
-    c.lineWidth = 12;
-    c.beginPath();
-    c.moveTo(cx - 72, baseY - 8);
-    c.lineTo(cx + 88, baseY - 226);
-    c.stroke();
-    c.strokeStyle = '#F2C448';
-    c.lineWidth = 5.5;
-    c.stroke();
-    // Blazing sculpted spearhead
-    c.fillStyle = '#FFF8C8';
-    c.beginPath();
-    c.moveTo(cx + 106, baseY - 252);
-    c.lineTo(cx + 92, baseY - 208);
-    c.lineTo(cx + 72, baseY - 224);
+    c.moveTo(cx - 30, hy - 14);
+    c.lineTo(cx, hy - 4);
+    c.lineTo(cx + 30, hy - 14);
+    c.lineTo(cx + 24, hy + 2);
+    c.lineTo(cx, hy + 5);
+    c.lineTo(cx - 24, hy + 2);
     c.closePath();
     c.fill();
+    c.fillStyle = '#FF861C';
+    c.beginPath();
+    c.moveTo(cx - 22, hy - 8);
+    c.lineTo(cx - 8, hy - 3);
+    c.lineTo(cx - 18, hy + 1);
+    c.closePath();
+    c.moveTo(cx + 22, hy - 8);
+    c.lineTo(cx + 8, hy - 3);
+    c.lineTo(cx + 18, hy + 1);
+    c.closePath();
+    c.fill();
+    // Flared nostrils & heavy tarnished gold nose-ring!
     c.strokeStyle = INK;
-    c.lineWidth = 3.8;
+    c.lineWidth = 8.5;
+    c.beginPath();
+    c.arc(cx, hy + 32, 12, 0, Math.PI * 2);
     c.stroke();
-    c.restore();
+    c.strokeStyle = '#F2C044';
+    c.lineWidth = 4.2;
+    c.stroke();
+  });
 
-    // Sweeping Royal Cobalt-and-Crimson Draped Champion Cape billowing heroically!
+  // BOSS 6: COLOSSEUM SPEARLORD (Heroic Greek Hoplite Champion: Muscled Bronze Cuirass, 3/4 Corinthian Helm w/ Sweeping Plume, Dynamic Lunge, Perspective Aspis Shield & Crackling Golden Spear — ZERO Lego Rectangle!)
+  withCell(ctx, 'boss_colosseum_spearlord', (c, w, h) => {
+    const cx = w * 0.5;
+    const baseY = h * 0.89;
+
+    // Crackling Golden Heroic War-Spear thrust diagonally across champion stance!
+    c.save();
+    paintTaperedArc(c, cx - 88, baseY - 2, cx + 6, baseY - 122, cx + 96, baseY - 236, 11, INK);
+    paintTaperedArc(c, cx - 86, baseY - 4, cx + 6, baseY - 122, cx + 96, baseY - 236, 5.2, '#F2C448');
+    // Radiant blazing barbed golden spearhead w/ lightning crackle
+    const spGlow = c.createRadialGradient(cx + 100, baseY - 242, 4, cx + 100, baseY - 242, 34);
+    spGlow.addColorStop(0, '#FFFEC8');
+    spGlow.addColorStop(0.5, 'rgba(255, 206, 58, 0.55)');
+    spGlow.addColorStop(1, 'rgba(255, 206, 58, 0)');
+    c.fillStyle = spGlow;
+    c.beginPath();
+    c.arc(cx + 100, baseY - 242, 34, 0, Math.PI * 2);
+    c.fill();
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 38, baseY - 156);
-        c.lineTo(cx + 42, baseY - 156);
-        c.bezierCurveTo(cx + 82, baseY - 84, cx + 76, baseY - 24, cx + 60, baseY + 2);
-        c.lineTo(cx + 16, baseY - 16);
-        c.lineTo(cx - 46, baseY - 6);
+        c.moveTo(cx + 114, baseY - 262);
+        c.lineTo(cx + 98, baseY - 216);
+        c.lineTo(cx + 88, baseY - 228);
+        c.lineTo(cx + 76, baseY - 232);
         c.closePath();
       },
-      { x0: cx - 46, y0: baseY - 156, x1: cx + 78, y1: baseY + 2 },
-      { lit: '#C81E38', mid: '#6E0C24', dark: '#1C061A', rim: '#FFE684' },
-      { shadowPoolFrac: 0.44, inkW: 4.6 }
+      { x0: cx + 76, y0: baseY - 262, x1: cx + 114, y1: baseY - 216 },
+      { lit: '#FFFFFF', mid: '#FFE26A', dark: '#8A4E0C', rim: '#FFFFFF' },
+      { shadowPoolFrac: 0.28, hatch: false, inkW: 3.4 }
     );
+    c.restore();
 
-    // Sculpted Golden-Greaved Warrior Legs in Dynamic Stride
-    for (const [lx, rx] of [
-      [cx - 24, cx - 8],
-      [cx + 10, cx + 28],
-    ]) {
+    // Sweeping Wind-Whipped Scarlet-and-Royal-Indigo Champion Cape w/ Deep #09060E Drapery Folds!
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(cx - 32, baseY - 166);
+        c.lineTo(cx + 38, baseY - 166);
+        c.bezierCurveTo(cx + 96, baseY - 102, cx + 106, baseY - 40, cx + 82, baseY + 2);
+        c.lineTo(cx + 42, baseY - 20);
+        c.lineTo(cx + 10, baseY - 4);
+        c.lineTo(cx - 46, baseY - 18);
+        c.bezierCurveTo(cx - 56, baseY - 68, cx - 46, baseY - 124, cx - 32, baseY - 166);
+        c.closePath();
+      },
+      { x0: cx - 54, y0: baseY - 166, x1: cx + 102, y1: baseY + 2 },
+      { lit: '#E2223C', mid: '#780E26', dark: '#1C061C', rim: '#FFE684' },
+      { shadowPoolFrac: 0.46, inkW: 4.4 }
+    );
+    paintTaperedArc(c, cx + 22, baseY - 150, cx + 62, baseY - 84, cx + 42, baseY - 20, 8.0, INK);
+
+    // Dynamic Lunging Heroic Warrior Legs w/ Sculpted Anatomical Calf Greaves (ZERO straight rectangle legs!)
+    const drawGreavedLeg = (hx: number, hy: number, kx: number, ky: number, fx: number, fy: number, front: boolean) => {
+      // Athletic thigh
       paintChiaroscuroShape(
         c,
         () => {
           c.beginPath();
-          c.moveTo(lx, baseY - 66);
-          c.lineTo(rx, baseY - 66);
-          c.lineTo(rx + 2, baseY + 2);
-          c.lineTo(lx - 2, baseY + 2);
+          c.moveTo(hx - 12, hy);
+          c.lineTo(hx + 12, hy);
+          c.lineTo(kx + 10, ky);
+          c.lineTo(kx - 10, ky);
           c.closePath();
         },
-        { x0: lx - 2, y0: baseY - 66, x1: rx + 2, y1: baseY + 2 },
-        { lit: '#FFF2B4', mid: '#D6962C', dark: '#4A2608' },
-        { shadowPoolFrac: 0.42, hatch: false, inkW: 3.8 }
+        { x0: Math.min(hx, kx) - 12, y0: hy, x1: Math.max(hx, kx) + 12, y1: ky },
+        front ? { lit: '#F2BC92', mid: '#C8845E', dark: '#6A3624' } : { lit: '#B87C58', mid: '#7A4630', dark: '#361A14' },
+        { shadowPoolFrac: 0.4, hatch: false, inkW: 3.4 }
+      );
+      // Curved bronze shin greave w/ pointed knee-lion ridge & sandal foot
+      paintChiaroscuroShape(
+        c,
+        () => {
+          c.beginPath();
+          c.moveTo(kx - 11, ky - 4);
+          c.lineTo(kx, ky - 12);
+          c.lineTo(kx + 11, ky - 4);
+          c.quadraticCurveTo(fx + 14, (ky + fy) * 0.5, fx + 7, fy - 4);
+          c.lineTo(fx + (front ? 16 : -14), fy + 4);
+          c.lineTo(fx - (front ? 10 : -8), fy + 4);
+          c.quadraticCurveTo(fx - 12, (ky + fy) * 0.5, kx - 11, ky - 4);
+          c.closePath();
+        },
+        { x0: Math.min(kx, fx) - 16, y0: ky - 12, x1: Math.max(kx, fx) + 16, y1: fy + 4 },
+        front
+          ? { lit: '#FFF6BE', mid: '#DF9C2C', dark: '#462208', rim: '#FFFFFF' }
+          : { lit: '#C48A2E', mid: '#744414', dark: '#241206' },
+        { shadowPoolFrac: 0.44, hatch: false, inkW: 3.6 }
+      );
+    };
+    drawGreavedLeg(cx - 14, baseY - 78, cx - 34, baseY - 40, cx - 44, baseY + 2, false);
+    drawGreavedLeg(cx + 16, baseY - 78, cx + 34, baseY - 38, cx + 32, baseY + 2, true);
+
+    // Fluttering Layered Leather-and-Gold Hoplite Pteruges War-Skirt!
+    for (let p = -3; p <= 3; p++) {
+      const px = cx + p * 11;
+      paintChiaroscuroShape(
+        c,
+        () => {
+          c.beginPath();
+          c.moveTo(px - 6, baseY - 94);
+          c.lineTo(px + 6, baseY - 94);
+          c.lineTo(px + 8 + p * 1.4, baseY - 52 + Math.abs(p) * 3);
+          c.lineTo(px - 4 + p * 1.4, baseY - 52 + Math.abs(p) * 3);
+          c.closePath();
+        },
+        { x0: px - 8, y0: baseY - 94, x1: px + 10, y1: baseY - 50 },
+        p % 2 === 0 ? { lit: '#4A82C4', mid: '#183C6E', dark: INK } : { lit: '#FFE894', mid: '#C88E28', dark: '#3E2008' },
+        { shadowPoolFrac: 0.36, hatch: false, inkW: 2.6 }
       );
     }
 
-    // Anatomical Sculpted Golden-Bronze Muscled Cuirass & Pteruges War-Skirt!
+    // Anatomical Sculpted Heroic Bronze-Gold Muscled Cuirass (Broad Deltoids, Tapered Waist, Carved Pecs & Abs — ZERO Box!)
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 42, baseY - 154);
-        c.lineTo(cx + 42, baseY - 154);
-        c.lineTo(cx + 26, baseY - 92);
-        c.lineTo(cx + 40, baseY - 54);
-        c.lineTo(cx - 40, baseY - 54);
-        c.lineTo(cx - 26, baseY - 92);
+        c.moveTo(cx - 46, baseY - 162);
+        c.quadraticCurveTo(cx, baseY - 172, cx + 46, baseY - 160);
+        c.bezierCurveTo(cx + 46, baseY - 132, cx + 34, baseY - 110, cx + 24, baseY - 90);
+        c.quadraticCurveTo(cx, baseY - 80, cx - 24, baseY - 90);
+        c.bezierCurveTo(cx - 34, baseY - 110, cx - 46, baseY - 132, cx - 46, baseY - 162);
         c.closePath();
       },
-      { x0: cx - 42, y0: baseY - 154, x1: cx + 42, y1: baseY - 54 },
-      { lit: '#FFF6BE', mid: '#E0A030', dark: '#4E2A0A', rim: '#FFFFFF' },
-      { shadowPoolFrac: 0.4, inkW: 4.6 }
+      { x0: cx - 46, y0: baseY - 170, x1: cx + 46, y1: baseY - 80 },
+      { lit: '#FFF8C8', mid: '#E4A430', dark: '#4A2408', rim: '#FFFFFF' },
+      { shadowPoolFrac: 0.42, inkW: 4.2 }
     );
-    // Embossed muscle pectoral ridge lines + cobalt waist sash
-    paintTaperedArc(c, cx - 26, baseY - 122, cx - 12, baseY - 112, cx - 2, baseY - 122, 3, '#5E340A');
-    paintTaperedArc(c, cx + 26, baseY - 122, cx + 12, baseY - 112, cx + 2, baseY - 122, 3, INK);
-    c.fillStyle = '#1E548C';
-    c.fillRect(cx - 28, baseY - 94, 56, 12);
-    c.strokeStyle = INK;
-    c.lineWidth = 3;
-    c.strokeRect(cx - 28, baseY - 94, 56, 12);
+    // Embossed sculptural pectoral & abdominal muscle ridges + cobalt battle-sash
+    paintTaperedArc(c, cx - 34, baseY - 134, cx - 16, baseY - 122, cx - 2, baseY - 132, 3.6, '#5A3008');
+    paintTaperedArc(c, cx + 34, baseY - 134, cx + 16, baseY - 122, cx + 2, baseY - 132, 3.6, INK);
+    paintTaperedArc(c, cx, baseY - 136, cx, baseY - 112, cx, baseY - 92, 2.8, '#5A3008');
+    paintTaperedArc(c, cx - 26, baseY - 94, cx, baseY - 86, cx + 26, baseY - 94, 9.0, '#1B5294');
+    paintTaperedArc(c, cx - 26, baseY - 94, cx, baseY - 86, cx + 26, baseY - 94, 2.6, INK);
 
-    // Sculpted Armored Right Spear-Arm + Gold Pauldron
+    // Sculpted Armored Right Spear-Arm + Layered Golden Pauldron & Gauntlet gripping spear!
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx + 32, baseY - 148);
-        c.lineTo(cx + 66, baseY - 134);
-        c.lineTo(cx + 58, baseY - 102);
-        c.lineTo(cx + 28, baseY - 116);
+        c.moveTo(cx + 28, baseY - 160);
+        c.bezierCurveTo(cx + 62, baseY - 160, cx + 74, baseY - 134, cx + 56, baseY - 116);
+        c.lineTo(cx + 34, baseY - 128);
         c.closePath();
       },
-      { x0: cx + 28, y0: baseY - 148, x1: cx + 66, y1: baseY - 102 },
-      { lit: '#FFF6BE', mid: '#E0A030', dark: '#4E2A0A', rim: '#FFFFFF' },
-      { shadowPoolFrac: 0.34, hatch: false, inkW: 3.8 }
+      { x0: cx + 28, y0: baseY - 160, x1: cx + 72, y1: baseY - 116 },
+      { lit: '#FFF8C8', mid: '#E4A430', dark: '#4A2408', rim: '#FFFFFF' },
+      { shadowPoolFrac: 0.36, hatch: false, inkW: 3.6 }
     );
-
-    // Ornate Embossed Round Hoplite Aspis Shield w/ Radiant Sun-Spear Relief (NOT a pink circle!)
-    const sx = cx - 46;
-    const sy = baseY - 102;
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.arc(sx, sy, 46, 0, Math.PI * 2);
+        c.moveTo(cx + 42, baseY - 126);
+        c.quadraticCurveTo(cx + 68, baseY - 122, cx + 72, baseY - 146);
+        c.lineTo(cx + 58, baseY - 154);
+        c.quadraticCurveTo(cx + 52, baseY - 134, cx + 34, baseY - 136);
+        c.closePath();
       },
-      { x0: sx - 46, y0: sy - 46, x1: sx + 46, y1: sy + 46 },
-      { lit: '#FFF8C8', mid: '#EBAC32', dark: '#542C08', rim: '#FFFFFF' },
-      { shadowPoolFrac: 0.36, inkW: 4.8 }
+      { x0: cx + 34, y0: baseY - 154, x1: cx + 72, y1: baseY - 122 },
+      { lit: '#F5C49E', mid: '#C8845E', dark: '#5C2C1C' },
+      { shadowPoolFrac: 0.36, hatch: false, inkW: 3.2 }
     );
-    c.fillStyle = '#183C5C';
+
+    // Perspective-Foreshortened 3/4 Tilted Sun-Embossed Hoplite Aspis Shield!
+    c.save();
+    c.translate(cx - 50, baseY - 108);
+    c.rotate(-0.18);
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.ellipse(0, 0, 38, 52, 0, 0, Math.PI * 2);
+      },
+      { x0: -38, y0: -52, x1: 38, y1: 52 },
+      { lit: '#FFF8C8', mid: '#EBAC32', dark: '#4E2608', rim: '#FFFFFF' },
+      { shadowPoolFrac: 0.38, inkW: 4.4 }
+    );
+    c.fillStyle = '#14385C';
     c.beginPath();
-    c.arc(sx, sy, 31, 0, Math.PI * 2);
+    c.ellipse(2, 0, 26, 37, 0, 0, Math.PI * 2);
     c.fill();
     c.strokeStyle = '#F5C448';
-    c.lineWidth = 3.2;
+    c.lineWidth = 3.0;
     c.stroke();
-    // Radiant embossed golden sun-star relief on shield face
-    c.fillStyle = '#FFF2AE';
+    // Radiant embossed 12-ray golden sun crest in shield perspective
+    c.fillStyle = '#FFF4B8';
     c.beginPath();
-    for (let i = 0; i < 16; i++) {
-      const r = i % 2 === 0 ? 24 : 9;
-      const a = (i * Math.PI) / 8;
-      const px = sx + Math.cos(a) * r;
-      const py = sy + Math.sin(a) * r;
+    for (let i = 0; i < 24; i++) {
+      const rx = i % 2 === 0 ? 21 : 8;
+      const ry = i % 2 === 0 ? 30 : 11;
+      const a = (i * Math.PI) / 12;
+      const px = 2 + Math.cos(a) * rx;
+      const py = Math.sin(a) * ry;
       if (i === 0) c.moveTo(px, py);
       else c.lineTo(px, py);
     }
     c.closePath();
     c.fill();
     c.strokeStyle = INK;
-    c.lineWidth = 2.2;
+    c.lineWidth = 1.8;
     c.stroke();
+    c.restore();
 
-    // Sweeping Crimson Horsehair Crest + Sculpted Corinthian War-Helm!
-    const hy = baseY - 182;
+    // Angled 3/4 Crested Corinthian War-Helm w/ Lush Multi-Strand Sweeping Crimson Horsehair Plume (ZERO tin-can bucket!)
+    const hy = baseY - 190;
+    // Layered sweeping multi-lock crimson horsehair plume arching dramatically over helm!
+    const plCols = { lit: '#FF3A4E', mid: '#A81224', dark: '#30050E', rim: '#FFB09E' };
+    paintComicBladeLock(c, cx - 10, hy - 22, cx - 54, hy - 84, cx + 22, hy - 88, cx + 6, hy - 44, plCols, 3.4);
+    paintComicBladeLock(c, cx + 2, hy - 22, cx + 48, hy - 86, cx + 78, hy - 34, cx + 38, hy - 38, plCols, 3.4);
+    paintComicBladeLock(c, cx + 18, hy - 14, cx + 64, hy - 52, cx + 74, hy + 8, cx + 42, hy - 16, { lit: '#CC182C', mid: '#6E0A18', dark: INK }, 3.0);
+
+    // Sculpted Curved 3/4 Corinthian Helmet Dome + Curved Cheek-Guards + Sharp Nose-Guard!
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 12, hy - 20);
-        c.bezierCurveTo(cx - 56, hy - 74, cx + 28, hy - 84, cx + 52, hy - 44);
-        c.quadraticCurveTo(cx + 60, hy - 14, cx + 26, hy - 10);
+        c.moveTo(cx - 24, hy - 10);
+        c.bezierCurveTo(cx - 26, hy - 42, cx + 24, hy - 42, cx + 26, hy - 8);
+        c.lineTo(cx + 24, hy + 18);
+        c.lineTo(cx + 10, hy + 28); // curved cheek-guard tip
+        c.lineTo(cx + 3, hy + 12);
+        c.lineTo(cx - 3, hy + 18); // sharp nasal guard!
+        c.lineTo(cx - 10, hy + 12);
+        c.lineTo(cx - 14, hy + 28); // left curved cheek-guard tip
+        c.lineTo(cx - 24, hy + 16);
         c.closePath();
       },
-      { x0: cx - 52, y0: hy - 78, x1: cx + 56, y1: hy - 10 },
-      { lit: '#FF3648', mid: '#A81224', dark: '#36060E', rim: '#FFA89E' },
-      { shadowPoolFrac: 0.38, inkW: 4.2 }
+      { x0: cx - 26, y0: hy - 42, x1: cx + 26, y1: hy + 28 },
+      { lit: '#FFF8C8', mid: '#E8AC34', dark: '#4A2408', rim: '#FFFFFF' },
+      { shadowPoolFrac: 0.4, hatch: false, inkW: 3.8 }
     );
-    paintChiaroscuroShape(
-      c,
-      () => {
-        c.beginPath();
-        c.moveTo(cx - 22, hy - 14);
-        c.quadraticCurveTo(cx, hy - 34, cx + 22, hy - 14);
-        c.lineTo(cx + 20, hy + 20);
-        c.lineTo(cx, hy + 28);
-        c.lineTo(cx - 20, hy + 20);
-        c.closePath();
-      },
-      { x0: cx - 22, y0: hy - 34, x1: cx + 22, y1: hy + 28 },
-      { lit: '#FFF6C4', mid: '#E8AC34', dark: '#542C0A' },
-      { shadowPoolFrac: 0.4, hatch: false, inkW: 4.2 }
-    );
+    // Deep recessed angular Corinthian eye-visor shadow + blazing slanted azure hero eyes!
     c.fillStyle = INK;
-    c.fillRect(cx - 14, hy - 5, 28, 8);
-    c.fillStyle = '#5EF2FF';
-    c.fillRect(cx - 10, hy - 3, 6, 3.5);
-    c.fillRect(cx + 4, hy - 3, 6, 3.5);
+    c.beginPath();
+    c.moveTo(cx - 19, hy - 6);
+    c.lineTo(cx - 3, hy - 1);
+    c.lineTo(cx - 6, hy + 7);
+    c.lineTo(cx - 18, hy + 4);
+    c.closePath();
+    c.moveTo(cx + 19, hy - 6);
+    c.lineTo(cx + 3, hy - 1);
+    c.lineTo(cx + 6, hy + 7);
+    c.lineTo(cx + 18, hy + 4);
+    c.closePath();
+    c.fill();
+    c.fillStyle = '#5CF6FF';
+    c.beginPath();
+    c.moveTo(cx - 15, hy - 3);
+    c.lineTo(cx - 6, hy);
+    c.lineTo(cx - 13, hy + 3);
+    c.closePath();
+    c.moveTo(cx + 15, hy - 3);
+    c.lineTo(cx + 6, hy);
+    c.lineTo(cx + 13, hy + 3);
+    c.closePath();
+    c.fill();
   });
 
-  // BOSS 7: THE FERRYMAN (Towering Hunched Skeletal River-Lord w/ Tattered Void-Indigo Cloak, Funerary Hat & Lantern-Hung Obsidian Oar — ZERO Paper Cone!)
+  // BOSS 7: THE FERRYMAN (Towering Hunched Spectral River-Lord w/ Deeply Folded Tattered Funerary Robes, Shrouded Hat, Gothic Jade Lantern & Gilded Filigree Oar!)
   withCell(ctx, 'boss_the_ferryman', (c, w, h) => {
-    const cx = w * 0.46;
-    const baseY = h * 0.88;
+    const cx = w * 0.44;
+    const baseY = h * 0.89;
 
-    // Massive Brass-Bound Obsidian River Oar trailing glowing green-gold Ghost Lantern!
+    // Ornate Gilded Bronze-and-Obsidian River Oar + Gothic Iron-Cage Spectral Jade Lantern!
     c.save();
-    c.translate(cx + 66, baseY - 124);
+    c.translate(cx + 72, baseY - 126);
     c.rotate(0.24);
-    c.fillStyle = '#2B1D34';
-    c.fillRect(-7, -118, 14, 232);
-    c.strokeStyle = INK;
-    c.lineWidth = 4.2;
-    c.strokeRect(-7, -118, 14, 232);
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(-24, -120);
-        c.quadraticCurveTo(0, -172, 24, -120);
-        c.lineTo(14, -68);
-        c.lineTo(-14, -68);
+        c.moveTo(-6, -120);
+        c.lineTo(6, -120);
+        c.lineTo(7, 114);
+        c.lineTo(-7, 114);
         c.closePath();
       },
-      { x0: -24, y0: -172, x1: 24, y1: -68 },
-      { lit: '#FFF0A8', mid: '#D69A32', dark: '#46260A', rim: '#78FFCC' },
-      { shadowPoolFrac: 0.4, inkW: 4.2 }
+      { x0: -7, y0: -120, x1: 7, y1: 114 },
+      { lit: '#4A3656', mid: '#20142C', dark: INK },
+      { shadowPoolFrac: 0.4, hatch: false, inkW: 3.6 }
     );
-    // Hanging Spectral Jade-Gold River Lantern!
+    // Ornate carved filigree golden-bronze paddle blade
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(-26, -120);
+        c.bezierCurveTo(-24, -158, 24, -158, 26, -120);
+        c.lineTo(14, -64);
+        c.lineTo(-14, -64);
+        c.closePath();
+      },
+      { x0: -26, y0: -158, x1: 26, y1: -64 },
+      { lit: '#FFF4B4', mid: '#D69A32', dark: '#46260A', rim: '#78FFCC' },
+      { shadowPoolFrac: 0.4, inkW: 3.8 }
+    );
+    paintTaperedArc(c, 0, -148, 0, -108, 0, -70, 3.2, INK);
+    // Hanging Gothic Wrought-Iron Spectral Jade Lantern!
     c.strokeStyle = '#E5B244';
     c.lineWidth = 3;
     c.beginPath();
-    c.moveTo(14, -64);
-    c.lineTo(28, -32);
+    c.moveTo(14, -62);
+    c.lineTo(30, -34);
     c.stroke();
-    const lGlow = c.createRadialGradient(28, -20, 2, 28, -20, 28);
+    const lGlow = c.createRadialGradient(30, -18, 3, 30, -18, 36);
     lGlow.addColorStop(0, '#EAFFF4');
-    lGlow.addColorStop(0.45, 'rgba(64, 248, 186, 0.78)');
+    lGlow.addColorStop(0.42, 'rgba(64, 248, 186, 0.82)');
     lGlow.addColorStop(1, 'rgba(20, 140, 100, 0)');
     c.fillStyle = lGlow;
     c.beginPath();
-    c.arc(28, -20, 28, 0, Math.PI * 2);
+    c.arc(30, -18, 36, 0, Math.PI * 2);
     c.fill();
-    c.fillStyle = '#78FFD2';
-    c.fillRect(21, -28, 14, 18);
-    c.strokeStyle = INK;
-    c.lineWidth = 2.6;
-    c.strokeRect(21, -28, 14, 18);
-    c.restore();
-
-    // Towering Hunched Billowing Tattered Void-Indigo & Tarnished-Gold Mantle!
-    paintChiaroscuroShape(
-      c,
-      () => {
-        c.beginPath();
-        c.moveTo(cx - 64, baseY);
-        c.bezierCurveTo(cx - 76, baseY - 94, cx - 54, baseY - 172, cx - 22, baseY - 188);
-        c.lineTo(cx + 34, baseY - 180);
-        c.bezierCurveTo(cx + 70, baseY - 104, cx + 68, baseY - 46, cx + 56, baseY - 4);
-        c.lineTo(cx + 30, baseY - 26);
-        c.lineTo(cx + 6, baseY + 4);
-        c.lineTo(cx - 20, baseY - 24);
-        c.lineTo(cx - 42, baseY + 2);
-        c.closePath();
-      },
-      { x0: cx - 74, y0: baseY - 188, x1: cx + 68, y1: baseY + 4 },
-      { lit: '#6C368E', mid: '#26103C', dark: INK, rim: '#E5B952' },
-      { shadowPoolFrac: 0.48, inkW: 5.0 }
-    );
-    // Tarnished-gold funerary stole & draped cloak sleeve + articulated skeletal claws gripping oar shaft!
-    c.strokeStyle = '#E8B242';
-    c.lineWidth = 6;
+    c.fillStyle = '#88FFD8';
     c.beginPath();
-    c.moveTo(cx - 44, baseY - 142);
-    c.quadraticCurveTo(cx + 2, baseY - 104, cx + 46, baseY - 134);
-    c.stroke();
-    // Draped right sleeve reaching out to the oar shaft
-    paintChiaroscuroShape(
-      c,
-      () => {
-        c.beginPath();
-        c.moveTo(cx + 18, baseY - 142);
-        c.lineTo(cx + 58, baseY - 122);
-        c.lineTo(cx + 52, baseY - 94);
-        c.quadraticCurveTo(cx + 30, baseY - 82, cx + 12, baseY - 104);
-        c.closePath();
-      },
-      { x0: cx + 12, y0: baseY - 142, x1: cx + 58, y1: baseY - 82 },
-      { lit: '#743D99', mid: '#2D1246', dark: INK, rim: '#E5B952' },
-      { shadowPoolFrac: 0.45, hatch: false, inkW: 3.8 }
-    );
-    // Articulated skeletal fingers wrapping around oar shaft at (cx + 62, baseY - 108)
-    for (let f = 0; f < 3; f++) {
-      const fy = baseY - 116 + f * 7;
-      c.fillStyle = '#E8DFC8';
-      c.beginPath();
-      c.roundRect(cx + 52, fy, 18, 6.2, 3);
-      c.fill();
-      c.strokeStyle = INK;
-      c.lineWidth = 2.4;
-      c.stroke();
-    }
-
-    // Deep Pitch-Black Face Shadow Cavern w/ Glowing Skeletal Jaw + Amethyst-Cyan Eye Embers!
-    const hy = baseY - 190;
-    c.fillStyle = INK;
-    c.beginPath();
-    c.ellipse(cx + 4, hy + 4, 24, 26, 0, 0, Math.PI * 2);
-    c.fill();
-    // Spectral ivory skull cheek & jaw rim peeking from under hat shadow
-    c.fillStyle = '#C8BCD8';
-    c.beginPath();
-    c.moveTo(cx - 12, hy + 10);
-    c.lineTo(cx + 20, hy + 10);
-    c.lineTo(cx + 12, hy + 26);
-    c.lineTo(cx - 4, hy + 26);
+    c.moveTo(22, -28);
+    c.lineTo(38, -28);
+    c.lineTo(35, -6);
+    c.lineTo(25, -6);
     c.closePath();
     c.fill();
     c.strokeStyle = INK;
     c.lineWidth = 2.6;
     c.stroke();
-    c.fillStyle = '#E068FF';
+    // Pointed gothic iron lantern cap & ribs
+    c.fillStyle = '#24182C';
     c.beginPath();
-    c.arc(cx - 6, hy + 2, 6, 0, Math.PI * 2);
-    c.arc(cx + 14, hy + 2, 6, 0, Math.PI * 2);
+    c.moveTo(19, -28);
+    c.lineTo(30, -39);
+    c.lineTo(41, -28);
+    c.closePath();
     c.fill();
-    c.fillStyle = '#FFFFFF';
-    c.beginPath();
-    c.arc(cx - 6, hy + 2, 2.5, 0, Math.PI * 2);
-    c.arc(cx + 14, hy + 2, 2.5, 0, Math.PI * 2);
-    c.fill();
+    c.stroke();
+    c.restore();
 
-    // Battered Asymmetric Tattered Wide-Brimmed Funerary Hat (organic bent peak, NOT a crisp triangle!)
+    // Tall Hunched Multi-Layered Tattered Void-Indigo Funerary Robes w/ Heavy #09060E Vertical Drapery Folds!
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 88, hy - 6);
-        c.quadraticCurveTo(cx - 26, hy - 34, cx - 8, hy - 74);
-        c.quadraticCurveTo(cx + 22, hy - 62, cx + 32, hy - 34);
-        c.quadraticCurveTo(cx + 68, hy - 22, cx + 92, hy - 4);
-        c.quadraticCurveTo(cx + 4, hy + 16, cx - 88, hy - 6);
+        c.moveTo(cx - 72, baseY - 2);
+        c.bezierCurveTo(cx - 86, baseY - 94, cx - 60, baseY - 174, cx - 22, baseY - 190);
+        c.lineTo(cx + 34, baseY - 182);
+        c.bezierCurveTo(cx + 74, baseY - 104, cx + 72, baseY - 46, cx + 58, baseY - 2);
+        c.lineTo(cx + 38, baseY - 30);
+        c.lineTo(cx + 18, baseY + 4);
+        c.lineTo(cx - 4, baseY - 28);
+        c.lineTo(cx - 26, baseY + 4);
+        c.lineTo(cx - 46, baseY - 26);
         c.closePath();
       },
-      { x0: cx - 88, y0: hy - 74, x1: cx + 92, y1: hy + 14 },
-      { lit: '#8A4AB0', mid: '#3A1858', dark: INK, rim: '#F2C452' },
-      { shadowPoolFrac: 0.44, inkW: 4.8 }
+      { x0: cx - 80, y0: baseY - 190, x1: cx + 72, y1: baseY + 4 },
+      { lit: '#723A98', mid: '#26103E', dark: INK, rim: '#E5B952' },
+      { shadowPoolFrac: 0.48, inkW: 4.8 }
     );
-    // Gold hatband & dangling amulet coin
-    c.strokeStyle = '#F2C452';
-    c.lineWidth = 4;
+    // Deep dramatic Mignola vertical cloak shadow canyons!
+    ctx.fillStyle = INK;
+    ctx.beginPath();
+    ctx.moveTo(cx - 34, baseY - 154);
+    ctx.quadraticCurveTo(cx - 46, baseY - 82, cx - 46, baseY - 26);
+    ctx.quadraticCurveTo(cx - 28, baseY - 82, cx - 22, baseY - 150);
+    ctx.closePath();
+    ctx.moveTo(cx - 2, baseY - 148);
+    ctx.quadraticCurveTo(cx - 12, baseY - 84, cx - 4, baseY - 28);
+    ctx.quadraticCurveTo(cx + 10, baseY - 84, cx + 10, baseY - 146);
+    ctx.closePath();
+    ctx.moveTo(cx + 30, baseY - 144);
+    ctx.quadraticCurveTo(cx + 38, baseY - 86, cx + 38, baseY - 30);
+    ctx.quadraticCurveTo(cx + 50, baseY - 84, cx + 44, baseY - 144);
+    ctx.closePath();
+    ctx.fill();
+
+    // Draped Gilded Bronze Funeral Stole & Heavy Hanging Mantle Collar
+    paintTaperedArc(c, cx - 50, baseY - 146, cx + 4, baseY - 104, cx + 52, baseY - 138, 11, INK);
+    paintTaperedArc(c, cx - 48, baseY - 146, cx + 4, baseY - 106, cx + 50, baseY - 138, 5.5, '#EBB644');
+
+    // Draped Void-Indigo Cloak Sleeve & Articulated Skeletal Clawed Hand gripping oar shaft!
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(cx + 18, baseY - 144);
+        c.lineTo(cx + 62, baseY - 124);
+        c.lineTo(cx + 54, baseY - 94);
+        c.quadraticCurveTo(cx + 32, baseY - 80, cx + 12, baseY - 106);
+        c.closePath();
+      },
+      { x0: cx + 12, y0: baseY - 144, x1: cx + 62, y1: baseY - 80 },
+      { lit: '#783FA0', mid: '#2D1246', dark: INK, rim: '#E5B952' },
+      { shadowPoolFrac: 0.45, hatch: false, inkW: 3.6 }
+    );
+    for (let f = 0; f < 3; f++) {
+      const fy = baseY - 118 + f * 7;
+      paintComicBladeLock(c, cx + 52, fy + 3, cx + 64, fy - 2, cx + 74, fy + 3, cx + 64, fy + 7, { lit: '#F4ECDA', mid: '#C2B29C', dark: '#463A38' }, 2.0);
+    }
+
+    // Deep Pitch-Black Shrouded Void Face w/ Grinning Skeletal Mandible & Blazing Amethyst-Cyan Eye Embers!
+    const hy = baseY - 194;
+    c.fillStyle = INK;
     c.beginPath();
-    c.moveTo(cx - 34, hy - 24);
-    c.quadraticCurveTo(cx + 4, hy - 14, cx + 40, hy - 24);
+    c.ellipse(cx + 4, hy + 4, 24, 28, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#D4C8E2';
+    c.beginPath();
+    c.moveTo(cx - 12, hy + 10);
+    c.lineTo(cx + 20, hy + 10);
+    c.lineTo(cx + 12, hy + 28);
+    c.lineTo(cx - 4, hy + 28);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 2.4;
     c.stroke();
+    c.fillStyle = '#E068FF';
+    c.beginPath();
+    c.moveTo(cx - 13, hy - 2);
+    c.lineTo(cx - 1, hy + 2);
+    c.lineTo(cx - 10, hy + 6);
+    c.closePath();
+    c.moveTo(cx + 21, hy - 2);
+    c.lineTo(cx + 9, hy + 2);
+    c.lineTo(cx + 18, hy + 6);
+    c.closePath();
+    c.fill();
+
+    // Weathered Asymmetric Wide-Brimmed Shrouded Funerary Hat w/ Bent Peak & Gold Obol Band!
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(cx - 94, hy - 4);
+        c.quadraticCurveTo(cx - 28, hy - 34, cx - 10, hy - 78);
+        c.quadraticCurveTo(cx + 22, hy - 66, cx + 34, hy - 34);
+        c.quadraticCurveTo(cx + 72, hy - 22, cx + 96, hy - 2);
+        c.quadraticCurveTo(cx + 4, hy + 18, cx - 94, hy - 4);
+        c.closePath();
+      },
+      { x0: cx - 94, y0: hy - 78, x1: cx + 96, y1: hy + 16 },
+      { lit: '#9450BC', mid: '#3A1858', dark: INK, rim: '#F2C452' },
+      { shadowPoolFrac: 0.44, inkW: 4.6 }
+    );
+    paintTaperedArc(c, cx - 36, hy - 24, cx + 4, hy - 14, cx + 42, hy - 24, 5.2, '#F2C452');
   });
 
-  // BOSS 8: SOVEREIGN LORD OF THE ABYSS (Titanic Underworld Monarch w/ Jagged Spiked Obsidian-Bronze Pauldrons, Flame-Hemmed Mantle, Horned Crown & Incandescent Bident — ZERO Balloon Shoulders!)
+  // BOSS 8: SOVEREIGN LORD OF THE ABYSS (Towering Underworld Monarch: Branching Obsidian Antler-Crown, Shadowed Bearded Face w/ Burning Eyes, Carved Skull Pauldrons, Layered Abyssal Mantle & Blazing Bident — ZERO Purple Triangle / Boxy Blocks!)
   withCell(ctx, 'boss_sovereign_lord', (c, w, h) => {
-    const cx = w * 0.46;
-    const baseY = h * 0.88;
+    const cx = w * 0.45;
+    const baseY = h * 0.9;
 
-    // Dramatic molten crimson-and-gold royal furnace aura
-    const aura = c.createRadialGradient(cx, baseY - 156, 16, cx, baseY - 156, 148);
-    aura.addColorStop(0, 'rgba(255, 76, 36, 0.56)');
-    aura.addColorStop(0.55, 'rgba(156, 14, 30, 0.26)');
+    // Dramatic molten crimson-and-gold underworld furnace aura
+    const aura = c.createRadialGradient(cx, baseY - 162, 16, cx, baseY - 162, 152);
+    aura.addColorStop(0, 'rgba(255, 76, 36, 0.52)');
+    aura.addColorStop(0.55, 'rgba(156, 14, 30, 0.24)');
     aura.addColorStop(1, 'rgba(18, 4, 12, 0)');
     c.fillStyle = aura;
     c.beginPath();
-    c.arc(cx, baseY - 156, 148, 0, Math.PI * 2);
+    c.arc(cx, baseY - 162, 152, 0, Math.PI * 2);
     c.fill();
 
-    // Colossal Incandescent Twin-Pronged Infernal Bident blazing with #FF3044 core heat!
+    // Colossal Incandescent Barbed Twin-Pronged Infernal Bident!
     c.save();
-    c.translate(cx + 98, baseY - 134);
-    c.rotate(0.18);
-    // Radiant heat aura around bident prongs
-    const bGlow = c.createRadialGradient(0, -138, 6, 0, -138, 56);
-    bGlow.addColorStop(0, 'rgba(255, 224, 140, 0.9)');
-    bGlow.addColorStop(0.45, 'rgba(255, 48, 68, 0.55)');
+    c.translate(cx + 102, baseY - 134);
+    c.rotate(0.16);
+    const bGlow = c.createRadialGradient(0, -142, 6, 0, -142, 60);
+    bGlow.addColorStop(0, 'rgba(255, 228, 148, 0.92)');
+    bGlow.addColorStop(0.45, 'rgba(255, 48, 68, 0.56)');
     bGlow.addColorStop(1, 'rgba(255, 48, 68, 0)');
     c.fillStyle = bGlow;
     c.beginPath();
-    c.arc(0, -138, 56, 0, Math.PI * 2);
+    c.arc(0, -142, 60, 0, Math.PI * 2);
     c.fill();
-    // Obsidian iron shaft
-    c.fillStyle = '#221622';
-    c.fillRect(-7, -108, 14, 242);
-    c.strokeStyle = INK;
-    c.lineWidth = 4.6;
-    c.strokeRect(-7, -108, 14, 242);
-    // Jagged twin blazing infernal bident prongs!
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(-30, -102);
-        c.lineTo(-24, -176);
-        c.lineTo(-8, -120);
-        c.lineTo(8, -120);
-        c.lineTo(24, -176);
-        c.lineTo(30, -102);
-        c.lineTo(14, -92);
-        c.lineTo(-14, -92);
+        c.moveTo(-6, -110);
+        c.lineTo(6, -110);
+        c.lineTo(7, 134);
+        c.lineTo(-7, 134);
         c.closePath();
       },
-      { x0: -30, y0: -176, x1: 30, y1: -92 },
-      { lit: '#FFF8C8', mid: '#FF6428', dark: '#8A1020', rim: '#FFFFFF' },
-      { shadowPoolFrac: 0.25, hatch: false, inkW: 4.4 }
+      { x0: -7, y0: -110, x1: 7, y1: 134 },
+      { lit: '#563C4E', mid: '#201422', dark: INK },
+      { shadowPoolFrac: 0.4, hatch: false, inkW: 3.8 }
+    );
+    // Razor-curved barbed twin bident tines blazing crimson-gold!
+    paintChiaroscuroShape(
+      c,
+      () => {
+        c.beginPath();
+        c.moveTo(-34, -104);
+        c.quadraticCurveTo(-38, -146, -22, -182);
+        c.lineTo(-10, -124);
+        c.lineTo(10, -124);
+        c.lineTo(22, -182);
+        c.quadraticCurveTo(38, -146, 34, -104);
+        c.lineTo(14, -90);
+        c.lineTo(-14, -90);
+        c.closePath();
+      },
+      { x0: -36, y0: -182, x1: 36, y1: -90 },
+      { lit: '#FFFAD0', mid: '#FF6424', dark: '#8A1020', rim: '#FFFFFF' },
+      { shadowPoolFrac: 0.24, hatch: false, inkW: 4.0 }
     );
     c.restore();
 
-    // Towering Broad-Shouldered Obsidian-Crimson Royal Mantle w/ Gold Filigree & Billowing Flame-Edged Hem!
+    // Sweeping Layered Abyssal Velvet Royal Mantle w/ Heavy #09060E Vertical Drapery Folds & Gold Brocade!
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 98, baseY + 2);
-        c.bezierCurveTo(cx - 114, baseY - 102, cx - 94, baseY - 180, cx - 48, baseY - 200);
-        c.lineTo(cx + 48, baseY - 200);
-        c.bezierCurveTo(cx + 94, baseY - 180, cx + 114, baseY - 102, cx + 98, baseY + 2);
-        c.lineTo(cx + 58, baseY - 24);
-        c.lineTo(cx + 28, baseY + 4);
+        c.moveTo(cx - 104, baseY + 2);
+        c.bezierCurveTo(cx - 118, baseY - 96, cx - 94, baseY - 172, cx - 50, baseY - 196);
+        c.lineTo(cx + 50, baseY - 196);
+        c.bezierCurveTo(cx + 94, baseY - 172, cx + 118, baseY - 96, cx + 104, baseY + 2);
+        c.lineTo(cx + 68, baseY - 26);
+        c.lineTo(cx + 38, baseY + 4);
         c.lineTo(cx, baseY - 22);
-        c.lineTo(cx - 28, baseY + 4);
-        c.lineTo(cx - 58, baseY - 24);
+        c.lineTo(cx - 38, baseY + 4);
+        c.lineTo(cx - 68, baseY - 26);
         c.closePath();
       },
-      { x0: cx - 108, y0: baseY - 200, x1: cx + 108, y1: baseY + 4 },
-      { lit: '#C4182C', mid: '#4E0A16', dark: INK, rim: '#FF7838' },
-      { shadowPoolFrac: 0.48, inkW: 5.4 }
+      { x0: cx - 114, y0: baseY - 196, x1: cx + 114, y1: baseY + 4 },
+      { lit: '#CE1A2E', mid: '#500A18', dark: INK, rim: '#FF7E3A' },
+      { shadowPoolFrac: 0.48, inkW: 5.0 }
     );
-    // Licking ember-gold royal filigree border along cape hem!
-    c.strokeStyle = '#F5BC42';
-    c.lineWidth = 4.6;
-    c.beginPath();
-    c.moveTo(cx - 90, baseY - 16);
-    c.lineTo(cx - 56, baseY - 34);
-    c.lineTo(cx, baseY - 14);
-    c.lineTo(cx + 56, baseY - 34);
-    c.lineTo(cx + 90, baseY - 16);
-    c.stroke();
+    // Deep Mignola vertical drapery shadow troughs + flame-gold Greek-key brocade hem!
+    ctx.fillStyle = INK;
+    ctx.beginPath();
+    ctx.moveTo(cx - 64, baseY - 156);
+    ctx.quadraticCurveTo(cx - 78, baseY - 82, cx - 68, baseY - 26);
+    ctx.quadraticCurveTo(cx - 50, baseY - 84, cx - 44, baseY - 154);
+    ctx.closePath();
+    ctx.moveTo(cx + 46, baseY - 154);
+    ctx.quadraticCurveTo(cx + 56, baseY - 82, cx + 68, baseY - 26);
+    ctx.quadraticCurveTo(cx + 80, baseY - 84, cx + 66, baseY - 156);
+    ctx.closePath();
+    ctx.fill();
+    paintTaperedArc(c, cx - 94, baseY - 16, cx - 64, baseY - 36, cx - 36, baseY - 12, 5.2, '#F5C044');
+    paintTaperedArc(c, cx - 36, baseY - 12, cx, baseY - 34, cx + 36, baseY - 12, 5.2, '#F5C044');
+    paintTaperedArc(c, cx + 36, baseY - 12, cx + 64, baseY - 36, cx + 94, baseY - 16, 5.2, '#F5C044');
 
-    // Titanic Sculpted Obsidian-Gold Royal Cuirass & Ribbed Underworld Crest
+    // Towering Muscular Armored Underworld Cuirass + Crimson-Gold Sovereign Sash & Skull-Buckle Belt!
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 58, baseY - 196);
-        c.lineTo(cx + 58, baseY - 196);
-        c.lineTo(cx + 40, baseY - 76);
-        c.lineTo(cx, baseY - 58);
-        c.lineTo(cx - 40, baseY - 76);
+        c.moveTo(cx - 56, baseY - 196);
+        c.quadraticCurveTo(cx, baseY - 208, cx + 56, baseY - 196);
+        c.bezierCurveTo(cx + 52, baseY - 146, cx + 44, baseY - 102, cx + 34, baseY - 68);
+        c.lineTo(cx, baseY - 46);
+        c.lineTo(cx - 34, baseY - 68);
+        c.bezierCurveTo(cx - 44, baseY - 102, cx - 52, baseY - 146, cx - 56, baseY - 196);
         c.closePath();
       },
-      { x0: cx - 58, y0: baseY - 196, x1: cx + 58, y1: baseY - 58 },
-      { lit: '#48344E', mid: '#1E1424', dark: INK, rim: '#F2BC48' },
-      { shadowPoolFrac: 0.46, inkW: 4.6 }
+      { x0: cx - 56, y0: baseY - 206, x1: cx + 56, y1: baseY - 46 },
+      { lit: '#543A5E', mid: '#1E1426', dark: INK, rim: '#F2BE48' },
+      { shadowPoolFrac: 0.46, inkW: 4.4 }
     );
-    // Gold skull-pectoral medallion
-    c.strokeStyle = '#F2BC48';
-    c.lineWidth = 3.8;
-    c.beginPath();
-    c.moveTo(cx - 38, baseY - 178);
-    c.lineTo(cx, baseY - 110);
-    c.lineTo(cx + 38, baseY - 178);
-    c.stroke();
+    paintTaperedArc(c, cx - 40, baseY - 180, cx, baseY - 114, cx + 40, baseY - 180, 5.0, '#F5C44E');
+    paintTaperedArc(c, cx - 36, baseY - 82, cx, baseY - 70, cx + 36, baseY - 82, 9.0, '#C88E28');
 
-    // GIGANTIC SPIKED OBSIDIAN-BRONZE LAYERED PAULDRONS (Jagged Angular Armor Plates — ZERO Balloon Circles!)
-    for (const dir of [-1, 1] as const) {
-      paintChiaroscuroShape(
-        c,
-        () => {
-          c.beginPath();
-          c.moveTo(cx + dir * 32, baseY - 198);
-          c.lineTo(cx + dir * 94, baseY - 224); // sweeping armored shoulder blade spike!
-          c.lineTo(cx + dir * 82, baseY - 182);
-          c.lineTo(cx + dir * 102, baseY - 164); // lower secondary armor flange!
-          c.lineTo(cx + dir * 72, baseY - 144);
-          c.lineTo(cx + dir * 36, baseY - 156);
-          c.closePath();
-        },
-        { x0: cx - 102, y0: baseY - 224, x1: cx + 102, y1: baseY - 144 },
-        { lit: '#FFF0A8', mid: '#C88428', dark: '#2E1614', rim: '#FF7A38' },
-        { shadowPoolFrac: 0.44, inkW: 4.8 }
-      );
-      // Crimson skull relief inlay on pauldron plate
-      c.fillStyle = '#D62032';
-      c.beginPath();
-      c.arc(cx + dir * 64, baseY - 176, 9, 0, Math.PI * 2);
-      c.fill();
-      c.strokeStyle = INK;
-      c.lineWidth = 2.6;
-      c.stroke();
-    }
+    // CARVED SCULPTED BRONZE-AND-OBSIDIAN SKULL PAULDRONS (ZERO boxy trapezoid blocks!)
+    paintCarvedSkullPauldron(c, cx - 68, baseY - 176, 1.55, 1, { lit: '#FFF2B0', mid: '#D48E28', dark: '#361614', rim: '#FF843C' });
+    paintCarvedSkullPauldron(c, cx + 68, baseY - 176, 1.55, -1, { lit: '#FFF2B0', mid: '#D48E28', dark: '#361614', rim: '#FF843C' });
 
-    // Stern Deeply-Shadowed Sovereign Visage, Braided Dark Beard & Towering Horned Obsidian-Gold Royal Crown (100% inside cell!)
-    const hy = baseY - 202;
+    // Stern Deeply-Shadowed Sovereign Visage, Blazing Crimson-Gold Eyes & Layered Braided Dark Beard!
+    const hy = baseY - 204;
     paintChiaroscuroShape(
       c,
       () => {
         c.beginPath();
-        c.moveTo(cx - 24, hy - 18);
-        c.quadraticCurveTo(cx, hy - 34, cx + 24, hy - 18);
-        c.lineTo(cx + 22, hy + 16);
-        c.lineTo(cx, hy + 28);
-        c.lineTo(cx - 22, hy + 16);
+        c.moveTo(cx - 26, hy - 18);
+        c.quadraticCurveTo(cx, hy - 36, cx + 26, hy - 18);
+        c.lineTo(cx + 24, hy + 16);
+        c.lineTo(cx, hy + 30);
+        c.lineTo(cx - 24, hy + 16);
         c.closePath();
       },
-      { x0: cx - 24, y0: hy - 34, x1: cx + 24, y1: hy + 28 },
-      { lit: '#F2E6F2', mid: '#BAA8C4', dark: '#463452' },
-      { shadowPoolFrac: 0.38, hatch: false, inkW: 4.2 }
+      { x0: cx - 26, y0: hy - 36, x1: cx + 26, y1: hy + 30 },
+      { lit: '#F5EAF6', mid: '#BEA8CA', dark: '#42304E' },
+      { shadowPoolFrac: 0.38, hatch: false, inkW: 3.8 }
     );
-    // Heavy Mignola brow shadow mask + blazing ember sovereign eyes!
+    // Heavy Mignola dark-obsidian brow shadow mask + burning angular crimson-gold monarch eyes!
     c.fillStyle = INK;
-    c.fillRect(cx - 22, hy - 14, 44, 15);
-    c.fillStyle = '#FF4818';
-    c.fillRect(cx - 16, hy - 8, 11, 5.5);
-    c.fillRect(cx + 5, hy - 8, 11, 5.5);
-    c.fillStyle = '#FFF8B8';
-    c.fillRect(cx - 13, hy - 7, 5, 3);
-    c.fillRect(cx + 8, hy - 7, 5, 3);
+    c.beginPath();
+    c.moveTo(cx - 25, hy - 16);
+    c.lineTo(cx + 25, hy - 16);
+    c.lineTo(cx + 22, hy + 2);
+    c.lineTo(cx, hy + 6);
+    c.lineTo(cx - 22, hy + 2);
+    c.closePath();
+    c.fill();
+    c.fillStyle = '#FF3C14';
+    c.beginPath();
+    c.moveTo(cx - 20, hy - 10);
+    c.lineTo(cx - 5, hy - 4);
+    c.lineTo(cx - 16, hy + 1);
+    c.closePath();
+    c.moveTo(cx + 20, hy - 10);
+    c.lineTo(cx + 5, hy - 4);
+    c.lineTo(cx + 16, hy + 1);
+    c.closePath();
+    c.fill();
+    c.fillStyle = '#FFFAC0';
+    c.beginPath();
+    c.arc(cx - 13, hy - 5, 2.8, 0, Math.PI * 2);
+    c.arc(cx + 13, hy - 5, 2.8, 0, Math.PI * 2);
+    c.fill();
 
-    // Sweeping Braided Dark Sovereign Beard w/ Gold Beard Clasps
-    paintChiaroscuroShape(
-      c,
-      () => {
-        c.beginPath();
-        c.moveTo(cx - 24, hy + 6);
-        c.lineTo(cx - 34, hy + 52);
-        c.lineTo(cx - 8, hy + 34);
-        c.lineTo(cx, hy + 62);
-        c.lineTo(cx + 8, hy + 34);
-        c.lineTo(cx + 34, hy + 52);
-        c.lineTo(cx + 24, hy + 6);
-        c.closePath();
-      },
-      { x0: cx - 34, y0: hy + 6, x1: cx + 34, y1: hy + 62 },
-      { lit: '#4A385C', mid: '#1D142A', dark: INK },
-      { shadowPoolFrac: 0.44, hatch: false, inkW: 4.0 }
-    );
+    // Sweeping Multi-Lock Braided & Forked Obsidian Sovereign Beard w/ Gold Beard Clasps!
+    const bCols = { lit: '#56406B', mid: '#1E142C', dark: INK, rim: '#FF9052' };
+    paintComicBladeLock(c, cx - 22, hy + 6, cx - 44, hy + 36, cx - 34, hy + 66, cx - 14, hy + 38, bCols, 3.2);
+    paintComicBladeLock(c, cx + 22, hy + 6, cx + 44, hy + 36, cx + 34, hy + 66, cx + 14, hy + 38, bCols, 3.2);
+    paintComicBladeLock(c, cx - 12, hy + 12, cx - 14, hy + 48, cx, hy + 76, cx + 14, hy + 48, bCols, 3.4);
+    // Gold beard rings
+    paintTaperedArc(c, cx - 10, hy + 42, cx, hy + 46, cx + 10, hy + 42, 4.2, '#F5C44E');
+    paintTaperedArc(c, cx - 7, hy + 56, cx, hy + 60, cx + 7, hy + 56, 3.8, '#F5C44E');
 
-    // Towering Branching Crowned Horned Obsidian-Gold Royal Helm (cleanly framed below y=6!)
+    // Towering Branching Organic Gnarled Obsidian-and-Gold Royal Antler-Crown (cleanly below y=6!)
+    const antCols = { lit: '#FFF6BC', mid: '#EBA828', dark: '#381A0C', rim: '#FFFFFF' };
     for (const dir of [-1, 1] as const) {
-      paintChiaroscuroShape(
-        c,
-        () => {
-          c.beginPath();
-          c.moveTo(cx + dir * 12, hy - 16);
-          c.quadraticCurveTo(cx + dir * 60, hy - 18, cx + dir * 82, hy - 58);
-          c.lineTo(cx + dir * 56, hy - 40);
-          c.lineTo(cx + dir * 50, hy - 68);
-          c.quadraticCurveTo(cx + dir * 30, hy - 32, cx + dir * 6, hy - 24);
-          c.closePath();
-        },
-        { x0: cx - 82, y0: hy - 68, x1: cx + 82, y1: hy - 16 },
-        { lit: '#FFF6BC', mid: '#EBA828', dark: '#462208', rim: '#FFFFFF' },
-        { shadowPoolFrac: 0.32, hatch: false, inkW: 4.2 }
-      );
+      paintComicBladeLock(c, cx + dir * 10, hy - 18, cx + dir * 56, hy - 18, cx + dir * 88, hy - 58, cx + dir * 52, hy - 40, antCols, 3.4);
+      paintComicBladeLock(c, cx + dir * 24, hy - 22, cx + dir * 48, hy - 44, cx + dir * 56, hy - 70, cx + dir * 34, hy - 44, antCols, 3.2);
+      paintComicBladeLock(c, cx + dir * 8, hy - 22, cx + dir * 22, hy - 50, cx + dir * 18, hy - 68, cx + dir * 4, hy - 44, antCols, 3.0);
     }
   });
 
