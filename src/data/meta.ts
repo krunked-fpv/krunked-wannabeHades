@@ -66,15 +66,8 @@ export const DEFAULT_SELECTED_ASPECTS: Readonly<Record<WeaponId, AspectId>> = {
 };
 
 /**
- * Starter Mirror configuration so Wave 1 combat immediately feels responsive:
- * - Greater Reflex rank 1 (2 consecutive dashes)
- * - Death Defiance rank 1 (1 extra life at 50% HP)
- * - Thick Skin rank 5 (+25 Max HP -> 75 starting HP)
- * - Infernal Soul rank 1 (2 Bloodstones)
- * - Shadow Presence rank 2 (+20% Backstab)
- * - Boiling Blood rank 2 (+20% damage with lodged Bloodstones)
- * - Cinder Vitality rank 1 (+1 HP per chamber)
- * - Fated Persuasion (side B) rank 1 (1 Boon reroll)
+ * Starter Mirror configuration so combat immediately feels sharp while leaving
+ * meaningful Darkness progression for the 12-pair Mirror of Dusk modal.
  */
 export const STARTER_MIRROR_RANKS: Readonly<Record<MirrorUpgradeId, number>> = {
   shadow_presence: 2,
@@ -111,7 +104,7 @@ export const STARTER_CURRENCIES = {
   gemstones: 50,
   keys: 4,
   nectar: 2,
-  titanBlood: 2,
+  titanBlood: 6,
   diamonds: 0,
   ambrosia: 0,
 } as const;
@@ -139,6 +132,19 @@ export function getMirrorUpgradeCost(
   return sideDef.baseCost + sideDef.costStep * Math.max(0, currentRank);
 }
 
+export function getMirrorTotalSpentForId(
+  id: MirrorUpgradeId,
+  side: 'a' | 'b',
+  rank: number
+): number {
+  const clamped = Math.max(0, Math.floor(rank));
+  let total = 0;
+  for (let r = 0; r < clamped; r++) {
+    total += getMirrorUpgradeCost(id, side, r);
+  }
+  return total;
+}
+
 export function getMirrorRankValue(
   id: MirrorUpgradeId,
   side: 'a' | 'b',
@@ -147,6 +153,16 @@ export function getMirrorRankValue(
   const sideDef = getMirrorSideDef(id, side);
   const clamped = Math.max(0, Math.min(sideDef.maxRank, Math.floor(rank)));
   return clamped * sideDef.valuePerRank;
+}
+
+export function getAspectUpgradeCost(aspectId: AspectId, currentRank: number): number {
+  const def = ASPECT_DEFS[aspectId];
+  if (!def || currentRank >= def.maxRank) return 0;
+  if (currentRank <= 0) {
+    return def.isHiddenAspect ? 3 : 1;
+  }
+  const base = def.isHiddenAspect ? 2 : 1;
+  return base + Math.max(0, currentRank - 1);
 }
 
 export function getShrineVowDef(id: ShrineVowId): ShrineVowDef {

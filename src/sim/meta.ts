@@ -1,6 +1,7 @@
 import {
   ASPECT_DEFS,
   DEFAULT_RENDER_SETTINGS,
+  KEEPSAKES,
   MIRROR_UPGRADES,
   PLAYER_CONSTANTS,
   SHRINE_VOWS,
@@ -28,9 +29,11 @@ import {
   STARTER_MIRROR_SIDES,
   TIGHT_DEADLINE_SECONDS,
   WEAPON_ORDER,
+  getAspectUpgradeCost,
   getDefaultAspectForWeapon,
   getMirrorRankValue,
   getMirrorSideDef,
+  getMirrorTotalSpentForId,
   getMirrorUpgradeCost,
   getShrineVowHeat,
   isValidAspectForWeapon,
@@ -293,14 +296,26 @@ export function getHealingMultiplier(vows: Partial<Record<ShrineVowId, number>>)
   return Math.max(0, 1 - rank * 0.25);
 }
 
-export function getShopPriceMultiplier(vows: Partial<Record<ShrineVowId, number>>): number {
+export function getShopPriceMultiplier(
+  vows: Partial<Record<ShrineVowId, number>>,
+  hasLoyaltyCard = false
+): number {
   const rank = Math.max(0, Math.min(2, Math.floor(vows.convenience_fee ?? 0)));
-  return 1 + rank * 0.4;
+  const mult = 1 + rank * 0.4;
+  return hasLoyaltyCard ? mult * 0.8 : mult;
 }
 
 export function getKeepsakeRank(meta: MetaSaveState, id: KeepsakeId | null): number {
   if (!id) return 0;
   return Math.max(1, Math.min(3, Math.floor(meta.keepsakeRanks[id] ?? 1)));
+}
+
+export function getWellBonusEncounters(state: SimState): number {
+  if (state.player.keepsakeId !== 'bone_sandglass') return 0;
+  return getKeepsakeValue(
+    'bone_sandglass',
+    getKeepsakeRank(state.meta, 'bone_sandglass')
+  );
 }
 
 export function applyMetaToPlayer(
@@ -319,8 +334,12 @@ export function applyMetaToPlayer(
 
   // Tight Deadline timer
   const deadlineRank = Math.max(0, Math.min(3, Math.floor(run.vows.tight_deadline ?? 0)));
-  run.tightDeadlineTimer =
-    deadlineRank > 0 ? (TIGHT_DEADLINE_SECONDS[deadlineRank - 1] ?? null) : null;
+  if (resetVitals || run.tightDeadlineTimer === null) {
+    run.tightDeadlineTimer =
+      deadlineRank > 0 ? (TIGHT_DEADLINE_SECONDS[deadlineRank - 1] ?? null) : null;
+  } else if (deadlineRank === 0) {
+    run.tightDeadlineTimer = null;
+  }
 
   // Selected weapon & aspect
   const weaponId: WeaponId = WEAPON_CONSTANTS[meta.selectedWeapon]
@@ -348,9 +367,11 @@ export function applyMetaToPlayer(
   if (resetVitals) {
     player.ammo = maxAmmo;
     player.reloadTimer = 0;
+  } else {
+    player.ammo = Math.min(player.ammo, maxAmmo);
   }
 
-  // Max HP: Base 50 + Thick Skin (side A) + Spiked Collar + Aspect modifiers
+  // Max HP: Base 50 + Thick Skin (side A) + Spiked Collar + Chaos Vitality + Aspect modifiers
   const thickSkin = getEffectiveMirrorUpgrade(meta, run.vows, 'thick_skin');
   let maxHp: number = PLAYER_CONSTANTS.baseMaxHealth;
   if (thickSkin.side === 'a') {
@@ -362,6 +383,11 @@ export function applyMetaToPlayer(
   if (keepsakeId === 'old_collar') {
     maxHp += getKeepsakeValue('old_collar', keepsakeRank);
   }
+  for (const boon of player.boons) {
+    if (boon.id === 'abyssos_vitality') {
+      maxHp += Math.round(boon.scaledValue);
+    }
+  }
   if (aspectId === 'blade_paladin') {
     maxHp += 50;
   } else if (aspectId === 'spear_dragon') {
@@ -371,15 +397,20 @@ export function applyMetaToPlayer(
     maxHp = Math.round(maxHp * 0.4);
   }
   maxHp = Math.max(25, Math.round(maxHp));
-  player.maxHp = maxHp;
   if (resetVitals) {
+    player.maxHp = maxHp;
     player.hp = maxHp;
     player.isDead = false;
   } else {
-    player.hp = Math.min(player.hp, maxHp);
+    const delta = Math.max(0, maxHp - player.maxHp);
+    player.maxHp = Math.max(player.maxHp, maxHp);
+    if (player.hammers.includes('hammer_blade_cursed_slash') || aspectId === 'spear_dragon') {
+      player.maxHp = maxHp;
+    }
+    player.hp = Math.min(player.maxHp, player.hp + delta);
   }
 
-  // Dash charges: Base 1 + Greater Reflex (side A) + Feral Claws + Hyper Reflex boon
+  // Dash charges: Base 1 + Greater Reflex (side A) + Feral Claws + Greatest Reflex boon
   const reflex = getEffectiveMirrorUpgrade(meta, run.vows, 'greater_reflex');
   let maxDashes: number = PLAYER_CONSTANTS.dashBaseClip;
   if (reflex.side === 'a' && reflex.rank > 0) {
@@ -388,9 +419,10 @@ export function applyMetaToPlayer(
   if (aspectId === 'fists_feral') {
     maxDashes += 2;
   }
-  const veloceDash = player.boons.find((b) => b.id === 'veloce_greatest_reflex');
-  if (veloceDash) {
-    maxDashes += Math.max(1, Math.round(veloceDash.scaledValue));
+  for (const b of player.boons) {
+    if (b.id === 'veloce_greatest_reflex') {
+      maxDashes += Math.max(1, Math.round(b.scaledValue));
+    }
   }
   player.maxDashCharges = maxDashes;
   if (resetVitals) {
@@ -417,16 +449,29 @@ export function applyMetaToPlayer(
     player.deathDefiances = Math.min(player.deathDefiances, maxDefiances);
   }
 
-  // Cast Bloodstones: Base 1 + Infernal Soul (side A)
+  // Cast Bloodstones: Base 1 + Infernal Soul (side A) + Primordial Grasp
   const soul = getEffectiveMirrorUpgrade(meta, run.vows, 'infernal_soul');
   let maxCast: number = PLAYER_CONSTANTS.baseCastAmmo;
   if (soul.side === 'a') {
     maxCast += Math.min(PLAYER_CONSTANTS.infernalSoulMaxBonus, Math.round(soul.value));
   }
+  for (const b of player.boons) {
+    if (b.id === 'abyssos_grasp') {
+      maxCast += Math.max(1, Math.round(b.scaledValue));
+    }
+  }
   player.maxCastAmmo = maxCast;
   if (resetVitals) {
     player.castAmmo = maxCast;
     player.castRegenTimer = 0;
+  } else {
+    player.castAmmo = Math.min(player.castAmmo, maxCast);
+  }
+
+  // Veloce Greater Evasion passive dodge folded safely into dodge pool
+  const evasionBoon = player.boons.find((b) => b.id === 'veloce_greater_evasion');
+  if (evasionBoon && player.plumeBonus < evasionBoon.scaledValue) {
+    player.plumeBonus = Math.max(player.plumeBonus, evasionBoon.scaledValue);
   }
 
   // Starting Gold: Deep Pockets (side A) + Gilded Pouch keepsake
@@ -439,7 +484,7 @@ export function applyMetaToPlayer(
     }
     player.gold = startGold;
     player.acornShields = 0;
-    player.plumeBonus = 0;
+    player.plumeBonus = evasionBoon ? evasionBoon.scaledValue : 0;
   }
 
   // Fated Authority (door rerolls) vs Fated Persuasion (boon rerolls)
@@ -449,6 +494,10 @@ export function applyMetaToPlayer(
     run.boonRerolls = fated.side === 'b' ? Math.round(fated.value) : 0;
   }
 }
+
+// ============================================================================
+// Hub Meta Upgrade & Equipment Mutations (Mirror, Weapons, Shrine, Keepsakes)
+// ============================================================================
 
 export function purchaseMirrorUpgrade(
   meta: MetaSaveState,
@@ -467,6 +516,20 @@ export function purchaseMirrorUpgrade(
   meta.darkness -= cost;
   meta.mirrorRanks[id] = currentRank + 1;
   return true;
+}
+
+export function refundMirrorUpgrades(meta: MetaSaveState): number {
+  let refunded = 0;
+  for (const id of MIRROR_UPGRADE_ORDER) {
+    const side = meta.mirrorActiveSide[id] ?? 'a';
+    const rank = Math.max(0, Math.floor(meta.mirrorRanks[id] ?? 0));
+    if (rank > 0) {
+      refunded += getMirrorTotalSpentForId(id, side, rank);
+      meta.mirrorRanks[id] = 0;
+    }
+  }
+  meta.darkness += refunded;
+  return refunded;
 }
 
 export function toggleMirrorSide(
@@ -497,15 +560,45 @@ export function setShrineVowRank(
   return computeHeat(meta.shrineVows);
 }
 
+export function unlockWeapon(meta: MetaSaveState, weaponId: WeaponId): boolean {
+  if (!WEAPON_CONSTANTS[weaponId]) return false;
+  if (meta.unlockedWeapons.includes(weaponId)) return true;
+  if (meta.keys < 1) return false;
+  meta.keys -= 1;
+  meta.unlockedWeapons.push(weaponId);
+  return true;
+}
+
+export function upgradeWeaponAspect(
+  meta: MetaSaveState,
+  aspectId: AspectId
+): boolean {
+  const def = ASPECT_DEFS[aspectId];
+  if (!def) return false;
+  const curRank = Math.max(0, Math.floor(meta.aspectRanks[aspectId] ?? 0));
+  if (curRank >= def.maxRank) return false;
+  const cost = getAspectUpgradeCost(aspectId, curRank);
+  if (meta.titanBlood < cost) return false;
+  meta.titanBlood -= cost;
+  meta.aspectRanks[aspectId] = curRank + 1;
+  return true;
+}
+
 export function selectWeaponAndAspect(
   meta: MetaSaveState,
   weaponId: WeaponId,
   aspectId?: AspectId
 ): void {
   if (!WEAPON_CONSTANTS[weaponId]) return;
+  if (!meta.unlockedWeapons.includes(weaponId)) {
+    meta.unlockedWeapons.push(weaponId);
+  }
   meta.selectedWeapon = weaponId;
   if (aspectId && isValidAspectForWeapon(weaponId, aspectId)) {
     meta.selectedAspects[weaponId] = aspectId;
+    if ((meta.aspectRanks[aspectId] ?? 0) <= 0) {
+      meta.aspectRanks[aspectId] = 1;
+    }
   } else if (!isValidAspectForWeapon(weaponId, meta.selectedAspects[weaponId])) {
     meta.selectedAspects[weaponId] = getDefaultAspectForWeapon(weaponId);
   }
@@ -515,7 +608,25 @@ export function selectKeepsake(
   meta: MetaSaveState,
   keepsakeId: KeepsakeId | null
 ): void {
+  if (keepsakeId && !KEEPSAKES[keepsakeId]) return;
+  if (keepsakeId && !meta.unlockedKeepsakes.includes(keepsakeId)) {
+    meta.unlockedKeepsakes.push(keepsakeId);
+  }
+  if (keepsakeId && !(meta.keepsakeRanks[keepsakeId] ?? 0)) {
+    meta.keepsakeRanks[keepsakeId] = 1;
+  }
   meta.selectedKeepsake = keepsakeId;
+}
+
+export function upgradeKeepsakeRank(
+  meta: MetaSaveState,
+  keepsakeId: KeepsakeId
+): number {
+  if (!KEEPSAKES[keepsakeId]) return 0;
+  const cur = Math.max(1, Math.min(3, Math.floor(meta.keepsakeRanks[keepsakeId] ?? 1)));
+  const next = Math.min(3, cur + 1);
+  meta.keepsakeRanks[keepsakeId] = next;
+  return next;
 }
 
 export function recordRunEndMeta(state: SimState, victory: boolean): void {
@@ -541,6 +652,10 @@ export function recordRunEndMeta(state: SimState, victory: boolean): void {
         meta.godModeDeaths + 1
       );
     }
+  }
+  // Level up equipped Keepsake after surviving chambers
+  if (state.player.keepsakeId && run.chambersCleared >= 5) {
+    upgradeKeepsakeRank(meta, state.player.keepsakeId);
   }
 }
 
