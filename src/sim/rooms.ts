@@ -1130,6 +1130,31 @@ function enterDoor(
     return true;
   }
 
+  // Returning from optional Ferryman duel back to the interrupted biome/depth!
+  if (state.room.templateId === 'ferryman_dock' && cm.ferrymanReturnBiome) {
+    const returnBiome = cm.ferrymanReturnBiome;
+    const returnDepth = cm.ferrymanReturnDepth;
+    cm.ferrymanReturnBiome = null;
+
+    const orderIdx = BIOME_PROGRESSION_ORDER.indexOf(returnBiome);
+    state.run.biomeOrderIndex = orderIdx >= 0 ? orderIdx : 0;
+
+    if (returnBiome === 'crypt_of_bile') {
+      loadRoom(state, 'crypt_of_bile', 1, 'styx_hub', undefined, ctx);
+    } else {
+      const nextDepth = returnDepth + 1;
+      const bossDepth = BIOME_CONSTANTS[returnBiome].bossDepth;
+      const nextKind: EncounterKind =
+        nextDepth >= bossDepth
+          ? returnBiome === 'frozen_summit'
+            ? 'surface_boss'
+            : 'boss'
+          : 'combat';
+      loadRoom(state, returnBiome, nextDepth, nextKind, undefined, ctx);
+    }
+    return true;
+  }
+
   // Chaos Gate entry: requires paying non-lethal HP cost (`20 + depth * 0.2`)
   if (door.isChaosGate) {
     const cost = door.chaosHpCost ?? Math.round(20 + state.room.depth * 0.2);
