@@ -15,6 +15,7 @@ import { AssetRegistry } from '../assets/AssetRegistry.js';
 import { autoLoadCustomPack, promptLoadCustomPackFolder } from '../assets/CustomPackLoader.js';
 import { AudioEngine } from '../audio/AudioEngine.js';
 import {
+  PATRON_CONSTANTS,
   SIM_CONSTANTS,
   type DebugBridge,
   type InputFrame,
@@ -51,9 +52,20 @@ import {
   stepSim,
   type SimGameplayHooks,
 } from '../sim/step.js';
-import { UiManager } from '../ui/UiManager.js';
+import { UiManager, type UiCallbacks } from '../ui/UiManager.js';
+import {
+  CameraFeelController,
+  type GameRendererFeelHooks,
+  type ScreenFxImpulse,
+} from './CameraFeelController.js';
 import { createDebugBridge, type ExtendedDebugBridge } from './DebugBridge.js';
 import { loadSave, resetSave as resetPersistedSave, writeSave } from './SaveManager.js';
+
+type FeelAwareRenderer = GameRenderer & Partial<GameRendererFeelHooks>;
+type UiCallbacksWithHover = UiCallbacks & { onUiHover?: () => void };
+
+const MAX_COSMETIC_FREEZE_SEC = 0.024;
+const COSMETIC_FREEZE_COOLDOWN_SEC = 0.22;
 
 declare global {
   interface Window {
@@ -149,6 +161,7 @@ export class GameApp {
   private readonly audio: AudioEngine;
   private readonly ui: UiManager;
   private readonly debugBridge: ExtendedDebugBridge;
+  private readonly cameraFeel = new CameraFeelController();
 
   private screen: ScreenId = 'title';
   private returnScreenBeforeOptions: ScreenId = 'title';
@@ -157,6 +170,8 @@ export class GameApp {
   private lastRafMs = 0;
   private lastRenderMs = 0;
   private simAccumulator = 0;
+  private cosmeticFreezeRemainingSec = 0;
+  private cosmeticFreezeCooldownSec = 0;
   private disposed = false;
 
   // Latched one-shot gameplay inputs so >60Hz displays (120Hz/144Hz) NEVER drop presses
@@ -211,6 +226,14 @@ export class GameApp {
     this.renderer.init(this.canvas);
     this.renderer.attachCustomPack(this.assetRegistry);
 
+    // Re-bake combat numeral glyph atlas once self-hosted OFL WOFF2 fonts finish loading
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      void document.fonts.ready.then(() => {
+        if (this.disposed) return;
+        (this.renderer as FeelAwareRenderer).rebakeFontAtlas?.();
+      });
+    }
+
     // Non-blocking background check for cached IndexedDB pack or local dev `/.wannabehades-assets/`
     void this.initCustomPackAutoDetect();
 
@@ -233,8 +256,10 @@ export class GameApp {
       setScreen: (screen) => this.applyScreenTransition(screen),
       clearPrevState: () => {
         this.prevState = null;
+        this.cameraFeel.reset();
+        this.cosmeticFreezeRemainingSec = 0;
       },
-      drainEvents: () => this.drainEvents(),
+      drainEvents: () => this.drainEvents(true),
       persistSave: () => this.persistSave(),
       syncScreenFromState: () => this.syncScreenFromState(),
       startRun: (seed) => this.handleStartRun(seed),
@@ -246,7 +271,10 @@ export class GameApp {
     window.__KRUNKED_DEBUG__ = this.debugBridge;
 
     // 6. Initialize Mythic UI Manager (Wave 1 + all Wave 2 Hub Meta, Shop & Codex modals)
-    this.ui = new UiManager(uiRoot, {
+    const uiCallbacks: UiCallbacksWithHover = {
+      onUiHover: () => {
+        this.audio.playUiSound('hover');
+      },
       onEnterCourtyard: () => {
         this.audio.unlock();
         this.audio.playUiSound('confirm');
@@ -440,7 +468,8 @@ export class GameApp {
       },
       getPortraitUrl: (patronId) => this.renderer.getPatronPortraitDataUrl(patronId),
       getDebugBridge: () => this.debugBridge,
-    });
+    };
+    this.ui = new UiManager(uiRoot, uiCallbacks);
 
     // 7. Window listeners (HiDPI resize & gesture audio unlock)
     this.handleResizeBound = () => this.handleResize();
@@ -538,6 +567,7 @@ export class GameApp {
     this.screen = screen;
     this.state.run.paused = MODAL_PAUSING_SCREENS.has(screen);
     this.simAccumulator = 0;
+    this.cosmeticFreezeRemainingSec = 0;
     if (isModalOverlayScreen(screen)) {
       this.clearPendingOneShots();
     }
@@ -557,8 +587,10 @@ export class GameApp {
     this.screen = 'hub';
     this.prevState = null;
     this.simAccumulator = 0;
+    this.cosmeticFreezeRemainingSec = 0;
+    this.cameraFeel.reset();
     this.clearPendingOneShots();
-    this.drainEvents();
+    this.drainEvents(true);
     this.audio.updateMusic(this.state, this.screen);
     this.persistSave();
   }
@@ -573,8 +605,10 @@ export class GameApp {
     this.screen = 'playing';
     this.prevState = null;
     this.simAccumulator = 0;
+    this.cosmeticFreezeRemainingSec = 0;
+    this.cameraFeel.reset();
     this.clearPendingOneShots();
-    this.drainEvents();
+    this.drainEvents(true);
     this.audio.updateMusic(this.state, this.screen);
     this.persistSave();
   }
@@ -694,14 +728,195 @@ export class GameApp {
     return merged;
   }
 
-  private drainEvents(): void {
+  private dispatchScreenFx(batch: readonly SimEvent[]): void {
+    const feelRenderer = this.renderer as FeelAwareRenderer;
+    if (typeof feelRenderer.triggerScreenFx !== 'function') return;
+
+    for (let i = 0; i < batch.length; i++) {
+      const ev = batch[i];
+      let fx: ScreenFxImpulse | null = null;
+      switch (ev.type) {
+        case 'damage':
+          if (ev.targetKind === 'enemy') {
+            if (ev.armorBroken) {
+              fx = {
+                kind: 'shockwave',
+                intensity: 0.58,
+                worldX: ev.pos.x,
+                worldY: ev.pos.y,
+                colorHex: '#6CEEFF',
+              };
+            } else if (ev.crit) {
+              fx = {
+                kind: 'crit_burst',
+                intensity: 0.48,
+                worldX: ev.pos.x,
+                worldY: ev.pos.y,
+                colorHex: '#FFE066',
+              };
+            }
+          }
+          break;
+
+        case 'deflect':
+          fx = {
+            kind: 'shockwave',
+            intensity: 0.55,
+            worldX: ev.pos.x,
+            worldY: ev.pos.y,
+            colorHex: '#6CEEFF',
+          };
+          break;
+
+        case 'god_call': {
+          const patronColor = PATRON_CONSTANTS[ev.patronId]?.colorHex ?? '#FFE066';
+          fx = ev.greater
+            ? {
+                kind: 'greater_call',
+                intensity: 0.85,
+                worldX: ev.pos.x,
+                worldY: ev.pos.y,
+                colorHex: patronColor,
+              }
+            : {
+                kind: 'chromatic',
+                intensity: 0.42,
+                worldX: ev.pos.x,
+                worldY: ev.pos.y,
+                colorHex: patronColor,
+              };
+          break;
+        }
+
+        case 'boss_phase':
+          fx = {
+            kind: 'boss_phase',
+            intensity: 0.92,
+            worldX: ev.pos.x,
+            worldY: ev.pos.y,
+            colorHex: '#FF2E46',
+          };
+          break;
+
+        case 'death_defiance':
+          fx = {
+            kind: 'death_defiance',
+            intensity: 1.0,
+            worldX: ev.pos.x,
+            worldY: ev.pos.y,
+            colorHex: '#FFD266',
+          };
+          break;
+
+        case 'enemy_death':
+          if (ev.finalInRoom || ev.isBoss) {
+            fx = {
+              kind: 'shockwave',
+              intensity: ev.isBoss ? 0.82 : 0.52,
+              worldX: ev.pos.x,
+              worldY: ev.pos.y,
+              colorHex: ev.isBoss ? '#FF465A' : '#FFE066',
+            };
+          }
+          break;
+
+        default:
+          break;
+      }
+
+      if (fx !== null) {
+        feelRenderer.triggerScreenFx(fx);
+      }
+    }
+  }
+
+  private dispatchRumbleProfiles(batch: readonly SimEvent[]): void {
+    let bestWeak = 0;
+    let bestStrong = 0;
+    let bestMs = 0;
+
+    const consider = (weak: number, strong: number, ms: number): void => {
+      if (weak > bestWeak) bestWeak = weak;
+      if (strong > bestStrong) bestStrong = strong;
+      if (ms > bestMs) bestMs = ms;
+    };
+
+    for (let i = 0; i < batch.length; i++) {
+      const ev = batch[i];
+      switch (ev.type) {
+        case 'rumble':
+          consider(ev.weak, ev.strong, ev.durationMs);
+          break;
+
+        case 'damage':
+          if (ev.targetKind === 'player') {
+            consider(0.68, 0.72, 125);
+          } else if (ev.armorBroken) {
+            consider(0.85, 0.65, 135);
+          } else if (ev.crit || ev.backstab) {
+            consider(0.78, 0.42, 110);
+          } else if (ev.wallSlam || ev.amount >= 40) {
+            consider(0.45, 0.55, 95);
+          } else {
+            consider(0.18, 0.08, 42);
+          }
+          break;
+
+        case 'special_cast':
+          consider(0.45, 0.55, 95);
+          break;
+
+        case 'deflect':
+          consider(0.85, 0.65, 135);
+          break;
+
+        case 'enemy_death':
+          if (ev.finalInRoom || ev.isBoss) {
+            consider(0.85, 0.75, 165);
+          }
+          break;
+
+        case 'boss_phase':
+        case 'death_defiance':
+          consider(0.9, 0.95, 260);
+          break;
+
+        case 'god_call':
+          if (ev.greater) {
+            consider(0.9, 0.95, 260);
+          } else {
+            consider(0.62, 0.52, 120);
+          }
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    if (bestMs > 0 && (bestWeak > 0 || bestStrong > 0)) {
+      this.input.triggerRumble(bestWeak, bestStrong, bestMs);
+    }
+  }
+
+  private drainEvents(isDebugStep = false): void {
     if (this.state.events.length === 0) return;
 
     const batch = this.state.events.splice(0, this.state.events.length);
+    const camX =
+      this.state.camera.zoom > 0.05 ? this.state.camera.x : this.state.player.pos.x;
+
     this.renderer.consumeEvents(batch, this.state);
-    this.audio.handleSimEvents(batch);
+    this.audio.handleSimEvents(batch, camX);
+    this.cameraFeel.consumeEvents(batch, this.state, this.state.meta.settings.screenShake);
+    this.dispatchScreenFx(batch);
+
+    if (!isDebugStep) {
+      this.dispatchRumbleProfiles(batch);
+    }
 
     // Retain toast-relevant events for HudOverlay.processToasts() on the next ui.update()
+    let freezeRequestSec = 0;
     for (let i = 0; i < batch.length; i++) {
       const ev = batch[i];
       if (
@@ -713,18 +928,40 @@ export class GameApp {
       ) {
         this.pendingUiEvents.push(ev);
       }
+
+      if (!isDebugStep && this.state.hitstopTimer <= 0) {
+        if (ev.type === 'deflect') {
+          freezeRequestSec = Math.max(freezeRequestSec, 0.022);
+        } else if (ev.type === 'damage' && ev.targetKind === 'enemy') {
+          if (ev.armorBroken) {
+            freezeRequestSec = Math.max(freezeRequestSec, 0.022);
+          } else if (ev.crit) {
+            freezeRequestSec = Math.max(freezeRequestSec, 0.018);
+          }
+        }
+      }
     }
     if (this.pendingUiEvents.length > 32) {
       this.pendingUiEvents.splice(0, this.pendingUiEvents.length - 32);
+    }
+
+    // Crisp presentation-only micro-freeze grace (strictly clamped <= 24ms, 0ms in headless/debug step)
+    if (
+      !isDebugStep &&
+      freezeRequestSec > 0 &&
+      this.cosmeticFreezeCooldownSec <= 0 &&
+      this.state.hitstopTimer <= 0 &&
+      this.isGameplaySimRunning()
+    ) {
+      this.cosmeticFreezeRemainingSec = Math.min(MAX_COSMETIC_FREEZE_SEC, freezeRequestSec);
+      this.cosmeticFreezeCooldownSec = COSMETIC_FREEZE_COOLDOWN_SEC;
     }
 
     let shouldSave = false;
     let roomChanged = false;
     for (let i = 0; i < batch.length; i++) {
       const ev = batch[i];
-      if (ev.type === 'rumble') {
-        this.input.triggerRumble(ev.weak, ev.strong, ev.durationMs);
-      } else if (ev.type === 'room_entered') {
+      if (ev.type === 'room_entered') {
         roomChanged = true;
         shouldSave = true;
       } else if (
@@ -738,6 +975,8 @@ export class GameApp {
 
     if (roomChanged) {
       this.prevState = null;
+      this.cameraFeel.reset();
+      this.cosmeticFreezeRemainingSec = 0;
     }
     if (shouldSave) {
       this.persistSave();
@@ -748,6 +987,7 @@ export class GameApp {
     const rawDtSec = this.lastRafMs > 0 ? (nowMs - this.lastRafMs) * 0.001 : SIM_CONSTANTS.fixedDt;
     this.lastRafMs = nowMs;
     const clampedDt = Math.max(0, Math.min(SIM_CONSTANTS.maxFrameDt, rawDtSec));
+    this.cosmeticFreezeCooldownSec = Math.max(0, this.cosmeticFreezeCooldownSec - clampedDt);
 
     const inGameplay = this.isGameplaySimRunning();
     const nearInteractable = inGameplay && findNearestInteractable(this.state) !== null;
@@ -775,6 +1015,7 @@ export class GameApp {
       this.screen = 'pause';
       this.state.run.paused = true;
       this.simAccumulator = 0;
+      this.cosmeticFreezeRemainingSec = 0;
       this.clearPendingOneShots();
       this.audio.playUiSound('click');
       // Prevent PauseAndOptionsModal from immediately resuming on the exact same frame
@@ -784,38 +1025,47 @@ export class GameApp {
     // 3. Fixed 60Hz deterministic simulation substeps
     const simRunningNow = this.isGameplaySimRunning();
     if (simRunningNow) {
-      // Always latch one-shot presses before checking accumulator so 120Hz/144Hz RAF frames
-      // with 0 sim substeps never drop dash/attack/special/cast/interact presses!
+      // Always latch one-shot presses before checking accumulator or micro-freeze so 120Hz/144Hz
+      // frames never drop dash/attack/special/cast/interact presses!
       this.latchOneShots(polledInput);
-      this.simAccumulator += clampedDt;
-      let steps = 0;
-      let stepInput: InputFrame | null = null;
 
-      while (
-        this.simAccumulator >= SIM_CONSTANTS.fixedDt &&
-        steps < SIM_CONSTANTS.maxSubStepsPerFrame
-      ) {
-        if (stepInput === null) {
-          stepInput = this.applyAndClearOneShots(polledInput);
-        } else {
-          stepInput = stripOneShotPresses(stepInput);
-        }
-        this.prevState = snapshotPrevState(this.state);
-        stepSim(this.state, { ...stepInput, tick: this.state.tick + 1 }, this.hooks);
-        this.drainEvents();
-        this.syncScreenFromState();
+      if (this.cosmeticFreezeRemainingSec > 0) {
+        this.cosmeticFreezeRemainingSec = Math.max(
+          0,
+          this.cosmeticFreezeRemainingSec - clampedDt
+        );
+      } else {
+        this.simAccumulator += clampedDt;
+        let steps = 0;
+        let stepInput: InputFrame | null = null;
 
-        this.simAccumulator -= SIM_CONSTANTS.fixedDt;
-        steps += 1;
+        while (
+          this.simAccumulator >= SIM_CONSTANTS.fixedDt &&
+          steps < SIM_CONSTANTS.maxSubStepsPerFrame
+        ) {
+          if (stepInput === null) {
+            stepInput = this.applyAndClearOneShots(polledInput);
+          } else {
+            stepInput = stripOneShotPresses(stepInput);
+          }
+          this.prevState = snapshotPrevState(this.state);
+          stepSim(this.state, { ...stepInput, tick: this.state.tick + 1 }, this.hooks);
+          this.drainEvents(false);
+          this.syncScreenFromState();
 
-        if (!this.isGameplaySimRunning()) {
-          this.simAccumulator = 0;
-          this.clearPendingOneShots();
-          break;
+          this.simAccumulator -= SIM_CONSTANTS.fixedDt;
+          steps += 1;
+
+          if (!this.isGameplaySimRunning()) {
+            this.simAccumulator = 0;
+            this.clearPendingOneShots();
+            break;
+          }
         }
       }
     } else {
       this.simAccumulator = 0;
+      this.cosmeticFreezeRemainingSec = 0;
       this.clearPendingOneShots();
       this.syncScreenFromState();
     }
@@ -823,21 +1073,31 @@ export class GameApp {
     // 4. Adaptive Greek-metal soundtrack state sync
     this.audio.updateMusic(this.state, this.screen);
 
-    // 5. Render pacing honoring targetFps (30 | 60 | 120) and classicSnap60Hz
+    // 5. Presentation-layer cosmetic camera feel update (aim look-ahead, recoil, zoom punch, trauma)
     const settings = this.state.meta.settings;
+    const feelOffset = this.cameraFeel.update(
+      clampedDt,
+      this.state,
+      polledInput,
+      this.screen,
+      settings
+    );
+    (this.renderer as FeelAwareRenderer).setCameraFeelOffset?.(feelOffset);
+
+    // 6. Render pacing honoring targetFps (30 | 60 | 120) and classicSnap60Hz
     const minRenderMs = settings.targetFps >= 120 ? 0 : 1000 / settings.targetFps - 1.5;
     const shouldRender = this.lastRenderMs === 0 || nowMs - this.lastRenderMs >= minRenderMs;
 
     if (shouldRender) {
       this.lastRenderMs = nowMs;
       const interpAlpha =
-        !this.isGameplaySimRunning() || settings.classicSnap60Hz
+        !this.isGameplaySimRunning() || settings.classicSnap60Hz || this.cosmeticFreezeRemainingSec > 0
           ? 1
           : Math.max(0, Math.min(1, this.simAccumulator / SIM_CONSTANTS.fixedDt));
       this.renderer.render(this.state, this.prevState, interpAlpha, settings, nowMs);
     }
 
-    // 6. Always update UI when rendering OR when a menu/debug input edge occurred
+    // 7. Always update UI when rendering OR when a menu/debug input edge occurred
     if (shouldRender || hasAnyMenuNav(uiMenuNav) || this.pendingUiEvents.length > 0) {
       const renderStats = this.renderer.getStats();
       const hash = this.ui.isDebugDrawerOpen() ? hashSimState(this.state) : '';

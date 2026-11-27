@@ -258,6 +258,7 @@ function createOverdriveCurve(drive: number, samples = 1024): Float32Array<Array
 export class MusicSynthesizer {
   private readonly ctx: AudioContext;
   private readonly musicMaster: GainNode;
+  private readonly busLimiter: DynamicsCompressorNode;
   private readonly muffleFilter: BiquadFilterNode;
   private readonly duckGain: GainNode;
 
@@ -302,9 +303,19 @@ export class MusicSynthesizer {
   private currentBpm = 92;
   private targetBpm = 92;
   private oneShotPlaying = false;
+  private isMuffled = false;
+  private currentDroneTranspose = 0;
 
   constructor(ctx: AudioContext, destination: AudioNode) {
     this.ctx = ctx;
+
+    // Gentle bus glue compressor prevents 6-stem boss peaks from ever clipping
+    this.busLimiter = ctx.createDynamicsCompressor();
+    this.busLimiter.threshold.value = -12;
+    this.busLimiter.knee.value = 8;
+    this.busLimiter.ratio.value = 4;
+    this.busLimiter.attack.value = 0.005;
+    this.busLimiter.release.value = 0.12;
 
     this.muffleFilter = ctx.createBiquadFilter();
     this.muffleFilter.type = 'lowpass';
@@ -317,7 +328,8 @@ export class MusicSynthesizer {
     this.musicMaster = ctx.createGain();
     this.musicMaster.gain.value = 0.72;
 
-    this.musicMaster.connect(this.muffleFilter);
+    this.musicMaster.connect(this.busLimiter);
+    this.busLimiter.connect(this.muffleFilter);
     this.muffleFilter.connect(this.duckGain);
     this.duckGain.connect(destination);
 
@@ -482,10 +494,11 @@ export class MusicSynthesizer {
   }
 
   setMenuMuffled(muffled: boolean): void {
-    if (this.disposed) return;
+    if (this.disposed || muffled === this.isMuffled) return;
+    this.isMuffled = muffled;
     const now = this.ctx.currentTime;
-    this.muffleFilter.frequency.setTargetAtTime(muffled ? 1350 : 18000, now, 0.14);
-    this.musicMaster.gain.setTargetAtTime(muffled ? 0.52 : 0.72, now, 0.14);
+    this.smoothParam(this.muffleFilter.frequency, muffled ? 1350 : 18000, now, 0.14);
+    this.smoothParam(this.musicMaster.gain, muffled ? 0.52 : 0.72, now, 0.14);
   }
 
   duck(level: number, holdSeconds: number): void {
@@ -493,6 +506,7 @@ export class MusicSynthesizer {
     const now = this.ctx.currentTime;
     const clamped = Math.max(0.1, Math.min(1.0, level));
     this.duckGain.gain.cancelScheduledValues(now);
+    this.duckGain.gain.setValueAtTime(Math.max(0.05, this.duckGain.gain.value), now);
     this.duckGain.gain.setTargetAtTime(clamped, now, 0.025);
     this.duckGain.gain.setTargetAtTime(1.0, now + Math.max(0.08, holdSeconds), 0.24);
   }
@@ -554,6 +568,7 @@ export class MusicSynthesizer {
       this.leadDelay.disconnect();
       this.leadDelayFeedback.disconnect();
       this.orchestralFilter.disconnect();
+      this.busLimiter.disconnect();
       this.muffleFilter.disconnect();
       this.duckGain.disconnect();
       this.musicMaster.disconnect();
@@ -1218,10 +1233,22 @@ export class MusicSynthesizer {
 
   private updateDronePitch(transposeSemitones: number): void {
     if (!this.droneOsc1 || !this.droneOsc2) return;
+    if (transposeSemitones === this.currentDroneTranspose) return;
+    this.currentDroneTranspose = transposeSemitones;
     const now = this.ctx.currentTime;
     const rootMidi = 38 + transposeSemitones;
-    this.droneOsc1.frequency.setTargetAtTime(midiToHz(rootMidi), now, 0.25);
-    this.droneOsc2.frequency.setTargetAtTime(midiToHz(rootMidi + 7), now, 0.25);
+    this.smoothParam(this.droneOsc1.frequency, midiToHz(rootMidi), now, 0.25);
+    this.smoothParam(this.droneOsc2.frequency, midiToHz(rootMidi + 7), now, 0.25);
+  }
+
+  private smoothParam(param: AudioParam, target: number, now: number, timeConstant: number): void {
+    try {
+      param.cancelScheduledValues(now);
+      param.setValueAtTime(param.value, now);
+      param.setTargetAtTime(target, now, timeConstant);
+    } catch {
+      param.setTargetAtTime(target, now, timeConstant);
+    }
   }
 
   private stopDrone(): void {
@@ -1260,12 +1287,12 @@ export class MusicSynthesizer {
     const bassLevel = isShop ? 0.22 : isSovereignP2 ? 1.0 : mix.bass;
     const leadLevel = isSovereignP1 ? 0.56 : isSovereignP2 ? 0.98 : mix.lead;
 
-    this.bouzoukiBus.gain.setTargetAtTime(Math.max(0.0001, mix.bouzouki), now, timeConstant);
-    this.bassBus.gain.setTargetAtTime(Math.max(0.0001, bassLevel), now, timeConstant);
-    this.percussionBus.gain.setTargetAtTime(Math.max(0.0001, mix.percussion), now, timeConstant);
-    this.leadBus.gain.setTargetAtTime(Math.max(0.0001, leadLevel), now, timeConstant);
-    this.orchestralBus.gain.setTargetAtTime(orchLevel, now, timeConstant);
-    this.droneBus.gain.setTargetAtTime(Math.max(0.0001, mix.drone), now, timeConstant);
+    this.smoothParam(this.bouzoukiBus.gain, Math.max(0.0001, mix.bouzouki), now, timeConstant);
+    this.smoothParam(this.bassBus.gain, Math.max(0.0001, bassLevel), now, timeConstant);
+    this.smoothParam(this.percussionBus.gain, Math.max(0.0001, mix.percussion), now, timeConstant);
+    this.smoothParam(this.leadBus.gain, Math.max(0.0001, leadLevel), now, timeConstant);
+    this.smoothParam(this.orchestralBus.gain, orchLevel, now, timeConstant);
+    this.smoothParam(this.droneBus.gain, Math.max(0.0001, mix.drone), now, timeConstant);
   }
 
   private createNoiseBuffer(seconds: number): AudioBuffer {
