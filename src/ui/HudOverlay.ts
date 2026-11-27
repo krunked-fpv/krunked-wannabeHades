@@ -366,14 +366,17 @@ export class HudOverlay {
       window.addEventListener('keydown', this.onHubKeyDown);
     }
 
+    const topCenterStack = document.createElement('div');
+    topCenterStack.className = 'kh-top-center-stack';
+    topCenterStack.append(this.bossStack, this.toastContainer);
+
     this.root.append(
-      this.bossStack,
+      topCenterStack,
       this.hubDock,
       this.topRight,
       bottomLeft,
       this.promptStrip,
-      this.interactBanner,
-      this.toastContainer
+      this.interactBanner
     );
     uiRoot.appendChild(this.root);
   }
@@ -393,6 +396,7 @@ export class HudOverlay {
 
     this.root.classList.toggle('kh-hidden', !showHud);
     this.isHubActive = screen === 'hub';
+    this.root.classList.toggle('kh-is-hub', this.isHubActive);
     this.hubDock.classList.toggle('kh-hidden', !this.isHubActive);
     if (this.isHubActive) {
       const codexGlyph = activeSource === 'gamepad' ? 'LB' : 'TAB';
@@ -661,6 +665,7 @@ export class HudOverlay {
   private updateBossBars(enemies: readonly EnemyState[]): void {
     const bosses = enemies.filter((e) => e.isBoss && e.aiState !== 'dead' && e.hp > 0);
     this.root.classList.toggle('kh-has-boss', bosses.length > 0);
+    this.root.classList.toggle('kh-has-dual-boss', bosses.length >= 2);
     if (bosses.length === 0) {
       if (this.lastBossSignature !== '') {
         this.lastBossSignature = '';

@@ -143,12 +143,26 @@ export const MYTHIC_UI_CSS = `
     max(16px, env(safe-area-inset-left, 0px));
 }
 
-/* Top-Center Boss Health Bar */
-.kh-boss-stack {
+/* Top-Center Unified Stack (Boss Health Bars + Event Toasts — mathematically prevents overlap) */
+.kh-top-center-stack {
   position: fixed;
   top: max(14px, calc(env(safe-area-inset-top, 0px) + 10px));
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 14;
+}
+
+.kh-hud.kh-is-hub:not(.kh-touch-active) .kh-top-center-stack {
+  top: max(76px, calc(env(safe-area-inset-top, 0px) + 72px));
+}
+
+/* Top-Center Boss Health Bar */
+.kh-boss-stack {
   width: min(560px, 68vw);
   display: flex;
   flex-direction: column;
@@ -721,28 +735,19 @@ export const MYTHIC_UI_CSS = `
   white-space: nowrap;
 }
 
-/* Event Toast Banner — sits cleanly top-center above playfield (drops below boss bar only when boss active) */
+/* Event Toast Banner — flows cleanly below Boss Health Bars inside .kh-top-center-stack */
 .kh-toast-container {
-  position: fixed;
-  top: max(14px, calc(env(safe-area-inset-top, 0px) + 10px));
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 5px;
   pointer-events: none;
-  z-index: 14;
-}
-
-.kh-hud.kh-has-boss .kh-toast-container {
-  top: max(92px, calc(env(safe-area-inset-top, 0px) + 86px));
 }
 
 .kh-toast {
   padding: 6px 16px;
   border-radius: 3px;
-  background: rgba(10, 8, 18, 0.9);
+  background: rgba(10, 8, 18, 0.92);
   border: 1px solid rgba(245, 203, 112, 0.62);
   border-left: 3px solid currentColor;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.78);
@@ -1542,18 +1547,20 @@ export const MYTHIC_UI_CSS = `
   .kh-hud.kh-touch-active .kh-boss-stack {
     width: min(260px, 31vw);
   }
-  .kh-toast-container {
-    top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
-    max-width: min(244px, 29vw);
+  .kh-hud:not(.kh-has-boss) .kh-top-center-stack {
+    top: max(54px, calc(env(safe-area-inset-top, 0px) + 52px));
   }
-  .kh-hud.kh-has-boss .kh-toast-container {
-    top: max(70px, calc(env(safe-area-inset-top, 0px) + 66px));
+  .kh-hud.kh-has-boss .kh-top-center-stack {
+    top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
+  }
+  .kh-toast-container {
+    max-width: min(260px, 34vw);
   }
   .kh-toast {
     padding: 4px 10px;
     font-size: 10.5px;
     letter-spacing: 0.05em;
-    max-width: min(244px, 29vw);
+    max-width: min(260px, 34vw);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
