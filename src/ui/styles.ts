@@ -276,13 +276,12 @@ export const MYTHIC_UI_CSS = `
 .kh-boss-bar-card {
   position: relative;
   display: flex;
-  align-items: center;
-  gap: 0;
+  flex-direction: column;
   width: 100%;
   background: linear-gradient(180deg, rgba(24, 14, 34, 0.94) 0%, rgba(11, 7, 16, 0.94) 100%);
   border: 1.5px solid var(--kh-gold);
   border-radius: 3px;
-  padding: 7px 10px 8px;
+  padding: 7px 11px 8px;
   box-shadow:
     0 0 0 1px var(--kh-ink),
     0 10px 30px rgba(0, 0, 0, 0.76),
@@ -297,16 +296,23 @@ export const MYTHIC_UI_CSS = `
     0 10px 30px rgba(0, 0, 0, 0.76);
 }
 
+.kh-boss-track-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+}
+
 .kh-boss-crown {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 0;
   filter: drop-shadow(0 2px 4px rgba(9, 6, 14, 0.92));
 }
 
-.kh-boss-crown-left { margin-right: 6px; margin-left: -4px; }
-.kh-boss-crown-right { margin-left: 6px; margin-right: -4px; }
+.kh-boss-crown-left { margin-right: -2px; margin-left: -4px; }
+.kh-boss-crown-right { margin-left: -2px; margin-right: -4px; }
 
 .kh-boss-card-inner {
   flex: 1;
@@ -384,6 +390,8 @@ export const MYTHIC_UI_CSS = `
 
 .kh-boss-hp-track {
   position: relative;
+  flex: 1;
+  min-width: 0;
   height: 17px;
   border-radius: 2px;
   background: rgba(18, 6, 12, 0.96);
@@ -3398,14 +3406,14 @@ input[type="range"].kh-slider::-moz-range-thumb {
     gap: 4px;
   }
   .kh-boss-bar-card {
-    padding: 4px 7px 5px;
+    padding: 4px 8px 5px;
   }
   .kh-boss-crown svg {
-    width: 17px;
-    height: 14px;
+    width: 19px;
+    height: 15px;
   }
-  .kh-boss-crown-left { margin-right: 4px; margin-left: -2px; }
-  .kh-boss-crown-right { margin-left: 4px; margin-right: -2px; }
+  .kh-boss-crown-left { margin-right: -2px; margin-left: -2px; }
+  .kh-boss-crown-right { margin-left: -2px; margin-right: -2px; }
   .kh-boss-header {
     margin-bottom: 3px;
     gap: 6px;
@@ -3677,11 +3685,11 @@ input[type="range"].kh-slider::-moz-range-thumb {
     padding: 5px 8px 6px;
   }
   .kh-boss-crown svg {
-    width: 18px;
-    height: 15px;
+    width: 20px;
+    height: 16px;
   }
-  .kh-boss-crown-left { margin-right: 4px; margin-left: -2px; }
-  .kh-boss-crown-right { margin-left: 4px; margin-right: -2px; }
+  .kh-boss-crown-left { margin-right: -2px; margin-left: -2px; }
+  .kh-boss-crown-right { margin-left: -2px; margin-right: -2px; }
   .kh-boss-header {
     margin-bottom: 4px;
     gap: 6px;
