@@ -559,27 +559,27 @@ export class ParticlesAndDecals {
       switch (ev.type) {
         case 'room_entered': {
           this.clearRoomDecals();
-          // Subtle warm underworld arrival wisps (no stray pale white ring!)
-          for (let k = 0; k < 10; k++) {
-            const a = (k / 10) * Math.PI * 2;
-            const spd = this.randRange(45, 110);
+          // Subtle upright rising underworld embers scattered around hero boots (no circular wreath!)
+          for (let k = 0; k < 7; k++) {
+            const ox = this.randRange(-26, 26);
+            const oy = this.randRange(-12, 12);
             this.spawnParticle(
               'ember_footstep',
-              state.player.pos.x + Math.cos(a) * 18,
-              state.player.pos.y + Math.sin(a) * 14,
-              6,
-              Math.cos(a) * spd,
-              Math.sin(a) * spd,
-              this.randRange(35, 85),
-              16,
-              3,
-              0.32,
-              0.92,
-              0.68,
-              0.65,
-              0.34,
-              1.1,
-              a,
+              state.player.pos.x + ox,
+              state.player.pos.y + oy,
+              2,
+              this.randRange(-28, 28),
+              this.randRange(-18, 18),
+              this.randRange(42, 95),
+              9,
+              2,
+              1.0,
+              0.56,
+              0.2,
+              0.46,
+              0.26,
+              0.85,
+              0,
               0
             );
           }

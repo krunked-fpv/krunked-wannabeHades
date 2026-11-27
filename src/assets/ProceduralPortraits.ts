@@ -1,5 +1,5 @@
 /**
- * ProceduralPortraits — High-resolution (360x480) Supergiant / Jen Zee-inspired
+ * ProceduralPortraits — High-resolution (360x480) painterly comic-ink
  * 3/4-angle comic-ink illustrated mythic character portraits for all 10 Patrons,
  * Prince Pyreus, and Warden Malice.
  *
@@ -81,7 +81,7 @@ export function getCharacterPortraitDataUrl(id: CharacterPortraitId): string {
 }
 
 // ============================================================================
-// Painterly Supergiant / Jen Zee Comic-Ink Anatomy & Lighting Engine
+// Painterly Mythic Comic-Ink Anatomy & Lighting Engine
 // ============================================================================
 
 interface BustConfig {
@@ -250,7 +250,7 @@ function paintHeroicTorso34(ctx: CanvasRenderingContext2D, cfg: BustConfig): voi
   ctx.save();
   ctx.clip();
 
-  // Dramatic diagonal shadow wedge across lower-right chest (classic Hades lighting!)
+  // Dramatic diagonal shadow wedge across lower-right chest (bold comic-ink lighting!)
   ctx.fillStyle = cfg.clothDark;
   ctx.globalAlpha = 0.72;
   ctx.beginPath();
@@ -449,7 +449,7 @@ function paintHeroicHead34(
   ctx.save();
   ctx.clip();
 
-  // Right-side sculpted cheekbone & temple shadow plane (authentic Jen Zee cel shape!)
+  // Right-side sculpted cheekbone & temple shadow plane (bold comic-ink cel shape!)
   ctx.fillStyle = cfg.skinShadow;
   ctx.globalAlpha = 0.72;
   ctx.beginPath();
@@ -463,7 +463,7 @@ function paintHeroicHead34(
   ctx.fill();
   ctx.globalAlpha = 1;
 
-  // Clean bold Jen Zee cel shadow plane — subtle cheekbone bevel highlight inside shadow
+  // Clean bold comic-ink cel shadow plane — subtle cheekbone bevel highlight inside shadow
   drawTaperedInkArc(ctx, 206, 206, 204, 232, 186, 256, 2.4, cfg.skinDeepShadow);
 
   // Warm sunlit cheek & brow specular highlight plane on lit left side
@@ -544,7 +544,7 @@ function paintHeroicHead34(
     ctx.arc(ex - 3, ey - 2, 2.2, 0, Math.PI * 2);
     ctx.fill();
 
-    // Thick dramatic upper lash wing (signature Jen Zee brushwork!)
+    // Thick dramatic upper lash wing (bold calligraphic brushwork!)
     ctx.strokeStyle = INK;
     ctx.lineWidth = fem ? 4.4 : 3.8;
     ctx.beginPath();

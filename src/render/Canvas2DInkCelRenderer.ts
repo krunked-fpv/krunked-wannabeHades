@@ -1,7 +1,7 @@
 /**
  * Canvas2DInkCelRenderer — High-craft Painterly Ink-Cel Canvas2D Fallback Renderer.
  *
- * Gracefully renders the exact same Supergiant-style comic-ink isometric arena, parallax abyss,
+ * Gracefully renders the exact same painterly comic-ink isometric arena, parallax abyss,
  * Y-sorted entities, flowing crimson cloak, Bezier Boon-tinted slash ribbons, crisp telegraphs,
  * additive dynamic light/bloom glows, and ink-outlined damage numbers whenever WebGL2 is
  * unavailable (e.g. headless software contexts or older GPUs). Never throws!
@@ -164,8 +164,8 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
     // 2. Isometric Stone Chamber Floor, Cliff Drop, Meander Trim, Pits & Decals
     this.drawChamberFloor(ctx, state, cam, vfx, timeSec);
 
-    // 3. Razor-Sharp Crimson & Gold Combat Telegraphs
-    this.drawTelegraphs(ctx, state.room.telegraphs, cam);
+    // 3. Razor-Sharp Crimson & Gold Combat Telegraphs (clipped against blocking pillars)
+    this.drawTelegraphs(ctx, state.room.telegraphs, state.room.obstacles, cam);
 
     // 4. Y-Sorted Entities, Props, Braziers, Doors, Cloak, Hero, Enemies & Projectiles
     this.drawYSortedWorld(ctx, state, prevState, cam, settings, timeSec);
@@ -343,14 +343,58 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
         const id = h.active ? 'prop_spike_active' : h.armed ? 'prop_spike_armed' : 'prop_spike_idle';
         const sc = Math.max(0.72, (h.radius * 2) / 110) * cam.zoom;
         this.drawSprite(ctx, id, sx, sy, sc, sc);
-      } else if (h.kind === 'lava_pool' || h.kind === 'poison_pool') {
+      } else if (h.kind === 'lava_pool' || h.kind === 'boiling_geyser' || h.kind === 'poison_pool') {
+        const isLava = h.kind !== 'poison_pool';
+        const rx = h.radius * cam.zoom;
+        const ry = h.radius * cam.isoScaleY * cam.zoom;
+        const curbX = Math.max(7 * cam.zoom, rx * 0.11);
+        const curbY = Math.max(4.5 * cam.zoom, ry * 0.11);
+        // Sculpted 3D stone curb rim
         ctx.beginPath();
-        ctx.ellipse(sx, sy, h.radius * cam.zoom, h.radius * cam.isoScaleY * cam.zoom, 0, 0, Math.PI * 2);
-        ctx.fillStyle = h.kind === 'lava_pool' ? 'rgba(255, 92, 24, 0.82)' : 'rgba(138, 218, 44, 0.68)';
+        ctx.ellipse(sx, sy + 2.5 * cam.zoom, rx + curbX, ry + curbY, 0, 0, Math.PI * 2);
+        ctx.fillStyle = isLava ? '#2c1718' : '#283424';
         ctx.fill();
-        ctx.strokeStyle = '#08060e';
-        ctx.lineWidth = 3 * cam.zoom;
+        ctx.strokeStyle = '#08050b';
+        ctx.lineWidth = 3.5 * cam.zoom;
         ctx.stroke();
+
+        ctx.beginPath();
+        ctx.ellipse(sx, sy - 0.5 * cam.zoom, rx + curbX * 0.94, ry + curbY * 0.94, 0, 0, Math.PI * 2);
+        ctx.fillStyle = isLava ? '#592e24' : '#586b47';
+        ctx.fill();
+
+        // Deep recessed basin
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fillStyle = isLava ? '#941c0c' : '#1d5216';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(sx, sy + ry * 0.07, rx * 0.82, ry * 0.74, 0, 0, Math.PI * 2);
+        ctx.fillStyle = isLava ? '#ea5412' : '#52ba24';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(sx, sy + ry * 0.08, rx * 0.5, ry * 0.42, 0, 0, Math.PI * 2);
+        ctx.fillStyle = isLava ? '#ffa828' : '#9cf238';
+        ctx.fill();
+
+        // Crisp inner ink rim
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = '#08050b';
+        ctx.lineWidth = 2.6 * cam.zoom;
+        ctx.stroke();
+      } else if (h.kind === 'curing_pool') {
+        const sc = Math.max(0.7, (h.radius * cam.zoom) / 52);
+        this.drawSprite(ctx, 'vfx_curing_basin', sx, sy, sc, sc);
+      } else if (h.kind === 'sawblade') {
+        const sc = Math.max(0.7, (h.radius * 2.1) / 88) * cam.zoom;
+        this.drawSprite(ctx, 'vfx_sawblade', sx, sy - 8 * cam.zoom, sc, sc * 0.86, timeSec * 14);
+      } else if (h.kind === 'pylon') {
+        const sc = Math.max(0.7, (h.radius * 2.1) / 76) * cam.zoom;
+        this.drawSprite(ctx, 'vfx_pylon', sx, sy, sc, sc);
+      } else if (h.kind === 'rift_vortex') {
+        const sc = Math.max(0.85, (h.radius * 2.1) / 96) * cam.zoom;
+        this.drawSprite(ctx, 'vfx_blade_rift', sx, sy - 6 * cam.zoom, sc, sc * cam.isoScaleY, timeSec * 9);
       }
     }
 
@@ -362,13 +406,71 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
       const id = d.kind === 'ichor' ? 'vfx_decal_ichor' : d.kind === 'crack' ? 'vfx_decal_crack' : 'vfx_decal_scorch';
       this.drawSprite(ctx, id, this.wxToSx(d.x, cam), this.wyToSy(d.y, 0, cam), d.scaleX * cam.zoom, d.scaleY * cam.zoom, d.angle, d.alpha * fade);
     }
+  }
 
-    void timeSec;
+  private clipRayToObstacles(
+    obstacles: readonly ArenaObstacle[],
+    ox: number,
+    oy: number,
+    dirX: number,
+    dirY: number,
+    maxLen: number
+  ): number {
+    let bestT = maxLen;
+    for (let i = 0; i < obstacles.length; i++) {
+      const obs = obstacles[i];
+      if (!obs.blocksProjectiles) continue;
+      if (obs.destructible && (obs.hp ?? 1) <= 0) continue;
+
+      const minX = obs.pos.x - obs.halfW;
+      const maxX = obs.pos.x + obs.halfW;
+      const minY = obs.pos.y - obs.halfH;
+      const maxY = obs.pos.y + obs.halfH;
+
+      let tMin = 0;
+      let tMax = bestT;
+
+      if (Math.abs(dirX) < 1e-6) {
+        if (ox < minX || ox > maxX) continue;
+      } else {
+        let t1 = (minX - ox) / dirX;
+        let t2 = (maxX - ox) / dirX;
+        if (t1 > t2) {
+          const tmp = t1;
+          t1 = t2;
+          t2 = tmp;
+        }
+        if (t1 > tMin) tMin = t1;
+        if (t2 < tMax) tMax = t2;
+        if (tMin > tMax) continue;
+      }
+
+      if (Math.abs(dirY) < 1e-6) {
+        if (oy < minY || oy > maxY) continue;
+      } else {
+        let t1 = (minY - oy) / dirY;
+        let t2 = (maxY - oy) / dirY;
+        if (t1 > t2) {
+          const tmp = t1;
+          t1 = t2;
+          t2 = tmp;
+        }
+        if (t1 > tMin) tMin = t1;
+        if (t2 < tMax) tMax = t2;
+        if (tMin > tMax) continue;
+      }
+
+      if (tMin > 0.5 && tMin < bestT && tMax > 0) {
+        bestT = tMin;
+      }
+    }
+    return bestT;
   }
 
   private drawTelegraphs(
     ctx: CanvasRenderingContext2D,
     telegraphs: readonly TelegraphShape[],
+    obstacles: readonly ArenaObstacle[],
     cam: CameraView
   ): void {
     for (let i = 0; i < telegraphs.length; i++) {
@@ -415,10 +517,15 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
         ctx.fillStyle = 'rgba(255, 76, 86, 0.38)';
         ctx.fill();
       } else {
-        const len = t.length ?? t.radius;
-        const hw = (t.width ?? 44) * 0.5;
+        const rawLen = t.length ?? t.radius;
+        const laneW = t.width ?? 44;
+        const hw = laneW * 0.5;
         const c = Math.cos(t.angle);
         const s = Math.sin(t.angle);
+        const len =
+          t.kind === 'line' && laneW <= 96
+            ? this.clipRayToObstacles(obstacles, t.pos.x, t.pos.y, c, s, rawLen)
+            : rawLen;
         const px = -s * hw;
         const py = c * hw;
         ctx.beginPath();
@@ -488,7 +595,21 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
     this.pushSort('hero', heroPos.y, 0, heroPos.x, heroPos.y);
     for (let i = 0; i < state.projectiles.length; i++) {
       const pr = state.projectiles[i];
-      this.pushSort('projectile', pr.pos.y + 8, i, pr.pos.x, pr.pos.y);
+      if (pr.kind === 'beam') {
+        const c = Math.cos(pr.angle);
+        const s = Math.sin(pr.angle);
+        const startOffset = pr.targetPos ? 0 : 28;
+        const ox = pr.startPos.x + c * startOffset;
+        const oy = pr.startPos.y + s * startOffset;
+        const rawLen = pr.targetPos
+          ? Math.min(pr.range, Math.hypot(pr.targetPos.x - ox, pr.targetPos.y - oy))
+          : Math.min(pr.range, 920);
+        const clippedLen = this.clipRayToObstacles(state.room.obstacles, ox, oy, c, s, Math.max(0, rawLen));
+        const hitPillar = clippedLen < rawLen - 0.5;
+        this.pushSort('projectile', hitPillar ? oy + s * clippedLen : oy + 8, i, ox, oy);
+      } else {
+        this.pushSort('projectile', pr.pos.y + 8, i, pr.pos.x, pr.pos.y);
+      }
     }
 
     for (let i = 1; i < this.sortCount; i++) {
@@ -560,7 +681,7 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
           this.drawHero(ctx, state, item.x, item.y, cam, timeSec);
           break;
         case 'projectile':
-          this.drawProjectile(ctx, state.projectiles[item.idx], cam);
+          this.drawProjectile(ctx, state.projectiles[item.idx], state.room.obstacles, cam);
           break;
       }
     }
@@ -699,10 +820,59 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
     }
   }
 
-  private drawProjectile(ctx: CanvasRenderingContext2D, pr: ProjectileState, cam: CameraView): void {
+  private drawProjectile(
+    ctx: CanvasRenderingContext2D,
+    pr: ProjectileState,
+    obstacles: readonly ArenaObstacle[],
+    cam: CameraView
+  ): void {
     const sx = this.wxToSx(pr.pos.x, cam);
     const sy = this.wyToSy(pr.pos.y, 20, cam);
-    if (pr.kind === 'cast') {
+    if (pr.kind === 'beam' || pr.kind === 'laser') {
+      const c = Math.cos(pr.angle);
+      const s = Math.sin(pr.angle);
+      let ox: number;
+      let oy: number;
+      let rawLen: number;
+      if (pr.kind === 'beam') {
+        const startOffset = pr.targetPos ? 0 : 28;
+        ox = pr.startPos.x + c * startOffset;
+        oy = pr.startPos.y + s * startOffset;
+        rawLen = pr.targetPos
+          ? Math.min(pr.range, Math.hypot(pr.targetPos.x - ox, pr.targetPos.y - oy))
+          : Math.min(pr.range, 920);
+      } else {
+        const dx = pr.pos.x - pr.startPos.x;
+        const dy = pr.pos.y - pr.startPos.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 4 && this.clipRayToObstacles(obstacles, pr.startPos.x, pr.startPos.y, dx / dist, dy / dist, dist) < dist - 1) {
+          return;
+        }
+        ox = pr.pos.x;
+        oy = pr.pos.y;
+        rawLen = Math.min(pr.range, 480);
+      }
+      const len = this.clipRayToObstacles(obstacles, ox, oy, c, s, Math.max(0, rawLen));
+      const x0 = this.wxToSx(ox, cam);
+      const y0 = this.wyToSy(oy, 24, cam);
+      const x1 = this.wxToSx(ox + c * len, cam);
+      const y1 = this.wyToSy(oy + s * len, 24, cam);
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.strokeStyle = '#09040e';
+      ctx.lineWidth = pr.radius * 1.48 * cam.zoom;
+      ctx.stroke();
+      ctx.strokeStyle = pr.colorHex || '#ff2a3c';
+      ctx.lineWidth = pr.radius * cam.zoom;
+      ctx.stroke();
+      ctx.strokeStyle = '#fff9eb';
+      ctx.lineWidth = pr.radius * 0.42 * cam.zoom;
+      ctx.stroke();
+      ctx.restore();
+    } else if (pr.kind === 'cast') {
       this.drawSprite(ctx, 'vfx_bloodstone', sx, sy, 0.54 * cam.zoom, 0.54 * cam.zoom, pr.angle);
     } else if (pr.kind === 'arrow' || pr.kind === 'dart' || pr.kind === 'bullet') {
       this.drawSprite(ctx, 'vfx_projectile_arrow', sx, sy, 0.7 * cam.zoom, 0.7 * cam.zoom, pr.angle);

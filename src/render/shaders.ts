@@ -1,5 +1,5 @@
 /**
- * shaders.ts — GLSL ES 3.00 shaders for the 6-Pass Supergiant Ink-Cel WebGL2 Pipeline:
+ * shaders.ts — GLSL ES 3.00 shaders for the 6-Pass Mythic Ink-Cel WebGL2 Pipeline:
  *   Pass 1: Deep Abyssal Chasm Parallax & Animated Underworld Mist
  *   Pass 2 & 3: Dynamic Ink-Cel Sprite, Floor, Telegraph & Bezier Ribbon Batcher
  *   Pass 4: Additive Dynamic Lightmap FBO
@@ -193,7 +193,7 @@ void main() {
   if (alpha < 0.004) discard;
 
   vec3 rgb = tex.rgb * vColor.rgb;
-  // Crisp Supergiant hit-flash white silhouette blend
+  // Crisp comic-ink hit-flash white silhouette blend
   rgb = mix(rgb, vec3(1.0, 0.98, 0.95), clamp(vFx.x, 0.0, 1.0));
   // Selective emissive luminance lift (drives Pass 5 bloom!)
   rgb *= (1.0 + max(0.0, vFx.y));
@@ -321,14 +321,14 @@ uniform float uFinalKillPulse;
 
 vec3 applyJewelColorGrade(vec3 col) {
   float lum = clamp(dot(col, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
-  // 3-way shadow / midtone / highlight Supergiant jewel-tone curve
+  // 3-way shadow / midtone / highlight mythic jewel-tone curve
   float wShadow = pow(1.0 - lum, 2.2);
   float wHigh = pow(lum, 2.0);
   float wMid = clamp(1.0 - wShadow - wHigh, 0.0, 1.0);
   vec3 tint = uShadowTint * wShadow + uMidtoneTint * wMid + uHighlightTint * wHigh;
   col *= tint;
 
-  // Deep Hades contrast curve: preserves jet-black ink shadows & jewel-tone richness
+  // Deep underworld contrast curve: preserves jet-black ink shadows & jewel-tone richness
   col = pow(max(col, vec3(0.0)), vec3(1.12));
   // Subtle ACES-inspired highlight shoulder (prevents white blowout while keeping darks dark)
   col = (col * (2.2 * col + 0.08)) / (col * (2.0 * col + 0.55) + 0.04);

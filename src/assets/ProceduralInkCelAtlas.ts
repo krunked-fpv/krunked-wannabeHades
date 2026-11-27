@@ -1,5 +1,5 @@
 /**
- * ProceduralInkCelAtlas — Pre-baked 2048x2048 Supergiant-style Ink-Cel Sprite Atlas.
+ * ProceduralInkCelAtlas — Pre-baked 2048x2048 Mythic Ink-Cel Sprite Atlas.
  *
  * Pre-renders every tile, prop, character, boss, weapon, pickup, Patron sigil, and VFX
  * sprite ONCE at startup onto a single 2048x2048 offscreen Canvas (zero per-frame canvas
@@ -1244,7 +1244,7 @@ function drawHeroPose(
   drawEmberAnkle(lFootX, footY - 2);
   drawEmberAnkle(rFootX, footY + 3);
 
-  // Tall athletic combat legs with dark-bronze greaves & knee guards (sleek Hades proportions!)
+  // Tall athletic combat legs with dark-bronze greaves & knee guards (sleek mythic proportions!)
   const drawLeg = (hipX: number, hipY: number, footX: number, footYPos: number, front: boolean) => {
     ctx.beginPath();
     ctx.moveTo(hipX - 7, hipY);
