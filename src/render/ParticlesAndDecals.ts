@@ -51,7 +51,10 @@ export type ParticleKind =
   | 'rose'
   | 'shockwave'
   | 'smoke'
-  | 'flame';
+  | 'flame'
+  | 'petal'
+  | 'snowflake'
+  | 'muzzle_flash';
 
 export interface Particle {
   active: boolean;
@@ -585,11 +588,69 @@ export class ParticlesAndDecals {
 
         case 'attack_swing': {
           const tint = this.getSlotPatronColor(state, 'attack');
+          // Bespoke VFX for ranged Arms (Adamant Rail muzzle flash, Heart-Seeking Bow burst)
+          if (ev.weaponId === 'adamant_rail') {
+            this.spawnParticle(
+              'muzzle_flash',
+              ev.pos.x + Math.cos(ev.angle) * 44,
+              ev.pos.y + Math.sin(ev.angle) * 44,
+              32,
+              Math.cos(ev.angle) * 60,
+              Math.sin(ev.angle) * 60,
+              0,
+              34,
+              18,
+              tint.r,
+              tint.g,
+              tint.b,
+              1,
+              0.11,
+              1.4,
+              ev.angle,
+              0
+            );
+            for (let s = 0; s < 4; s++) {
+              const sa = ev.angle + this.randRange(-0.35, 0.35);
+              this.spawnParticle('spark', ev.pos.x + Math.cos(ev.angle) * 40, ev.pos.y + Math.sin(ev.angle) * 40, 30, Math.cos(sa) * 280, Math.sin(sa) * 280, 20, 14, 3, tint.coreR, tint.coreG, tint.coreB, 1, 0.16, 1.5, sa, 0);
+            }
+            break;
+          }
+          if (ev.weaponId === 'heart_seeking_bow') {
+            this.spawnParticle(
+              'spark',
+              ev.pos.x + Math.cos(ev.angle) * 36,
+              ev.pos.y + Math.sin(ev.angle) * 36,
+              30,
+              0,
+              0,
+              0,
+              46,
+              10,
+              tint.r,
+              tint.g,
+              tint.b,
+              0.95,
+              0.18,
+              1.6,
+              ev.angle,
+              2
+            );
+            break;
+          }
+
           const radius = this.weaponSlashRadius(ev.weaponId, ev.comboStep, ev.isDashStrike);
           const isThrust = ev.weaponId === 'eternal_spear' || (ev.weaponId === 'stygian_blade' && ev.comboStep === 2);
           const flip = ev.comboStep % 2 === 1 ? -1 : 1;
-          const arcSpan = isThrust ? 0.55 : ev.isDashStrike ? 2.55 : 2.35;
-          const thickness = ev.isDashStrike ? 54 : isThrust ? 40 : 46;
+          const arcSpan = isThrust
+            ? 0.55
+            : ev.weaponId === 'twin_fists'
+              ? 1.75
+              : ev.weaponId === 'shield_of_chaos'
+                ? 2.2
+                : ev.isDashStrike
+                  ? 2.55
+                  : 2.35;
+          const thickness = ev.weaponId === 'twin_fists' ? 38 : ev.isDashStrike ? 54 : isThrust ? 40 : 46;
 
           this.spawnSlashRibbon(
             isThrust ? 'thrust' : 'arc',
@@ -1315,32 +1376,114 @@ export class ParticlesAndDecals {
     this.lastHeroX = hx;
     this.lastHeroY = hy;
 
-    // Subtle ambient drifting underworld sparks around the chamber
+    // Biome-specific ambient atmospheric particles (Cinder embers, Verdant petals, Crypt spores, Frozen snow!)
     this.ambientTimer += safeDt;
-    if (this.ambientTimer >= 0.16) {
+    const biome = state.room.biome;
+    const spawnInterval = biome === 'frozen_summit' || biome === 'verdant_colosseum' || biome === 'cinder_mire' ? 0.09 : 0.16;
+    if (this.ambientTimer >= spawnInterval) {
       this.ambientTimer = 0;
       const b = state.room.bounds;
-      const rx = this.randRange(b.minX, b.maxX);
-      const ry = this.randRange(b.minY, b.maxY);
-      const isSanctum = state.room.biome === 'sanctum_hub';
-      const isCinder = state.room.biome === 'cinder_mire';
-      this.spawnParticle(
-        'smoke',
-        rx,
-        ry,
-        this.randRange(4, 30),
-        this.randRange(-18, 18),
-        this.randRange(-12, 12),
-        this.randRange(18, 46),
-        this.randRange(5, 10),
-        2,
-        isCinder ? 1.0 : isSanctum ? 1.0 : 0.36,
-        isCinder ? 0.48 : isSanctum ? 0.62 : 0.94,
-        isCinder ? 0.16 : isSanctum ? 0.28 : 0.68,
-        0.52,
-        1.5,
-        1.4
-      );
+      const rx = this.randRange(b.minX - 60, b.maxX + 60);
+      const ry = this.randRange(b.minY - 60, b.maxY + 60);
+
+      if (biome === 'frozen_summit') {
+        this.spawnParticle(
+          'snowflake',
+          rx,
+          ry,
+          this.randRange(180, 290),
+          this.randRange(-48, -14),
+          this.randRange(12, 34),
+          this.randRange(-72, -38),
+          this.randRange(10, 18),
+          this.randRange(8, 14),
+          0.9,
+          0.96,
+          1.0,
+          0.82,
+          3.2,
+          0.35,
+          this.randRange(0, 6.28),
+          this.randRange(-2.5, 2.5)
+        );
+      } else if (biome === 'verdant_colosseum') {
+        this.spawnParticle(
+          'petal',
+          rx,
+          ry,
+          this.randRange(120, 240),
+          this.randRange(26, 68),
+          this.randRange(8, 28),
+          this.randRange(-46, -22),
+          this.randRange(12, 20),
+          this.randRange(10, 16),
+          1.0,
+          0.42,
+          0.78,
+          0.88,
+          3.0,
+          0.3,
+          this.randRange(0, 6.28),
+          this.randRange(-4, 4)
+        );
+      } else if (biome === 'cinder_mire') {
+        this.spawnParticle(
+          'ember_footstep',
+          rx,
+          ry,
+          this.randRange(4, 24),
+          this.randRange(-26, 26),
+          this.randRange(-14, 14),
+          this.randRange(45, 110),
+          this.randRange(10, 18),
+          3,
+          1.0,
+          0.46,
+          0.14,
+          0.85,
+          1.4,
+          1.4,
+          this.randRange(-0.4, 0.4),
+          this.randRange(-3, 3)
+        );
+      } else if (biome === 'crypt_of_bile') {
+        this.spawnParticle(
+          'smoke',
+          rx,
+          ry,
+          this.randRange(4, 24),
+          this.randRange(-14, 14),
+          this.randRange(-10, 10),
+          this.randRange(16, 42),
+          this.randRange(8, 16),
+          3,
+          0.66,
+          0.92,
+          0.22,
+          0.6,
+          1.6,
+          0.8
+        );
+      } else {
+        const isSanctum = biome === 'sanctum_hub';
+        this.spawnParticle(
+          'smoke',
+          rx,
+          ry,
+          this.randRange(4, 30),
+          this.randRange(-18, 18),
+          this.randRange(-12, 12),
+          this.randRange(18, 46),
+          this.randRange(5, 10),
+          2,
+          isSanctum ? 1.0 : 0.36,
+          isSanctum ? 0.62 : 0.94,
+          isSanctum ? 0.28 : 0.68,
+          0.52,
+          1.5,
+          1.2
+        );
+      }
     }
 
     // Update slash ribbons
