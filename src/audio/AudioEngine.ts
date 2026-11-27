@@ -73,6 +73,7 @@ export class AudioEngine {
   private prevHasPoisonStatus = false;
   private lastLavaSizzleTick = -999;
   private lastPoisonHissTick = -999;
+  private lastUiHoverMs = -Infinity;
   private disposed = false;
 
   /**
@@ -118,9 +119,10 @@ export class AudioEngine {
   }
 
   /**
-   * Translate authoritative 60Hz SimEvents into tactile Hades combat foley & Patron stingers.
+   * Translate authoritative 60Hz SimEvents into tactile combat foley & Patron stingers,
+   * optionally spatially panned relative to `listenerX` (camera center X).
    */
-  handleSimEvents(events: readonly SimEvent[]): void {
+  handleSimEvents(events: readonly SimEvent[], listenerX?: number): void {
     if (this.disposed || !this.sfx || !this.ctx || this.ctx.state !== 'running') return;
     if (this.settings.muted || this.settings.masterVolume <= 0.001 || this.settings.sfxVolume <= 0.001) {
       return;
@@ -134,75 +136,85 @@ export class AudioEngine {
             this.seenZeroBasedCombo = true;
           }
           const step = this.seenZeroBasedCombo ? ev.comboStep + 1 : Math.max(1, ev.comboStep);
-          this.dispatchWeaponAttackSfx(ev.weaponId, step, ev.isDashStrike);
+          const pan = this.computeSpatialPan(ev.pos.x, listenerX);
+          this.dispatchWeaponAttackSfx(ev.weaponId, step, ev.isDashStrike, pan);
           break;
         }
 
         case 'special_cast': {
-          this.dispatchWeaponSpecialSfx(ev.weaponId);
+          const pan = this.computeSpatialPan(ev.pos.x, listenerX);
+          this.dispatchWeaponSpecialSfx(ev.weaponId, pan);
           break;
         }
 
         case 'bloodstone_fired': {
-          this.sfx.play('cast_fire', { patronId: ev.patronId });
+          const pan = this.computeSpatialPan(ev.pos.x, listenerX);
+          this.sfx.play('cast_fire', { patronId: ev.patronId, pan });
           break;
         }
 
         case 'dash': {
+          const pan = this.computeSpatialPan(ev.pos.x, listenerX);
           this.sfx.play(ev.perfect ? 'dash_perfect' : 'dash', {
             patronId: ev.patronId,
+            pan,
           });
           break;
         }
 
         case 'damage': {
+          const pan = this.computeSpatialPan(ev.pos.x, listenerX);
           if (ev.targetKind === 'player') {
-            this.sfx.play('player_hit');
+            this.sfx.play('player_hit', { pan: pan !== undefined ? pan * 0.45 : undefined });
           } else {
             if (ev.armorBroken) {
-              this.sfx.play('armor_break');
+              this.sfx.play('armor_break', { pan });
             }
             if (ev.wallSlam) {
-              this.sfx.play('wall_slam');
+              this.sfx.play('wall_slam', { pan });
             }
             if (ev.crit) {
-              this.sfx.play('hit_crit');
+              this.sfx.play('hit_crit', { pan });
             } else if (ev.backstab) {
-              this.sfx.play('hit_backstab');
+              this.sfx.play('hit_backstab', { pan });
             } else if (ev.amount >= 40) {
-              this.sfx.play('hit_heavy');
+              this.sfx.play('hit_heavy', { pan });
             } else {
-              this.sfx.play('hit_light');
+              this.sfx.play('hit_light', { pan });
             }
           }
           break;
         }
 
         case 'deflect': {
-          this.sfx.play('deflect');
+          const pan = this.computeSpatialPan(ev.pos.x, listenerX);
+          this.sfx.play('deflect', { pan });
           break;
         }
 
         case 'enemy_spawn': {
-          this.sfx.play('enemy_spawn', { isBoss: ev.isBoss });
+          const pan = this.computeSpatialPan(ev.pos.x, listenerX);
+          this.sfx.play('enemy_spawn', { isBoss: ev.isBoss, pan });
           break;
         }
 
         case 'enemy_death': {
+          const pan = this.computeSpatialPan(ev.pos.x, listenerX);
           if (ev.archetype === 'soul_orb') {
-            this.sfx.play('soul_eye_shatter');
+            this.sfx.play('soul_eye_shatter', { pan });
           } else if (ev.finalInRoom || ev.isBoss) {
-            this.sfx.play('final_kill_boom');
+            this.sfx.play('final_kill_boom', { pan: pan !== undefined ? pan * 0.35 : undefined });
             this.music?.duck(0.32, 0.85);
           } else {
-            this.sfx.play('enemy_death');
+            this.sfx.play('enemy_death', { pan });
           }
           break;
         }
 
         case 'boss_phase': {
-          this.sfx.play('boss_phase');
-          this.music?.duck(0.55, 0.55);
+          const pan = this.computeSpatialPan(ev.pos.x, listenerX);
+          this.sfx.play('boss_phase', { pan: pan !== undefined ? pan * 0.4 : undefined });
+          this.music?.duck(0.5, 0.65);
           if (ev.bossId === 'sovereign_lord' && ev.phase >= 2) {
             this.desiredTrack = 'boss_sovereign_p2';
             this.desiredIntensity = 'boss';
@@ -214,43 +226,46 @@ export class AudioEngine {
         }
 
         case 'status_applied': {
+          const pan = this.computeSpatialPan(ev.pos.x, listenerX);
           if (ev.statusId === 'chill') {
-            this.sfx.play('chill_crackle', { volume: 0.65 });
+            this.sfx.play('chill_crackle', { volume: 0.65, pan });
           } else if (ev.statusId === 'hangover') {
-            this.sfx.play('hangover_fizz', { volume: 0.65 });
+            this.sfx.play('hangover_fizz', { volume: 0.65, pan });
           } else if (ev.statusId === 'poison') {
-            this.sfx.play('poison_hiss', { volume: 0.65 });
+            this.sfx.play('poison_hiss', { volume: 0.65, pan });
           } else if (ev.statusId === 'doom') {
-            this.sfx.play('doom_gong', { volume: 0.42, pitchScale: 1.45 });
+            this.sfx.play('doom_gong', { volume: 0.42, pitchScale: 1.45, pan });
           }
           break;
         }
 
         case 'status_triggered': {
+          const pan = this.computeSpatialPan(ev.pos.x, listenerX);
           if (ev.statusId === 'doom') {
-            this.sfx.play('doom_gong');
+            this.sfx.play('doom_gong', { pan });
           } else if (ev.statusId === 'hangover') {
-            this.sfx.play('hangover_fizz');
+            this.sfx.play('hangover_fizz', { pan });
           } else if (ev.statusId === 'chill') {
-            this.sfx.play('chill_crackle');
+            this.sfx.play('chill_crackle', { pan });
           } else if (ev.statusId === 'poison') {
-            this.sfx.play('poison_hiss');
+            this.sfx.play('poison_hiss', { pan });
           } else {
-            this.sfx.play('status_proc', { statusId: ev.statusId });
+            this.sfx.play('status_proc', { statusId: ev.statusId, pan });
           }
           break;
         }
 
         case 'pickup_collected': {
+          const pan = this.computeSpatialPan(ev.pos.x, listenerX);
           const lower = ev.label.toLowerCase();
           if (ev.kind === 'chaos_gate') {
-            this.sfx.play('chaos_void_hum');
+            this.sfx.play('chaos_void_hum', { pan });
           } else if (ev.kind === 'fountain') {
-            this.sfx.play('curing_pool_chime');
+            this.sfx.play('curing_pool_chime', { pan });
           } else if (lower.includes('bloodstone') || lower.includes('cast')) {
-            this.sfx.play('cast_pickup');
+            this.sfx.play('cast_pickup', { pan });
           } else {
-            this.sfx.play('pickup_collect', { patronId: ev.patronId });
+            this.sfx.play('pickup_collect', { patronId: ev.patronId, pan });
           }
           break;
         }
@@ -269,9 +284,11 @@ export class AudioEngine {
         }
 
         case 'god_call': {
+          const pan = this.computeSpatialPan(ev.pos.x, listenerX);
           this.sfx.play('god_call', {
             patronId: ev.patronId,
             greater: ev.greater,
+            pan: pan !== undefined ? pan * 0.35 : undefined,
           });
           if (ev.greater) {
             this.music?.duck(0.45, 0.9);
@@ -281,7 +298,7 @@ export class AudioEngine {
 
         case 'death_defiance': {
           this.sfx.play('death_defiance');
-          this.music?.duck(0.25, 1.05);
+          this.music?.duck(0.25, 1.15);
           break;
         }
 
@@ -338,13 +355,15 @@ export class AudioEngine {
       this.settings.sfxVolume > 0.001;
 
     if (sameRoomAdvance && canPlaySfx && this.sfx) {
+      const camX = state.camera.zoom > 0.05 ? state.camera.x : state.player.pos.x;
+      const heroPan = this.computeSpatialPan(state.player.pos.x, camX);
       // 1. Bloodstone pickup
       if (this.prevCastAmmo >= 0 && state.player.castAmmo > this.prevCastAmmo) {
-        this.sfx.play('cast_pickup');
+        this.sfx.play('cast_pickup', { pan: heroPan });
       }
       // 2. Eternal Spear recall transition (spearOut true -> false)
       if (state.player.weaponId === 'eternal_spear' && this.prevSpearOut && !state.player.spearOut) {
-        this.sfx.play('spear_recall');
+        this.sfx.play('spear_recall', { pan: heroPan });
       }
       // 3. Adamant Rail reload clack transition (reloadTimer <= 0 -> > 0)
       if (
@@ -352,33 +371,33 @@ export class AudioEngine {
         this.prevReloadTimer <= 0 &&
         state.player.reloadTimer > 0
       ) {
-        this.sfx.play('rail_reload');
+        this.sfx.play('rail_reload', { pan: heroPan });
       }
       // 4. Heart-Seeking Bow draw creak + golden Power Shot glint
       if (state.player.weaponId === 'heart_seeking_bow') {
         if (this.prevAttackChargeTimer <= 0 && state.player.attackChargeTimer > 0) {
-          this.sfx.play('bow_draw');
+          this.sfx.play('bow_draw', { pan: heroPan });
         } else if (this.prevAttackChargeTimer < 0.42 && state.player.attackChargeTimer >= 0.42) {
-          this.sfx.play('bow_power_shot', { volume: 0.35, pitchScale: 1.25 });
+          this.sfx.play('bow_power_shot', { volume: 0.35, pitchScale: 1.25, pan: heroPan });
         }
       }
       // 5. Shield of Chaos block/Bull Rush clang
       if (state.player.weaponId === 'shield_of_chaos' && !this.prevIsBlocking && state.player.isBlocking) {
-        this.sfx.play('shield_clang', { volume: 0.45 });
+        this.sfx.play('shield_clang', { volume: 0.45, pan: heroPan });
       }
       // 6. Cinder Mire lava sizzle
       if (state.player.inLava && (!this.prevInLava || state.tick - this.lastLavaSizzleTick >= 26)) {
-        this.sfx.play('lava_sizzle');
+        this.sfx.play('lava_sizzle', { pan: heroPan });
         this.lastLavaSizzleTick = state.tick;
       }
       // 7. Crypt of Bile poison hiss
       if (state.player.inPoison && (!this.prevInPoison || state.tick - this.lastPoisonHissTick >= 30)) {
-        this.sfx.play('poison_hiss');
+        this.sfx.play('poison_hiss', { pan: heroPan });
         this.lastPoisonHissTick = state.tick;
       }
       // 8. Crypt of Bile curing pool cleanse chime
       if (this.prevHasPoisonStatus && !hasPoisonStatus) {
-        this.sfx.play('curing_pool_chime');
+        this.sfx.play('curing_pool_chime', { pan: heroPan });
       }
     }
 
@@ -426,12 +445,19 @@ export class AudioEngine {
   }
 
   /**
-   * Play crisp obsidian-and-bronze UI feedback sounds.
+   * Play crisp carved-marble and burnished-bronze UI feedback sounds.
+   * Hover ticks are debounced at 45ms so rapid cursor sweeps remain velvety.
    */
   playUiSound(kind: 'click' | 'hover' | 'confirm' | 'back'): void {
     if (this.disposed || !this.sfx || !this.ctx || this.ctx.state !== 'running') return;
     if (this.settings.muted || this.settings.masterVolume <= 0.001 || this.settings.sfxVolume <= 0.001) {
       return;
+    }
+
+    if (kind === 'hover') {
+      const nowMs = this.ctx.currentTime * 1000;
+      if (nowMs - this.lastUiHoverMs < 45) return;
+      this.lastUiHoverMs = nowMs;
     }
 
     const id: SfxId =
@@ -496,29 +522,42 @@ export class AudioEngine {
   }
 
   // ============================================================================
-  // Bespoke 6-Weapon Foley Dispatch
+  // Spatial Panning & Bespoke 6-Weapon Foley Dispatch
   // ============================================================================
 
-  private dispatchWeaponAttackSfx(weaponId: SimState['player']['weaponId'], step: number, isDashStrike: boolean): void {
+  private computeSpatialPan(worldX: number, listenerX?: number): number | undefined {
+    if (listenerX === undefined || !Number.isFinite(worldX) || !Number.isFinite(listenerX)) {
+      return undefined;
+    }
+    const raw = (worldX - listenerX) / 680;
+    return raw < -0.75 ? -0.75 : raw > 0.75 ? 0.75 : raw;
+  }
+
+  private dispatchWeaponAttackSfx(
+    weaponId: SimState['player']['weaponId'],
+    step: number,
+    isDashStrike: boolean,
+    pan?: number
+  ): void {
     if (!this.sfx) return;
     switch (weaponId) {
       case 'stygian_blade': {
         const swingId: SfxId =
           step <= 1 ? 'sword_swing_1' : step === 2 ? 'sword_swing_2' : 'sword_swing_3';
-        this.sfx.play(swingId, { weaponId, isDashStrike });
+        this.sfx.play(swingId, { weaponId, isDashStrike, pan });
         break;
       }
       case 'eternal_spear': {
         if (step >= 4) {
-          this.sfx.play('spear_spin', { weaponId, isDashStrike });
+          this.sfx.play('spear_spin', { weaponId, isDashStrike, pan });
         } else {
           const pitchScale = step <= 1 ? 1.0 : step === 2 ? 1.14 : 1.3;
-          this.sfx.play('spear_thrust', { weaponId, isDashStrike, pitchScale });
+          this.sfx.play('spear_thrust', { weaponId, isDashStrike, pitchScale, pan });
         }
         break;
       }
       case 'shield_of_chaos': {
-        this.sfx.play(isDashStrike ? 'shield_clang' : 'shield_bash', { weaponId, isDashStrike });
+        this.sfx.play(isDashStrike ? 'shield_clang' : 'shield_bash', { weaponId, isDashStrike, pan });
         break;
       }
       case 'heart_seeking_bow': {
@@ -529,6 +568,7 @@ export class AudioEngine {
           isDashStrike,
           pitchScale,
           volume: step >= 2 || isDashStrike ? 1.0 : 0.72,
+          pan,
         });
         break;
       }
@@ -539,39 +579,41 @@ export class AudioEngine {
           weaponId,
           isDashStrike,
           pitchScale: fistLadder[idx],
+          pan,
         });
         break;
       }
       case 'adamant_rail': {
-        this.sfx.play('rail_shot', { weaponId, isDashStrike });
+        this.sfx.play('rail_shot', { weaponId, isDashStrike, pan });
         break;
       }
     }
   }
 
-  private dispatchWeaponSpecialSfx(weaponId: SimState['player']['weaponId']): void {
+  private dispatchWeaponSpecialSfx(weaponId: SimState['player']['weaponId'], pan?: number): void {
     if (!this.sfx) return;
     switch (weaponId) {
       case 'stygian_blade':
-        this.sfx.play('sword_nova', { weaponId });
+        this.sfx.play('sword_nova', { weaponId, pan });
         break;
       case 'eternal_spear':
         this.sfx.play(this.prevSpearOut ? 'spear_recall' : 'spear_thrust', {
           weaponId,
           pitchScale: this.prevSpearOut ? 1.0 : 0.9,
+          pan,
         });
         break;
       case 'shield_of_chaos':
-        this.sfx.play('shield_boomerang', { weaponId });
+        this.sfx.play('shield_boomerang', { weaponId, pan });
         break;
       case 'heart_seeking_bow':
-        this.sfx.play('bow_volley', { weaponId });
+        this.sfx.play('bow_volley', { weaponId, pan });
         break;
       case 'twin_fists':
-        this.sfx.play('fists_uppercut', { weaponId });
+        this.sfx.play('fists_uppercut', { weaponId, pan });
         break;
       case 'adamant_rail':
-        this.sfx.play('rail_mortar', { weaponId });
+        this.sfx.play('rail_mortar', { weaponId, pan });
         break;
     }
   }

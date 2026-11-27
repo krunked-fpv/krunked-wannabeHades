@@ -135,9 +135,14 @@ export class ProceduralSfx {
     voiceGain.gain.setValueAtTime(gain, now);
 
     let routeOut: AudioNode = voiceGain;
-    if (typeof this.ctx.createStereoPanner === 'function' && opts.pan !== undefined && Math.abs(opts.pan) > 0.01) {
+    if (
+      typeof this.ctx.createStereoPanner === 'function' &&
+      opts.pan !== undefined &&
+      Number.isFinite(opts.pan) &&
+      Math.abs(opts.pan) > 0.01
+    ) {
       const panner = this.ctx.createStereoPanner();
-      panner.pan.setValueAtTime(clamp(opts.pan, -0.85, 0.85), now);
+      panner.pan.setValueAtTime(clamp(opts.pan, -0.75, 0.75), now);
       voiceGain.connect(panner);
       routeOut = panner;
     }
@@ -373,7 +378,7 @@ export class ProceduralSfx {
   // Wave 2 Bespoke Infernal Arms (Spear, Shield, Bow, Twin Fists, Adamant Rail)
   // ============================================================================
 
-  /** Eternal Spear: razor-focused piercing jab + keen steel polearm whistle. */
+  /** Eternal Spear: 3-layer razor-focused piercing jab + keen steel polearm whistle + sub snap. */
   private synthSpearThrust(
     dest: AudioNode,
     now: number,
@@ -381,51 +386,53 @@ export class ProceduralSfx {
     isDashStrike: boolean,
     stops: (() => void)[]
   ): number {
-    const p = pitch * (isDashStrike ? 1.15 : 1.0);
-    const dur = 0.17;
+    const p = pitch * (isDashStrike ? 1.14 : 1.0);
+    const dur = 0.18;
 
-    // Narrow high-Q piercing air whistle
+    // Layer 1 — High Transient Bite (2.4kHz–6.2kHz razor air cut & spearhead glint)
+    this.transientBand(dest, this.whiteNoise, 5200 * p, 1850 * p, 4.4, now, 0.022, 0.56, stops);
     const noise = this.startNoise(this.whiteNoise, now, dur, stops);
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass';
-    bp.Q.setValueAtTime(5.2, now);
-    bp.frequency.setValueAtTime(clamp(2350 * p, 400, 11000), now);
+    bp.Q.setValueAtTime(5.0, now);
+    bp.frequency.setValueAtTime(clamp(2550 * p, 400, 11000), now);
     bp.frequency.exponentialRampToValueAtTime(clamp(680 * p, 200, 5000), now + dur * 0.9);
     const nEnv = this.ctx.createGain();
     nEnv.gain.setValueAtTime(0.001, now);
-    nEnv.gain.linearRampToValueAtTime(0.66, now + 0.012);
+    nEnv.gain.linearRampToValueAtTime(0.62, now + 0.012);
     nEnv.gain.exponentialRampToValueAtTime(0.001, now + dur);
     noise.connect(bp);
     bp.connect(nEnv);
     nEnv.connect(dest);
 
-    // Gleaming spearhead ping (F#5 + metallic harmonic)
-    this.tone(dest, 'triangle', 740 * p, 520 * p, now, 0.12, 0.3, stops);
-    this.tone(dest, 'sine', 1980 * p, 1420 * p, now, 0.09, 0.18, stops);
-    if (isDashStrike) {
-      this.tone(dest, 'sine', 185 * p, 64, now, 0.11, 0.34, stops);
-    }
+    // Layer 2 — Waveshaped Mid Body (shaft & bronze tip resonance)
+    this.shapedTone(dest, 'triangle', 520 * p, 240 * p, now, 0.085, 0.34, this.softClipCurve, 1800, stops);
+    this.tone(dest, 'sine', 2080 * p, 1480 * p, now, 0.08, 0.19, stops);
+
+    // Layer 3 — Tight Sub-Bass Weight (visceral lunge thrust)
+    this.tone(dest, 'sine', (isDashStrike ? 155 : 122) * p, 52, now, isDashStrike ? 0.11 : 0.08, isDashStrike ? 0.44 : 0.3, stops);
     return dur;
   }
 
-  /** Eternal Spear: 360° charging Spin Attack vortex sweep + ringing bronze arc. */
+  /** Eternal Spear: 360° charging Spin Attack vortex sweep + waveshaped bronze arc + sub surge. */
   private synthSpearSpin(
     dest: AudioNode,
     now: number,
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.46;
+    const dur = 0.48;
 
-    // Swirling dual-peak vortex air sweep
+    // Layer 1 — Swirling high transient vortex sweep
+    this.transientBand(dest, this.whiteNoise, 4600 * pitch, 2100 * pitch, 3.2, now, 0.028, 0.48, stops);
     const noise = this.startNoise(this.pinkNoise, now, dur, stops);
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass';
     bp.Q.setValueAtTime(3.0, now);
     bp.frequency.setValueAtTime(420 * pitch, now);
-    bp.frequency.exponentialRampToValueAtTime(2800 * pitch, now + 0.14);
+    bp.frequency.exponentialRampToValueAtTime(2950 * pitch, now + 0.14);
     bp.frequency.exponentialRampToValueAtTime(900 * pitch, now + 0.28);
-    bp.frequency.exponentialRampToValueAtTime(2100 * pitch, now + 0.36);
+    bp.frequency.exponentialRampToValueAtTime(2200 * pitch, now + 0.36);
     bp.frequency.exponentialRampToValueAtTime(340, now + dur);
 
     const nEnv = this.ctx.createGain();
@@ -437,9 +444,12 @@ export class ProceduralSfx {
     bp.connect(nEnv);
     nEnv.connect(dest);
 
-    // Sweeping steel blade ring + low rotational weight
-    this.fmTone(dest, 587.33 * pitch, 880 * pitch, 240, now, 0.38, 0.28, stops);
-    this.tone(dest, 'sine', 155 * pitch, 52, now, 0.26, 0.45, stops);
+    // Layer 2 — Waveshaped mid bronze spin body + FM ring
+    this.shapedTone(dest, 'sawtooth', 320 * pitch, 180 * pitch, now, 0.22, 0.24, this.softClipCurve, 1300, stops);
+    this.fmTone(dest, 587.33 * pitch, 880 * pitch, 250, now, 0.38, 0.3, stops);
+
+    // Layer 3 — Sub-bass rotational momentum drop
+    this.tone(dest, 'sine', 135 * pitch, 48, now, 0.28, 0.52, stops);
     return dur;
   }
 
@@ -450,7 +460,7 @@ export class ProceduralSfx {
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.28;
+    const dur = 0.29;
 
     // Rising magnetic zip sweep
     const zip = this.startNoise(this.pinkNoise, now, 0.2, stops);
@@ -458,7 +468,7 @@ export class ProceduralSfx {
     bp.type = 'bandpass';
     bp.Q.setValueAtTime(4.2, now);
     bp.frequency.setValueAtTime(540 * pitch, now);
-    bp.frequency.exponentialRampToValueAtTime(3100 * pitch, now + 0.18);
+    bp.frequency.exponentialRampToValueAtTime(3300 * pitch, now + 0.18);
     const zEnv = this.ctx.createGain();
     zEnv.gain.setValueAtTime(0.001, now);
     zEnv.gain.linearRampToValueAtTime(0.58, now + 0.05);
@@ -467,14 +477,15 @@ export class ProceduralSfx {
     bp.connect(zEnv);
     zEnv.connect(dest);
 
-    // Ascending metallic shimmer + tactile catch click at 0.16s
-    this.tone(dest, 'sine', 520 * pitch, 1480 * pitch, now, 0.17, 0.28, stops);
-    this.tone(dest, 'triangle', 980 * pitch, 440 * pitch, now + 0.15, 0.08, 0.42, stops);
-    this.tone(dest, 'sine', 240 * pitch, 95, now + 0.15, 0.09, 0.36, stops);
+    // Ascending metallic shimmer + tactile 3-layer catch lock at 150ms
+    this.tone(dest, 'sine', 520 * pitch, 1520 * pitch, now, 0.17, 0.28, stops);
+    this.transientBand(dest, this.whiteNoise, 3800 * pitch, 1600 * pitch, 3.0, now + 0.15, 0.018, 0.45, stops);
+    this.shapedTone(dest, 'triangle', 640 * pitch, 290 * pitch, now + 0.15, 0.085, 0.4, this.softClipCurve, 1800, stops);
+    this.tone(dest, 'sine', 120 * pitch, 54, now + 0.15, 0.095, 0.42, stops);
     return dur;
   }
 
-  /** Shield of Chaos: heavy bronze-and-iron slam bash. */
+  /** Shield of Chaos: 3-layer heavy bronze-and-iron slam bash. */
   private synthShieldBash(
     dest: AudioNode,
     now: number,
@@ -482,15 +493,18 @@ export class ProceduralSfx {
     isDashStrike: boolean,
     stops: (() => void)[]
   ): number {
-    const dur = 0.26;
+    const dur = 0.28;
     const boost = isDashStrike ? 1.12 : 1.0;
 
-    // Heavy low bronze mass slam
-    this.tone(dest, 'sine', 155 * pitch * boost, 36, now, 0.22, 0.85, stops);
-    this.tone(dest, 'triangle', 220 * pitch, 72, now, 0.16, 0.42, stops);
+    // Layer 1 — Metallic bronze rim impact crack (2.2kHz–4.8kHz)
+    this.transientBand(dest, this.whiteNoise, 4200 * pitch, 1900 * pitch, 2.4, now, 0.02, 0.54, stops);
 
-    // Broad metallic shield face resonance
-    this.fmTone(dest, 310 * pitch, 468 * pitch, 310, now, 0.22, 0.36, stops);
+    // Layer 2 — Waveshaped mid bronze body slam + FM face resonance
+    this.shapedTone(dest, 'sawtooth', 290 * pitch, 120 * pitch, now, 0.12, 0.38, this.softClipCurve, 1200, stops);
+    this.fmTone(dest, 310 * pitch, 468 * pitch, 320, now, 0.23, 0.38, stops);
+
+    // Layer 3 — Deep sub-bass bronze mass thump (115Hz -> 36Hz)
+    this.tone(dest, 'sine', 118 * pitch * boost, 36, now, 0.22, 0.88, stops);
 
     // Heavy air displacement shock
     const thud = this.startNoise(this.pinkNoise, now, 0.16, stops);
@@ -499,7 +513,7 @@ export class ProceduralSfx {
     lp.frequency.setValueAtTime(1400, now);
     lp.frequency.exponentialRampToValueAtTime(220, now + 0.15);
     const env = this.ctx.createGain();
-    env.gain.setValueAtTime(0.58, now);
+    env.gain.setValueAtTime(0.54, now);
     env.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
     thud.connect(lp);
     lp.connect(env);
@@ -508,30 +522,27 @@ export class ProceduralSfx {
     return dur;
   }
 
-  /** Shield of Chaos: resonant armored block / Bull Rush bronze clang! */
+  /** Shield of Chaos: 3-layer resonant armored block / Bull Rush bronze clang! */
   private synthShieldClang(
     dest: AudioNode,
     now: number,
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.52;
+    const dur = 0.54;
     const f0 = 392.0 * pitch; // G4 noble bronze ring
-    this.fmTone(dest, f0, f0 * 1.48, 360, now, 0.48, 0.46, stops);
-    this.tone(dest, 'triangle', f0 * 2.0, f0 * 1.98, now, 0.36, 0.24, stops);
-    this.tone(dest, 'sine', f0 * 3.12, f0 * 3.08, now, 0.22, 0.16, stops);
 
-    // Crisp metal-on-metal spark impact
-    const spark = this.startNoise(this.whiteNoise, now, 0.05, stops);
-    const hp = this.ctx.createBiquadFilter();
-    hp.type = 'highpass';
-    hp.frequency.setValueAtTime(2400, now);
-    const env = this.ctx.createGain();
-    env.gain.setValueAtTime(0.45, now);
-    env.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-    spark.connect(hp);
-    hp.connect(env);
-    env.connect(dest);
+    // Layer 1 — Crisp metal-on-metal spark impact (2.6kHz–6.2kHz)
+    this.transientBand(dest, this.whiteNoise, 5400 * pitch, 2400 * pitch, 2.2, now, 0.022, 0.6, stops);
+
+    // Layer 2 — Waveshaped resonant bronze bell & harmonics
+    this.shapedTone(dest, 'triangle', f0 * 0.75, f0 * 0.5, now, 0.11, 0.32, this.softClipCurve, 1600, stops);
+    this.fmTone(dest, f0, f0 * 1.48, 380, now, 0.48, 0.48, stops);
+    this.tone(dest, 'triangle', f0 * 2.0, f0 * 1.98, now, 0.36, 0.25, stops);
+    this.tone(dest, 'sine', f0 * 3.12, f0 * 3.08, now, 0.22, 0.17, stops);
+
+    // Layer 3 — Tight sub-bass shield rebound weight
+    this.tone(dest, 'sine', 115 * pitch, 46, now, 0.14, 0.48, stops);
     return dur;
   }
 
@@ -542,9 +553,12 @@ export class ProceduralSfx {
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.42;
+    const dur = 0.44;
 
-    // Rhythmic spinning blade-disc AM modulation (18 Hz rotation flutter)
+    // Layer 1 — Crisp bronze edge launch zip
+    this.transientBand(dest, this.whiteNoise, 4600 * pitch, 2000 * pitch, 3.0, now, 0.02, 0.48, stops);
+
+    // Rhythmic spinning blade-disc AM modulation (19 Hz rotation flutter)
     const disc = this.startNoise(this.pinkNoise, now, dur, stops);
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass';
@@ -568,8 +582,9 @@ export class ProceduralSfx {
     bp.connect(spinGain);
     spinGain.connect(dest);
 
-    // Initial bronze launch ping
-    this.fmTone(dest, 523.25 * pitch, 784 * pitch, 200, now, 0.3, 0.34, stops);
+    // Layer 2 & 3 — Bronze launch ping + sub sling kick
+    this.fmTone(dest, 523.25 * pitch, 784 * pitch, 210, now, 0.3, 0.36, stops);
+    this.tone(dest, 'sine', 120 * pitch, 52, now, 0.11, 0.38, stops);
     return dur;
   }
 
@@ -581,7 +596,7 @@ export class ProceduralSfx {
     stops: (() => void)[]
   ): number {
     const dur = 0.34;
-    this.tone(dest, 'triangle', 175 * pitch, 370 * pitch, now, dur * 0.9, 0.24, stops);
+    this.shapedTone(dest, 'triangle', 175 * pitch, 370 * pitch, now, dur * 0.9, 0.24, this.softClipCurve, 1200, stops);
 
     const friction = this.startNoise(this.pinkNoise, now, dur, stops);
     const bp = this.ctx.createBiquadFilter();
@@ -599,34 +614,37 @@ export class ProceduralSfx {
     return dur;
   }
 
-  /** Heart-Seeking Bow: taut arrow release + radiant golden Power Shot chime! */
+  /** Heart-Seeking Bow: 3-layer taut bowstring snap + feathered zip + golden Power Shot chime! */
   private synthBowPowerShot(
     dest: AudioNode,
     now: number,
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.44;
+    const dur = 0.45;
 
-    // 1. Snappy resonant bowstring twang
-    this.tone(dest, 'triangle', 360 * pitch, 140 * pitch, now, 0.14, 0.52, stops);
-    this.tone(dest, 'sine', 210 * pitch, 65, now, 0.1, 0.38, stops);
-
-    // 2. Feathered arrow sonic zip
-    const zip = this.startNoise(this.whiteNoise, now, 0.15, stops);
+    // Layer 1 — Crisp bowstring leather snap & feathered sonic zip (3.2kHz–6.2kHz)
+    this.transientBand(dest, this.whiteNoise, 5800 * pitch, 2200 * pitch, 2.8, now, 0.018, 0.58, stops);
+    const zip = this.startNoise(this.whiteNoise, now, 0.14, stops);
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass';
     bp.Q.setValueAtTime(3.2, now);
     bp.frequency.setValueAtTime(3600 * pitch, now);
-    bp.frequency.exponentialRampToValueAtTime(980 * pitch, now + 0.14);
+    bp.frequency.exponentialRampToValueAtTime(980 * pitch, now + 0.13);
     const zEnv = this.ctx.createGain();
-    zEnv.gain.setValueAtTime(0.48, now);
-    zEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    zEnv.gain.setValueAtTime(0.46, now);
+    zEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
     zip.connect(bp);
     bp.connect(zEnv);
     zEnv.connect(dest);
 
-    // 3. Radiant golden Power Shot harmonic chime (D6 -> A6 -> D7!)
+    // Layer 2 — Waveshaped resonant bowstring & timber twang body (220Hz–520Hz)
+    this.shapedTone(dest, 'triangle', 420 * pitch, 155 * pitch, now, 0.13, 0.5, this.softClipCurve, 1900, stops);
+
+    // Layer 3 — Tight sub-bass release kick (125Hz -> 50Hz)
+    this.tone(dest, 'sine', 125 * pitch, 50, now, 0.11, 0.44, stops);
+
+    // Radiant golden Power Shot harmonic chime (D6 -> A6 -> D7!)
     const f1 = 1174.66 * pitch;
     this.tone(dest, 'sine', f1, f1 * 1.005, now + 0.005, 0.34, 0.36, stops);
     this.tone(dest, 'triangle', f1 * 1.5, f1 * 1.51, now + 0.025, 0.32, 0.28, stops);
@@ -641,19 +659,20 @@ export class ProceduralSfx {
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.32;
+    const dur = 0.34;
+    this.tone(dest, 'sine', 118 * pitch, 48, now, 0.12, 0.42, stops);
     for (let i = 0; i < 5; i++) {
       const t = now + i * 0.02;
       const stepPitch = pitch * (0.94 + i * 0.045);
-      this.tone(dest, 'triangle', 340 * stepPitch, 165 * stepPitch, t, 0.09, 0.26, stops);
-      this.tone(dest, 'sine', 1420 * stepPitch, 920 * stepPitch, t, 0.075, 0.14, stops);
+      this.shapedTone(dest, 'triangle', 360 * stepPitch, 165 * stepPitch, t, 0.085, 0.28, this.softClipCurve, 1800, stops);
+      this.tone(dest, 'sine', 1480 * stepPitch, 940 * stepPitch, t, 0.075, 0.15, stops);
     }
 
     const fan = this.startNoise(this.pinkNoise, now, 0.24, stops);
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass';
     bp.Q.setValueAtTime(2.0, now);
-    bp.frequency.setValueAtTime(2800 * pitch, now);
+    bp.frequency.setValueAtTime(2900 * pitch, now);
     bp.frequency.exponentialRampToValueAtTime(750 * pitch, now + 0.22);
     const env = this.ctx.createGain();
     env.gain.setValueAtTime(0.001, now);
@@ -665,7 +684,7 @@ export class ProceduralSfx {
     return dur;
   }
 
-  /** Twin Fists: rapid snappy gauntlet jab + fiery ember snap. */
+  /** Twin Gauntlets: 3-layer rapid snappy gauntlet jab + ember crack + knuckle sub. */
   private synthFistsFlurry(
     dest: AudioNode,
     now: number,
@@ -674,48 +693,57 @@ export class ProceduralSfx {
     stops: (() => void)[]
   ): number {
     const p = pitch * (isDashStrike ? 1.12 : 1.0);
-    const dur = 0.11;
+    const dur = 0.12;
 
-    // Fast punchy air snap
-    const snap = this.startNoise(this.pinkNoise, now, 0.085, stops);
+    // Layer 1 — Snappy ember-leather transient crack (2.4kHz–5.4kHz)
+    this.transientBand(dest, this.whiteNoise, 4600 * p, 1900 * p, 2.4, now, 0.016, 0.56, stops);
+    const snap = this.startNoise(this.pinkNoise, now, 0.08, stops);
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass';
     bp.Q.setValueAtTime(2.4, now);
     bp.frequency.setValueAtTime(clamp(1650 * p, 300, 7000), now);
-    bp.frequency.exponentialRampToValueAtTime(340, now + 0.08);
+    bp.frequency.exponentialRampToValueAtTime(340, now + 0.075);
     const nEnv = this.ctx.createGain();
-    nEnv.gain.setValueAtTime(0.68, now);
-    nEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.085);
+    nEnv.gain.setValueAtTime(0.62, now);
+    nEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
     snap.connect(bp);
     bp.connect(nEnv);
     nEnv.connect(dest);
 
-    // Tight leather-knuckle thump
-    this.tone(dest, 'sine', 230 * p, 68, now, 0.08, 0.56, stops);
-    this.tone(dest, 'triangle', 490 * p, 240 * p, now, 0.05, 0.22, stops);
+    // Layer 2 — Waveshaped mid punch body (380Hz -> 145Hz)
+    this.shapedTone(dest, 'triangle', 380 * p, 145 * p, now, 0.06, 0.38, this.softClipCurve, 1500, stops);
+
+    // Layer 3 — Tight knuckle sub-thump (122Hz -> 50Hz)
+    this.tone(dest, 'sine', 122 * p, 50, now, 0.085, 0.62, stops);
     return dur;
   }
 
-  /** Twin Fists: explosive Rising Uppercut (twin ascending strikes + fiery lift!). */
+  /** Twin Gauntlets: explosive 3-layer Rising Uppercut (twin ascending strikes + fiery lift!). */
   private synthFistsUppercut(
     dest: AudioNode,
     now: number,
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.36;
+    const dur = 0.38;
 
-    // Two rapid ascending uppercut blows (0ms & 70ms)
-    this.tone(dest, 'sine', 135 * pitch, 290 * pitch, now, 0.14, 0.62, stops);
-    this.tone(dest, 'sine', 165 * pitch, 46, now + 0.065, 0.24, 0.78, stops);
-    this.tone(dest, 'sawtooth', 260 * pitch, 580 * pitch, now + 0.065, 0.16, 0.24, stops);
+    // Layer 1 — Twin fiery transient cracks (0ms & 65ms)
+    this.transientBand(dest, this.whiteNoise, 4400 * pitch, 1900 * pitch, 2.2, now, 0.018, 0.54, stops);
+    this.transientBand(dest, this.whiteNoise, 5200 * pitch, 2100 * pitch, 2.2, now + 0.065, 0.024, 0.64, stops);
+
+    // Layer 2 — Waveshaped ascending uppercut roar
+    this.shapedTone(dest, 'sawtooth', 240 * pitch, 560 * pitch, now + 0.055, 0.16, 0.3, this.softClipCurve, 2100, stops);
+
+    // Layer 3 — Twin sub-bass knockout thumps
+    this.tone(dest, 'sine', 120 * pitch, 54, now, 0.12, 0.62, stops);
+    this.tone(dest, 'sine', 135 * pitch, 40, now + 0.065, 0.24, 0.84, stops);
 
     const flame = this.startNoise(this.pinkNoise, now + 0.03, 0.28, stops);
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass';
     bp.Q.setValueAtTime(1.8, now);
     bp.frequency.setValueAtTime(600, now + 0.03);
-    bp.frequency.exponentialRampToValueAtTime(2600 * pitch, now + 0.14);
+    bp.frequency.exponentialRampToValueAtTime(2700 * pitch, now + 0.14);
     bp.frequency.exponentialRampToValueAtTime(420, now + 0.3);
     const env = this.ctx.createGain();
     env.gain.setValueAtTime(0.62, now + 0.03);
@@ -726,38 +754,42 @@ export class ProceduralSfx {
     return dur;
   }
 
-  /** Adamant Rail: punchy mechanical muzzle crack + metallic bolt snap. */
+  /** Adamant Rail: 3-layer punchy mechanical muzzle crack + hard-clipped bark + chamber sub. */
   private synthRailShot(
     dest: AudioNode,
     now: number,
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.13;
+    const dur = 0.14;
 
-    // High-energy supersonic muzzle crack through hard saturation
-    const crack = this.startNoise(this.whiteNoise, now, 0.07, stops);
+    // Layer 1 — Supersonic high-frequency muzzle crack (2.8kHz–6.4kHz)
+    this.transientBand(dest, this.whiteNoise, 6000 * pitch, 2400 * pitch, 1.8, now, 0.018, 0.64, stops);
+    const crack = this.startNoise(this.whiteNoise, now, 0.068, stops);
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass';
     bp.Q.setValueAtTime(1.3, now);
     bp.frequency.setValueAtTime(2800 * pitch, now);
-    bp.frequency.exponentialRampToValueAtTime(620, now + 0.065);
+    bp.frequency.exponentialRampToValueAtTime(620, now + 0.064);
 
     const drive = this.ctx.createWaveShaper();
     drive.curve = this.hardClipCurve;
 
     const cEnv = this.ctx.createGain();
-    cEnv.gain.setValueAtTime(0.62, now);
-    cEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+    cEnv.gain.setValueAtTime(0.58, now);
+    cEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.068);
 
     crack.connect(bp);
     bp.connect(drive);
     drive.connect(cEnv);
     cEnv.connect(dest);
 
-    // Mechanical chamber punch + metallic ping
-    this.tone(dest, 'sawtooth', 290 * pitch, 64, now, 0.09, 0.42, stops);
-    this.tone(dest, 'triangle', 1240 * pitch, 720 * pitch, now, 0.045, 0.2, stops);
+    // Layer 2 — Waveshaped mechanical bark + brass bolt ping
+    this.shapedTone(dest, 'sawtooth', 390 * pitch, 120 * pitch, now, 0.075, 0.42, this.hardClipCurve, 1900, stops);
+    this.tone(dest, 'triangle', 1280 * pitch, 740 * pitch, now, 0.04, 0.2, stops);
+
+    // Layer 3 — Tight chamber recoil sub (115Hz -> 48Hz)
+    this.tone(dest, 'sine', 115 * pitch, 48, now, 0.085, 0.5, stops);
     return dur;
   }
 
@@ -1095,36 +1127,70 @@ export class ProceduralSfx {
     opts: PlaySfxOptions,
     stops: (() => void)[]
   ): number {
-    const stepPitchMult = comboStep === 1 ? 1.0 : comboStep === 2 ? 1.24 : 1.48;
-    const dashBoost = opts.isDashStrike ? 1.12 : 1.0;
+    const stepPitchMult = comboStep === 1 ? 1.0 : comboStep === 2 ? 1.2 : 1.4;
+    const dashBoost = opts.isDashStrike ? 1.1 : 1.0;
     const p = pitch * stepPitchMult * dashBoost;
-    const dur = comboStep === 3 ? 0.24 : 0.17;
+    const dur = comboStep === 3 ? 0.25 : 0.18;
+
+    // Layer 1 — High Transient Steel Edge Whistle (2.2kHz–5.8kHz)
+    this.transientBand(
+      dest,
+      this.whiteNoise,
+      clamp(4200 * p, 1800, 9200),
+      clamp(1650 * p, 900, 4800),
+      3.4,
+      now,
+      0.02,
+      comboStep === 3 ? 0.54 : 0.42,
+      stops
+    );
 
     const noise = this.startNoise(this.pinkNoise, now, dur, stops);
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass';
-    bp.Q.setValueAtTime(comboStep === 3 ? 3.2 : 2.1, now);
-    const startFreq = 980 * p;
-    const endFreq = (comboStep === 3 ? 420 : 280) * p;
+    bp.Q.setValueAtTime(comboStep === 3 ? 3.0 : 2.1, now);
+    const startFreq = 1080 * p;
+    const endFreq = (comboStep === 3 ? 440 : 290) * p;
     bp.frequency.setValueAtTime(clamp(startFreq, 200, 9500), now);
     bp.frequency.exponentialRampToValueAtTime(clamp(endFreq, 120, 4000), now + dur * 0.9);
 
     const nEnv = this.ctx.createGain();
     nEnv.gain.setValueAtTime(0.001, now);
-    nEnv.gain.linearRampToValueAtTime(0.75, now + 0.018);
+    nEnv.gain.linearRampToValueAtTime(0.72, now + 0.016);
     nEnv.gain.exponentialRampToValueAtTime(0.001, now + dur);
 
     noise.connect(bp);
     bp.connect(nEnv);
     nEnv.connect(dest);
 
-    const steelBase = 520 * p;
-    this.tone(dest, 'triangle', steelBase, steelBase * 0.72, now, dur * 0.85, 0.24, stops);
-    this.tone(dest, 'sine', steelBase * 2.41, steelBase * 1.9, now, dur * 0.6, 0.12, stops);
+    // Layer 2 — Waveshaped Mid Blade Body & Steel Harmonics (240Hz–640Hz)
+    const steelBase = 480 * p;
+    this.shapedTone(
+      dest,
+      'triangle',
+      steelBase,
+      steelBase * 0.56,
+      now,
+      dur * 0.72,
+      comboStep === 3 ? 0.34 : 0.26,
+      this.softClipCurve,
+      2000,
+      stops
+    );
+    this.tone(dest, 'sine', steelBase * 2.52, steelBase * 1.95, now, dur * 0.55, 0.14, stops);
 
-    if (comboStep === 3 || opts.isDashStrike) {
-      this.tone(dest, 'sine', 175 * pitch, 58 * pitch, now, 0.13, 0.34, stops);
-    }
+    // Layer 3 — Tight Sub-Bass Swing Weight (heavier on finisher / dash-strike)
+    const heavySwing = comboStep === 3 || Boolean(opts.isDashStrike);
+    this.tone(
+      dest,
+      'sine',
+      (heavySwing ? 124 : 104) * pitch,
+      heavySwing ? 46 : 56,
+      now,
+      heavySwing ? 0.13 : 0.08,
+      heavySwing ? 0.44 : 0.24,
+      stops
+    );
 
     return dur;
   }
@@ -1272,6 +1338,7 @@ export class ProceduralSfx {
     return dur;
   }
 
+  /** 3-Layer Punchy Combat Impact (Transient Bite + Waveshaped Mid Body + Tight Sub-Bass Weight). */
   private synthHitImpact(
     dest: AudioNode,
     now: number,
@@ -1280,70 +1347,124 @@ export class ProceduralSfx {
     stops: (() => void)[]
   ): number {
     const heavy = weight === 'heavy';
-    const dur = heavy ? 0.2 : 0.12;
+    const dur = heavy ? 0.22 : 0.13;
 
-    const startHz = (heavy ? 150 : 205) * pitch;
-    const endHz = heavy ? 40 : 64;
-    this.tone(dest, 'sine', startHz, endHz, now, dur * 0.85, heavy ? 0.82 : 0.65, stops);
-    if (heavy) {
-      this.tone(dest, 'triangle', 115 * pitch, 36, now, 0.16, 0.42, stops);
-    }
+    // Layer 1 — High Transient Bite (1.8kHz–5.8kHz blade crack / metallic strike)
+    this.transientBand(
+      dest,
+      this.whiteNoise,
+      (heavy ? 4400 : 5200) * pitch,
+      (heavy ? 1650 : 2100) * pitch,
+      heavy ? 1.8 : 2.3,
+      now,
+      heavy ? 0.022 : 0.014,
+      heavy ? 0.7 : 0.56,
+      stops
+    );
+    this.tone(
+      dest,
+      'sine',
+      (heavy ? 2400 : 3100) * pitch,
+      (heavy ? 1150 : 1550) * pitch,
+      now,
+      heavy ? 0.028 : 0.02,
+      heavy ? 0.24 : 0.18,
+      stops
+    );
 
-    const noise = this.startNoise(this.whiteNoise, now, heavy ? 0.095 : 0.055, stops);
+    // Layer 2 — Waveshaped Mid Body Punch (180Hz–540Hz)
+    this.shapedTone(
+      dest,
+      heavy ? 'sawtooth' : 'triangle',
+      (heavy ? 360 : 440) * pitch,
+      (heavy ? 115 : 175) * pitch,
+      now,
+      heavy ? 0.1 : 0.06,
+      heavy ? 0.5 : 0.38,
+      heavy ? this.hardClipCurve : this.softClipCurve,
+      heavy ? 1500 : 2100,
+      stops
+    );
+
+    const crunch = this.startNoise(this.whiteNoise, now, heavy ? 0.095 : 0.055, stops);
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'bandpass';
     filter.Q.setValueAtTime(1.5, now);
-    filter.frequency.setValueAtTime((heavy ? 1250 : 2100) * pitch, now);
-    filter.frequency.exponentialRampToValueAtTime(420, now + (heavy ? 0.09 : 0.05));
+    filter.frequency.setValueAtTime((heavy ? 1350 : 2150) * pitch, now);
+    filter.frequency.exponentialRampToValueAtTime(380, now + (heavy ? 0.09 : 0.05));
 
     const drive = this.ctx.createWaveShaper();
     drive.curve = heavy ? this.hardClipCurve : this.softClipCurve;
 
     const env = this.ctx.createGain();
-    env.gain.setValueAtTime(heavy ? 0.62 : 0.48, now);
+    env.gain.setValueAtTime(heavy ? 0.56 : 0.44, now);
     env.gain.exponentialRampToValueAtTime(0.001, now + (heavy ? 0.095 : 0.055));
 
-    noise.connect(filter);
+    crunch.connect(filter);
     filter.connect(drive);
     drive.connect(env);
     env.connect(dest);
 
+    // Layer 3 — Tight Sub-Bass Punch (115Hz -> 42Hz heavy / 112Hz -> 54Hz light)
+    this.tone(
+      dest,
+      'sine',
+      (heavy ? 115 : 112) * pitch,
+      heavy ? 42 : 54,
+      now,
+      heavy ? 0.15 : 0.088,
+      heavy ? 0.9 : 0.68,
+      stops
+    );
+
     return dur;
   }
 
+  /** Critical Hit: heavy 3-layer impact + incandescent crack + crystalline golden triad shimmer. */
   private synthHitCrit(
     dest: AudioNode,
     now: number,
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.42;
+    const dur = 0.46;
 
-    this.synthHitImpact(dest, now, pitch * 1.05, 'heavy', stops);
+    // 3-layer foundation impact
+    this.synthHitImpact(dest, now, pitch * 1.04, 'heavy', stops);
 
+    // Razor electric-gold high transient snap (3.0kHz -> 6.4kHz)
+    this.transientBand(dest, this.whiteNoise, 6200 * pitch, 2600 * pitch, 2.6, now, 0.022, 0.66, stops);
+    this.tone(dest, 'sawtooth', 980 * pitch, 2880 * pitch, now, 0.042, 0.24, stops);
+
+    // Radiant golden crit shimmer triad (A6 + E7 + A7) + delicate FM bell glint
     const f1 = 1760 * pitch;
-    this.tone(dest, 'sine', f1, f1 * 1.005, now + 0.005, 0.36, 0.42, stops);
-    this.tone(dest, 'triangle', f1 * 1.5, f1 * 1.51, now + 0.012, 0.3, 0.28, stops);
-    this.tone(dest, 'sine', f1 * 2.0, f1 * 1.98, now + 0.018, 0.24, 0.18, stops);
-    this.tone(dest, 'sawtooth', 980 * pitch, 2640 * pitch, now, 0.045, 0.2, stops);
+    this.fmTone(dest, f1, f1 * 1.5, 220, now + 0.006, 0.34, 0.34, stops);
+    this.tone(dest, 'sine', f1, f1 * 1.006, now + 0.005, 0.4, 0.4, stops);
+    this.tone(dest, 'triangle', f1 * 1.5, f1 * 1.51, now + 0.014, 0.32, 0.28, stops);
+    this.tone(dest, 'sine', f1 * 2.0, f1 * 1.98, now + 0.022, 0.26, 0.18, stops);
+
+    // Extra deep crit confirmation sub thump
+    this.tone(dest, 'sine', 108 * pitch, 38, now, 0.17, 0.55, stops);
 
     return dur;
   }
 
+  /** Backstab: 3-layer lethal steel-rend transient + waveshaped precision slash + sinister glint. */
   private synthHitBackstab(
     dest: AudioNode,
     now: number,
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.24;
-    this.synthHitImpact(dest, now, pitch * 1.15, 'light', stops);
+    const dur = 0.26;
 
+    // Layer 1 — Razor high-Q blade rend (3.8kHz -> 1.1kHz)
+    this.transientBand(dest, this.whiteNoise, 5600 * pitch, 2200 * pitch, 3.6, now, 0.018, 0.62, stops);
     const slice = this.startNoise(this.whiteNoise, now, 0.11, stops);
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass';
     bp.Q.setValueAtTime(4.5, now);
-    bp.frequency.setValueAtTime(3200 * pitch, now);
+    bp.frequency.setValueAtTime(3400 * pitch, now);
     bp.frequency.exponentialRampToValueAtTime(920 * pitch, now + 0.1);
     const env = this.ctx.createGain();
     env.gain.setValueAtTime(0.55, now);
@@ -1352,36 +1473,48 @@ export class ProceduralSfx {
     bp.connect(env);
     env.connect(dest);
 
-    this.tone(dest, 'triangle', 880 * pitch, 932.33 * pitch, now + 0.01, 0.17, 0.3, stops);
-    this.tone(dest, 'sine', 1760 * pitch, 1480 * pitch, now + 0.015, 0.14, 0.18, stops);
+    // Layer 2 — Waveshaped mid body rend + sinister minor-second glint (A5 -> Bb5)
+    this.shapedTone(dest, 'sawtooth', 540 * pitch, 210 * pitch, now, 0.08, 0.38, this.softClipCurve, 2200, stops);
+    this.tone(dest, 'triangle', 880 * pitch, 932.33 * pitch, now + 0.01, 0.18, 0.34, stops);
+    this.tone(dest, 'sine', 1760 * pitch, 1480 * pitch, now + 0.015, 0.15, 0.2, stops);
+
+    // Layer 3 — Precision sub punch
+    this.tone(dest, 'sine', 118 * pitch, 50, now, 0.1, 0.68, stops);
     return dur;
   }
 
+  /** Armor Break: 3-layer gilded plate rupture + 7-shard shatter cascade + shield-break sub drop. */
   private synthArmorBreak(
     dest: AudioNode,
     now: number,
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.62;
+    const dur = 0.66;
 
-    const brassBase = 233.08 * pitch;
-    this.fmTone(dest, brassBase, brassBase * 1.414, 420, now, 0.42, 0.46, stops);
-    this.tone(dest, 'sawtooth', brassBase * 0.5, 58, now, 0.26, 0.42, stops);
-
-    const shardFreqs = [2180, 2890, 3420, 4150, 2610, 4780];
+    // Layer 1 — Blinding ceramic/metal crack transient + 7 cascading crystalline shards
+    this.transientBand(dest, this.whiteNoise, 5800 * pitch, 2200 * pitch, 2.0, now, 0.024, 0.72, stops);
+    const shardFreqs = [2180, 2890, 3420, 4150, 2610, 4780, 5360];
     for (let i = 0; i < shardFreqs.length; i++) {
-      const t = now + i * 0.022 + Math.random() * 0.012;
+      const t = now + i * 0.02 + Math.random() * 0.01;
       const f = shardFreqs[i] * pitch * (0.94 + Math.random() * 0.12);
-      this.tone(dest, 'sine', f, f * 0.94, t, 0.14 + Math.random() * 0.12, 0.18, stops);
+      this.tone(dest, 'sine', f, f * 0.93, t, 0.16 + Math.random() * 0.12, 0.19, stops);
     }
+
+    // Layer 2 — Waveshaped FM bronze-plate rupture body
+    const brassBase = 233.08 * pitch;
+    this.shapedTone(dest, 'sawtooth', 360 * pitch, 125 * pitch, now, 0.16, 0.44, this.hardClipCurve, 1800, stops);
+    this.fmTone(dest, brassBase, brassBase * 1.414, 440, now, 0.44, 0.48, stops);
+
+    // Layer 3 — Deep shield-shatter sub pressure drop (116Hz -> 36Hz)
+    this.tone(dest, 'sine', 116 * pitch, 36, now, 0.26, 0.86, stops);
 
     const grit = this.startNoise(this.whiteNoise, now, 0.28, stops);
     const hp = this.ctx.createBiquadFilter();
     hp.type = 'highpass';
-    hp.frequency.setValueAtTime(1400, now);
+    hp.frequency.setValueAtTime(1500, now);
     const gEnv = this.ctx.createGain();
-    gEnv.gain.setValueAtTime(0.62, now);
+    gEnv.gain.setValueAtTime(0.58, now);
     gEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
     grit.connect(hp);
     hp.connect(gEnv);
@@ -1390,45 +1523,60 @@ export class ProceduralSfx {
     return dur;
   }
 
+  /** Wall Slam: 3-layer carved-stone fracture crack + waveshaped granite crunch + architectural sub thud. */
   private synthWallSlam(
     dest: AudioNode,
     now: number,
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.36;
+    const dur = 0.38;
 
-    this.tone(dest, 'sine', 120 * pitch, 28, now, 0.28, 0.9, stops);
-    this.tone(dest, 'triangle', 180 * pitch, 46, now, 0.18, 0.45, stops);
+    // Layer 1 — Sharp granite fracture crack (2.6kHz -> 950Hz)
+    this.transientBand(dest, this.whiteNoise, 3800 * pitch, 1300 * pitch, 2.0, now, 0.022, 0.64, stops);
 
-    const rubble = this.startNoise(this.pinkNoise, now, 0.3, stops);
+    // Layer 2 — Waveshaped stone crunch + tumbling debris rubble
+    this.shapedTone(dest, 'sawtooth', 310 * pitch, 92 * pitch, now, 0.15, 0.46, this.softClipCurve, 1100, stops);
+    const rubble = this.startNoise(this.pinkNoise, now, 0.32, stops);
     const lp = this.ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(950 * pitch, now);
-    lp.frequency.exponentialRampToValueAtTime(140, now + 0.28);
+    lp.frequency.setValueAtTime(1050 * pitch, now);
+    lp.frequency.exponentialRampToValueAtTime(140, now + 0.3);
     const rEnv = this.ctx.createGain();
-    rEnv.gain.setValueAtTime(0.7, now);
-    rEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    rEnv.gain.setValueAtTime(0.68, now);
+    rEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
     rubble.connect(lp);
     lp.connect(rEnv);
     rEnv.connect(dest);
 
+    // Layer 3 — Deep architectural stone-impact sub thud (110Hz -> 30Hz)
+    this.tone(dest, 'sine', 110 * pitch, 30, now, 0.28, 0.92, stops);
+
     return dur;
   }
 
+  /** Deflect: 3-layer blade-on-aegis spark ping + noble bronze FM parry bell + rebound sub. */
   private synthDeflect(
     dest: AudioNode,
     now: number,
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.65;
-
+    const dur = 0.68;
     const f0 = 440 * pitch;
-    this.fmTone(dest, f0, f0 * 1.41, 280, now, 0.58, 0.42, stops);
-    this.tone(dest, 'sine', f0 * 2.0, f0 * 1.99, now, 0.48, 0.26, stops);
-    this.tone(dest, 'triangle', f0 * 2.76, f0 * 2.73, now, 0.34, 0.16, stops);
-    this.tone(dest, 'sine', 1180 * pitch, 2860 * pitch, now, 0.085, 0.28, stops);
+
+    // Layer 1 — Blinding parry spark transient + rising deflection gleam
+    this.transientBand(dest, this.whiteNoise, 5800 * pitch, 2600 * pitch, 2.8, now, 0.02, 0.62, stops);
+    this.tone(dest, 'sine', 1240 * pitch, 3020 * pitch, now, 0.09, 0.3, stops);
+
+    // Layer 2 — Waveshaped bronze shield body + shimmering FM bell partials
+    this.shapedTone(dest, 'triangle', 380 * pitch, 220 * pitch, now, 0.1, 0.32, this.softClipCurve, 1900, stops);
+    this.fmTone(dest, f0, f0 * 1.41, 300, now, 0.6, 0.46, stops);
+    this.tone(dest, 'sine', f0 * 2.0, f0 * 1.99, now, 0.5, 0.28, stops);
+    this.tone(dest, 'triangle', f0 * 2.76, f0 * 2.73, now, 0.36, 0.18, stops);
+
+    // Layer 3 — Tight resonant rebound sub thump (118Hz -> 48Hz)
+    this.tone(dest, 'sine', 118 * pitch, 48, now, 0.13, 0.52, stops);
 
     return dur;
   }
@@ -1508,49 +1656,87 @@ export class ProceduralSfx {
     return dur;
   }
 
+  /**
+   * Boss Phase Shift: Bone-rattling low underworld war-horn brass fifth (D2 + A2 detuned),
+   * dramatic 80Hz -> 30Hz cinematic sub-drop, and reverberant metallic anvil crash!
+   */
   private synthBossPhase(
     dest: AudioNode,
     now: number,
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 1.05;
+    const dur = 1.25;
 
-    this.tone(dest, 'sine', 135 * pitch, 34, now, 0.55, 0.85, stops);
+    // 1. Cinematic 80Hz -> 30Hz chest-rattling sub-drop
+    const sub = this.ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(84 * pitch, now);
+    sub.frequency.exponentialRampToValueAtTime(30, now + 0.72);
+    const subDrive = this.ctx.createWaveShaper();
+    subDrive.curve = this.softClipCurve;
+    const subEnv = this.ctx.createGain();
+    subEnv.gain.setValueAtTime(0.001, now);
+    subEnv.gain.linearRampToValueAtTime(0.95, now + 0.016);
+    subEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+    sub.connect(subDrive);
+    subDrive.connect(subEnv);
+    subEnv.connect(dest);
+    this.scheduleOsc(sub, now, now + 0.88, stops);
 
-    const hornNotes = [73.42, 110.0, 155.56];
+    // 2. Low underworld brass war-horn fifth (D2 73.42Hz + A2 110.0Hz, detuned unison pairs)
     const lp = this.ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.Q.setValueAtTime(2.6, now);
-    lp.frequency.setValueAtTime(320, now);
-    lp.frequency.exponentialRampToValueAtTime(2400, now + 0.24);
-    lp.frequency.exponentialRampToValueAtTime(520, now + 0.98);
+    lp.Q.setValueAtTime(2.8, now);
+    lp.frequency.setValueAtTime(240, now);
+    lp.frequency.exponentialRampToValueAtTime(2350, now + 0.26);
+    lp.frequency.exponentialRampToValueAtTime(460, now + 1.15);
 
     const drive = this.ctx.createWaveShaper();
     drive.curve = this.softClipCurve;
 
     const hEnv = this.ctx.createGain();
     hEnv.gain.setValueAtTime(0.001, now);
-    hEnv.gain.linearRampToValueAtTime(0.45, now + 0.1);
-    hEnv.gain.setValueAtTime(0.42, now + 0.48);
-    hEnv.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+    hEnv.gain.linearRampToValueAtTime(0.46, now + 0.11);
+    hEnv.gain.setValueAtTime(0.42, now + 0.58);
+    hEnv.gain.exponentialRampToValueAtTime(0.001, now + 1.18);
 
     lp.connect(drive);
     drive.connect(hEnv);
     hEnv.connect(dest);
 
-    for (const freq of hornNotes) {
+    const hornSpecs: readonly [number, number][] = [
+      [73.42, -9],
+      [73.42, 9],
+      [110.0, -7],
+      [110.0, 7],
+      [146.83, 0],
+    ];
+    for (let i = 0; i < hornSpecs.length; i++) {
+      const [freq, detune] = hornSpecs[i];
       const osc = this.ctx.createOscillator();
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(freq * pitch, now);
+      osc.detune.setValueAtTime(detune, now);
       osc.connect(lp);
-      this.scheduleOsc(osc, now, now + 1.02, stops);
+      this.scheduleOsc(osc, now, now + 1.2, stops);
     }
 
-    this.fmTone(dest, 587.33 * pitch, 880 * pitch, 240, now + 0.05, 0.65, 0.2, stops);
+    // 3. Reverberant metallic underworld anvil crash at 35ms
+    const anvilT = now + 0.035;
+    this.transientBand(dest, this.whiteNoise, 5600 * pitch, 2100 * pitch, 2.0, anvilT, 0.04, 0.64, stops);
+    this.fmTone(dest, 587.33 * pitch, 932.33 * pitch, 340, anvilT, 0.85, 0.34, stops);
+    this.fmTone(dest, 1174.66 * pitch, 1661.22 * pitch, 220, anvilT + 0.005, 0.62, 0.2, stops);
+
     return dur;
   }
 
+  /**
+   * Patron Stingers (`boon_offer`, `boon_select`, `god_call`, `greater_call`):
+   * - `boon_offer`: shimmering lyre/harp rising arpeggio + radiant choir-pad swell
+   * - `boon_select`: majestic divine chime + sub confirmation bloom + tiered rarity crystal sparkle
+   * - `god_call` / `greater_call`: heroic Patron proclamation + brass/anvil surge
+   */
   private synthPatronChord(
     dest: AudioNode,
     now: number,
@@ -1563,7 +1749,7 @@ export class ProceduralSfx {
     const profile = patronId ? PATRON_AUDIO_PROFILES[patronId] : PATRON_AUDIO_PROFILES.aegira;
     const isCall = style === 'call' || style === 'greater_call';
     const isGreater = style === 'greater_call';
-    const dur = isGreater ? 1.35 : isCall ? 0.95 : style === 'select' ? 0.85 : 0.78;
+    const dur = isGreater ? 1.4 : isCall ? 1.0 : style === 'select' ? 0.98 : 0.96;
 
     const rarityTranspose =
       rarity === 'legendary' || rarity === 'duo'
@@ -1578,21 +1764,96 @@ export class ProceduralSfx {
 
     const lp = this.ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(profile.cutoffHz * (isCall ? 1.25 : 1.0), now);
-    lp.frequency.exponentialRampToValueAtTime(Math.max(550, profile.cutoffHz * 0.32), now + dur);
+    lp.frequency.setValueAtTime(profile.cutoffHz * (isCall ? 1.25 : 1.08), now);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(580, profile.cutoffHz * 0.34), now + dur);
     lp.connect(dest);
 
-    const arpeggioGap = style === 'offer' ? 0.048 : style === 'select' ? 0.032 : 0.022;
-    const notes = profile.chordIntervals;
+    if (style === 'offer') {
+      // Shimmering harp/lyre rising arpeggio (D4–F4–A4–C#5–E5 blended with Patron voicing)
+      const harpSemitones = [0, 3, 7, 11, 14];
+      const baseMidi = patronId ? profile.rootMidi : 62; // D4 anchor
+      for (let i = 0; i < harpSemitones.length; i++) {
+        const startT = now + i * 0.056;
+        const interval =
+          i < profile.chordIntervals.length && i > 0
+            ? Math.round((harpSemitones[i] + profile.chordIntervals[i]) * 0.5)
+            : harpSemitones[i];
+        const freq = midiToHz(baseMidi + interval) * pitch;
+        const noteDur = Math.max(0.32, dur - i * 0.056);
+        // Plucked lyre attack + silky octave overtone
+        this.tone(lp, 'triangle', freq, freq * 1.003, startT, noteDur, 0.24, stops, -4);
+        this.tone(lp, 'sine', freq * 2, freq * 2.004, startT + 0.004, noteDur * 0.72, 0.14, stops, 5);
+        this.tone(dest, 'sine', freq * 3, freq * 2.99, startT + 0.006, 0.16, 0.05, stops);
+      }
 
-    for (let i = 0; i < notes.length; i++) {
-      const startT = now + i * arpeggioGap;
-      const freq = midiToHz(profile.rootMidi + notes[i] + rarityTranspose) * pitch;
-      const noteDur = Math.max(0.25, dur - i * arpeggioGap);
-      const voiceVol = (0.28 / Math.sqrt(notes.length)) * (isCall ? 1.2 : 1.0);
+      // Radiant choir-pad swell underneath (warm detuned slow-attack triad bloom)
+      const padFilter = this.ctx.createBiquadFilter();
+      padFilter.type = 'lowpass';
+      padFilter.frequency.setValueAtTime(520, now);
+      padFilter.frequency.exponentialRampToValueAtTime(2200, now + 0.36);
+      padFilter.frequency.exponentialRampToValueAtTime(720, now + dur);
 
-      this.tone(lp, profile.wave, freq, freq, startT, noteDur, voiceVol, stops, -5);
-      this.tone(lp, 'sine', freq * 2, freq * 2, startT + 0.008, noteDur * 0.75, voiceVol * 0.38, stops, 6);
+      const padEnv = this.ctx.createGain();
+      padEnv.gain.setValueAtTime(0.001, now);
+      padEnv.gain.linearRampToValueAtTime(0.24, now + 0.22);
+      padEnv.gain.setValueAtTime(0.2, now + 0.54);
+      padEnv.gain.exponentialRampToValueAtTime(0.001, now + dur);
+      padFilter.connect(padEnv);
+      padEnv.connect(dest);
+
+      const padIntervals = [0, 7, 12];
+      for (let i = 0; i < padIntervals.length; i++) {
+        const f = midiToHz(baseMidi - 12 + padIntervals[i]) * pitch;
+        const osc = this.ctx.createOscillator();
+        osc.type = i === 0 ? 'sawtooth' : 'triangle';
+        osc.frequency.setValueAtTime(f, now);
+        osc.detune.setValueAtTime((i - 1) * 8, now);
+        osc.connect(padFilter);
+        this.scheduleOsc(osc, now, now + dur + 0.03, stops);
+      }
+    } else {
+      const arpeggioGap = style === 'select' ? 0.03 : 0.02;
+      const notes = profile.chordIntervals;
+
+      for (let i = 0; i < notes.length; i++) {
+        const startT = now + i * arpeggioGap;
+        const freq = midiToHz(profile.rootMidi + notes[i] + rarityTranspose) * pitch;
+        const noteDur = Math.max(0.28, dur - i * arpeggioGap);
+        const voiceVol = (0.29 / Math.sqrt(notes.length)) * (isCall ? 1.2 : 1.0);
+
+        this.tone(lp, profile.wave, freq, freq, startT, noteDur, voiceVol, stops, -5);
+        this.tone(lp, 'sine', freq * 2, freq * 2, startT + 0.008, noteDur * 0.78, voiceVol * 0.4, stops, 6);
+      }
+
+      // Divine chime + rarity crystalline sparkle for boon_select
+      if (style === 'select') {
+        const chimeRoot = midiToHz(profile.rootMidi + 12 + rarityTranspose) * pitch;
+        this.fmTone(dest, chimeRoot, chimeRoot * 2.0, 140, now + 0.02, 0.56, 0.24, stops);
+
+        if (rarity === 'rare') {
+          this.tone(dest, 'sine', chimeRoot * 1.5, chimeRoot * 1.505, now + 0.09, 0.36, 0.16, stops);
+        } else if (rarity === 'epic') {
+          const spark = [12, 19, 24];
+          for (let i = 0; i < spark.length; i++) {
+            const sf = midiToHz(profile.rootMidi + spark[i] + rarityTranspose) * pitch;
+            this.tone(dest, 'sine', sf, sf * 1.004, now + 0.07 + i * 0.045, 0.34, 0.15, stops);
+          }
+        } else if (rarity === 'heroic') {
+          const spark = [12, 16, 19, 24];
+          for (let i = 0; i < spark.length; i++) {
+            const sf = midiToHz(profile.rootMidi + spark[i] + rarityTranspose) * pitch;
+            this.tone(dest, 'triangle', sf, sf * 1.005, now + 0.06 + i * 0.042, 0.38, 0.16, stops);
+          }
+          this.fmTone(dest, chimeRoot * 1.5, chimeRoot * 3.0, 180, now + 0.14, 0.48, 0.14, stops);
+        } else if (rarity === 'duo' || rarity === 'legendary') {
+          const spark = [12, 16, 19, 24, 31];
+          for (let i = 0; i < spark.length; i++) {
+            const sf = midiToHz(profile.rootMidi + spark[i] + rarityTranspose) * pitch;
+            this.tone(dest, 'sine', sf, sf * 1.006, now + 0.05 + i * 0.04, 0.46, 0.17, stops);
+          }
+          this.fmTone(dest, chimeRoot * 2.0, chimeRoot * 3.0, 210, now + 0.12, 0.62, 0.18, stops);
+        }
+      }
     }
 
     switch (profile.texture) {
@@ -1654,85 +1915,128 @@ export class ProceduralSfx {
     }
 
     if (style === 'select' || isCall) {
-      this.tone(dest, 'sine', 130 * pitch, 42, now, isGreater ? 0.65 : 0.34, isGreater ? 0.85 : 0.48, stops);
+      this.tone(dest, 'sine', 124 * pitch, 42, now, isGreater ? 0.68 : 0.36, isGreater ? 0.88 : 0.52, stops);
     }
     if (isGreater) {
       const rootHz = midiToHz(profile.rootMidi - 12) * pitch;
-      this.tone(dest, 'sawtooth', rootHz, rootHz, now + 0.03, 0.95, 0.3, stops);
-      this.fmTone(dest, rootHz * 4, rootHz * 6, 320, now + 0.08, 0.9, 0.24, stops);
+      this.shapedTone(dest, 'sawtooth', rootHz, rootHz, now + 0.03, 0.98, 0.32, this.softClipCurve, 2400, stops, -6);
+      this.shapedTone(dest, 'sawtooth', rootHz * 1.5, rootHz * 1.5, now + 0.04, 0.94, 0.24, this.softClipCurve, 2600, stops, 6);
+      this.fmTone(dest, rootHz * 4, rootHz * 6, 340, now + 0.07, 0.95, 0.26, stops);
     }
 
     return dur;
   }
 
+  /** Player Hurt: unmistakable 3-layer armor-dent bite + hard-clipped mid crunch + heavy gut sub. */
   private synthPlayerHit(
     dest: AudioNode,
     now: number,
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 0.26;
+    const dur = 0.28;
 
-    const osc = this.ctx.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(140 * pitch, now);
-    osc.frequency.exponentialRampToValueAtTime(42, now + 0.2);
+    // Layer 1 — Visceral armor-dent / impact bite transient (1.9kHz–4.4kHz)
+    this.transientBand(dest, this.whiteNoise, 4100 * pitch, 1750 * pitch, 2.0, now, 0.02, 0.64, stops);
 
-    const lp = this.ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(620, now);
+    // Layer 2 — Hard-saturated ominous low-mid crunch + dissonant iron FM groan
+    this.shapedTone(dest, 'sawtooth', 260 * pitch, 78 * pitch, now, 0.18, 0.54, this.hardClipCurve, 980, stops);
+    this.fmTone(dest, 310 * pitch, 465 * pitch, 280, now, 0.15, 0.34, stops);
 
-    const env = this.ctx.createGain();
-    env.gain.setValueAtTime(0.75, now);
-    env.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-
-    osc.connect(lp);
-    lp.connect(env);
-    env.connect(dest);
-    this.scheduleOsc(osc, now, now + 0.24, stops);
-
-    this.fmTone(dest, 310 * pitch, 465 * pitch, 260, now, 0.14, 0.32, stops);
-
-    const noise = this.startNoise(this.whiteNoise, now, 0.08, stops);
-    const bp = this.ctx.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.setValueAtTime(1200, now);
-    const nEnv = this.ctx.createGain();
-    nEnv.gain.setValueAtTime(0.42, now);
-    nEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-    noise.connect(bp);
-    bp.connect(nEnv);
-    nEnv.connect(dest);
+    // Layer 3 — Heavy warning sub gut-punch drop (115Hz -> 36Hz)
+    this.tone(dest, 'sine', 115 * pitch, 36, now, 0.21, 0.9, stops);
 
     return dur;
   }
 
+  /**
+   * Death Defiance:
+   * Stage 1 (0–240ms): Dramatic time-warp reverse swell sweep
+   * Stage 2 (240ms): Shattering obsidian glass crack + crystal scatter + resurrection sub thump
+   * Stage 3 (300–1380ms): Triumphant soaring golden horn chord (D4 + A4 + D5 + F#5)!
+   */
   private synthDeathDefiance(
     dest: AudioNode,
     now: number,
     pitch: number,
     stops: (() => void)[]
   ): number {
-    const dur = 1.15;
+    const dur = 1.42;
+    const shatterT = now + 0.24;
 
-    this.tone(dest, 'sine', 180 * pitch, 38, now, 0.24, 0.72, stops);
-    const crack = this.startNoise(this.whiteNoise, now, 0.12, stops);
-    const hp = this.ctx.createBiquadFilter();
-    hp.type = 'highpass';
-    hp.frequency.setValueAtTime(2000, now);
-    const cEnv = this.ctx.createGain();
-    cEnv.gain.setValueAtTime(0.45, now);
-    cEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-    crack.connect(hp);
-    hp.connect(cEnv);
-    cEnv.connect(dest);
+    // Stage 1 — Dramatic time-warp reverse swell (0..240ms)
+    const revNoise = this.startNoise(this.pinkNoise, now, 0.26, stops);
+    const revBp = this.ctx.createBiquadFilter();
+    revBp.type = 'bandpass';
+    revBp.Q.setValueAtTime(2.6, now);
+    revBp.frequency.setValueAtTime(180 * pitch, now);
+    revBp.frequency.exponentialRampToValueAtTime(3800 * pitch, shatterT);
+    const revEnv = this.ctx.createGain();
+    revEnv.gain.setValueAtTime(0.001, now);
+    revEnv.gain.exponentialRampToValueAtTime(0.58, shatterT - 0.008);
+    revEnv.gain.exponentialRampToValueAtTime(0.001, shatterT + 0.018);
+    revNoise.connect(revBp);
+    revBp.connect(revEnv);
+    revEnv.connect(dest);
 
-    const notes = [293.66, 369.99, 440.0, 587.33];
-    for (let i = 0; i < notes.length; i++) {
-      const t = now + 0.12 + i * 0.075;
-      const f = notes[i] * pitch;
-      this.tone(dest, 'triangle', f, f, t, 0.8 - i * 0.07, 0.32, stops);
-      this.tone(dest, 'sine', f * 2, f * 2, t + 0.01, 0.65 - i * 0.06, 0.18, stops);
+    // Rising reversed harmonic tension tone leading right into shatter
+    const revOsc = this.ctx.createOscillator();
+    revOsc.type = 'triangle';
+    revOsc.frequency.setValueAtTime(146.83 * pitch, now);
+    revOsc.frequency.exponentialRampToValueAtTime(587.33 * pitch, shatterT);
+    const revToneEnv = this.ctx.createGain();
+    revToneEnv.gain.setValueAtTime(0.001, now);
+    revToneEnv.gain.exponentialRampToValueAtTime(0.36, shatterT - 0.006);
+    revToneEnv.gain.exponentialRampToValueAtTime(0.001, shatterT + 0.015);
+    revOsc.connect(revToneEnv);
+    revToneEnv.connect(dest);
+    this.scheduleOsc(revOsc, now, shatterT + 0.02, stops);
+
+    // Stage 2 — Shattering obsidian glass crack + scattering shards + sub pulse (240ms)
+    this.tone(dest, 'sine', 120 * pitch, 34, shatterT, 0.32, 0.88, stops);
+    this.transientBand(dest, this.whiteNoise, 6400 * pitch, 2400 * pitch, 1.8, shatterT, 0.032, 0.72, stops);
+    const glassShards = [2420, 3180, 3960, 4680, 2860, 5240];
+    for (let i = 0; i < glassShards.length; i++) {
+      const t = shatterT + i * 0.018;
+      const f = glassShards[i] * pitch;
+      this.tone(dest, 'sine', f, f * 0.92, t, 0.2, 0.16, stops);
+    }
+
+    // Stage 3 — Triumphant soaring golden horn chord (D4 + A4 + D5 + F#5)
+    const hornT = now + 0.29;
+    const hornDur = 1.08;
+    const hornLp = this.ctx.createBiquadFilter();
+    hornLp.type = 'lowpass';
+    hornLp.Q.setValueAtTime(1.6, hornT);
+    hornLp.frequency.setValueAtTime(580, hornT);
+    hornLp.frequency.exponentialRampToValueAtTime(3400, hornT + 0.22);
+    hornLp.frequency.exponentialRampToValueAtTime(1250, hornT + hornDur);
+
+    const hornDrive = this.ctx.createWaveShaper();
+    hornDrive.curve = this.softClipCurve;
+
+    const hornEnv = this.ctx.createGain();
+    hornEnv.gain.setValueAtTime(0.001, hornT);
+    hornEnv.gain.linearRampToValueAtTime(0.38, hornT + 0.08);
+    hornEnv.gain.setValueAtTime(0.32, hornT + 0.56);
+    hornEnv.gain.exponentialRampToValueAtTime(0.001, hornT + hornDur);
+
+    hornLp.connect(hornDrive);
+    hornDrive.connect(hornEnv);
+    hornEnv.connect(dest);
+
+    const chordNotes = [293.66, 440.0, 587.33, 739.99];
+    for (let i = 0; i < chordNotes.length; i++) {
+      const f = chordNotes[i] * pitch;
+      const osc = this.ctx.createOscillator();
+      osc.type = i < 2 ? 'sawtooth' : 'triangle';
+      osc.frequency.setValueAtTime(f, hornT);
+      osc.detune.setValueAtTime((i - 1.5) * 6, hornT);
+      osc.connect(hornLp);
+      this.scheduleOsc(osc, hornT, hornT + hornDur + 0.03, stops);
+
+      // Gleaming golden upper octave shimmer
+      this.tone(dest, 'sine', f * 2, f * 2.004, hornT + 0.03 + i * 0.035, 0.65, 0.12, stops);
     }
 
     return dur;
@@ -1797,6 +2101,9 @@ export class ProceduralSfx {
     return dur;
   }
 
+  /**
+   * Mythic Carved-Marble & Burnished-Bronze UI Foley (`hover`, `click`, `confirm`, `back`).
+   */
   private synthUi(
     dest: AudioNode,
     now: number,
@@ -1805,21 +2112,35 @@ export class ProceduralSfx {
     stops: (() => void)[]
   ): number {
     if (kind === 'hover') {
-      this.tone(dest, 'sine', 1120 * pitch, 880 * pitch, now, 0.032, 0.45, stops);
+      // Delicate 28ms burnished-bronze chime tick + subtle woody parchment brush
+      this.tone(dest, 'sine', 1760 * pitch, 1480 * pitch, now, 0.028, 0.3, stops);
+      this.tone(dest, 'sine', 2640 * pitch, 2480 * pitch, now + 0.003, 0.022, 0.11, stops);
+      this.transientBand(dest, this.pinkNoise, 2100 * pitch, 1400 * pitch, 3.4, now, 0.022, 0.24, stops);
       return 0.04;
     }
     if (kind === 'click') {
-      this.tone(dest, 'triangle', 640 * pitch, 290 * pitch, now, 0.06, 0.55, stops);
-      this.tone(dest, 'sine', 1480 * pitch, 980 * pitch, now, 0.03, 0.25, stops);
-      return 0.075;
+      // Solid weighted carved-marble stone-latch click + soft gilded D5/A5 overtone
+      this.transientBand(dest, this.whiteNoise, 2600 * pitch, 1300 * pitch, 2.8, now, 0.014, 0.36, stops);
+      this.shapedTone(dest, 'triangle', 380 * pitch, 128 * pitch, now, 0.055, 0.44, this.softClipCurve, 1300, stops);
+      this.tone(dest, 'sine', 587.33 * pitch, 587.33 * pitch, now + 0.004, 0.075, 0.2, stops);
+      this.tone(dest, 'sine', 880.0 * pitch, 880.0 * pitch, now + 0.008, 0.065, 0.12, stops);
+      return 0.095;
     }
     if (kind === 'confirm') {
-      this.tone(dest, 'triangle', 587.33 * pitch, 587.33 * pitch, now, 0.14, 0.42, stops);
-      this.tone(dest, 'sine', 880.0 * pitch, 880.0 * pitch, now + 0.055, 0.22, 0.4, stops);
-      return 0.28;
+      // Resonant Greco-Roman bronze gong-chime chord (D4 + A4 + F#5) + stone-seal sub tap
+      this.tone(dest, 'sine', 120 * pitch, 56, now, 0.09, 0.34, stops);
+      this.fmTone(dest, 293.66 * pitch, 440.0 * pitch, 95, now, 0.46, 0.32, stops);
+      this.tone(dest, 'triangle', 440.0 * pitch, 440.0 * pitch, now + 0.028, 0.42, 0.28, stops);
+      this.tone(dest, 'sine', 739.99 * pitch, 739.99 * pitch, now + 0.055, 0.38, 0.24, stops);
+      this.tone(dest, 'sine', 1479.98 * pitch, 1479.98 * pitch, now + 0.068, 0.28, 0.09, stops);
+      return 0.5;
     }
-    this.tone(dest, 'triangle', 520 * pitch, 330 * pitch, now, 0.095, 0.45, stops);
-    return 0.11;
+    // `back`: warm low stone-slide thud + downward wooden fifth (A4 -> D4)
+    this.transientBand(dest, this.pinkNoise, 780 * pitch, 260 * pitch, 1.8, now, 0.085, 0.32, stops);
+    this.tone(dest, 'sine', 185 * pitch, 72, now, 0.1, 0.42, stops);
+    this.tone(dest, 'triangle', 440.0 * pitch, 432.0 * pitch, now, 0.07, 0.24, stops);
+    this.tone(dest, 'triangle', 293.66 * pitch, 286.0 * pitch, now + 0.042, 0.13, 0.28, stops);
+    return 0.18;
   }
 
   private synthPickup(
@@ -1937,6 +2258,77 @@ export class ProceduralSfx {
     osc.connect(env);
     env.connect(dest);
     this.scheduleOsc(osc, startTime, startTime + duration + 0.015, stops);
+  }
+
+  /** Waveshaped mid-body punch helper (`osc -> lowpass -> waveShaper -> env -> dest`). */
+  private shapedTone(
+    dest: AudioNode,
+    type: OscillatorType,
+    startHz: number,
+    endHz: number,
+    startTime: number,
+    duration: number,
+    peakGain: number,
+    curve: Float32Array<ArrayBuffer>,
+    cutoffHz: number,
+    stops: (() => void)[],
+    detuneCents = 0
+  ): void {
+    const osc = this.ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(clamp(startHz, 20, 14000), startTime);
+    if (Math.abs(endHz - startHz) > 0.5) {
+      osc.frequency.exponentialRampToValueAtTime(clamp(endHz, 20, 14000), startTime + duration);
+    }
+    if (detuneCents !== 0) {
+      osc.detune.setValueAtTime(detuneCents, startTime);
+    }
+
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(clamp(cutoffHz, 120, 14000), startTime);
+
+    const shaper = this.ctx.createWaveShaper();
+    shaper.curve = curve;
+
+    const env = this.ctx.createGain();
+    env.gain.setValueAtTime(0.0001, startTime);
+    env.gain.linearRampToValueAtTime(Math.max(0.001, peakGain), startTime + Math.min(0.008, duration * 0.2));
+    env.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+    osc.connect(lp);
+    lp.connect(shaper);
+    shaper.connect(env);
+    env.connect(dest);
+    this.scheduleOsc(osc, startTime, startTime + duration + 0.015, stops);
+  }
+
+  /** Crisp bandpass-filtered noise transient crack / bite helper (8–35ms). */
+  private transientBand(
+    dest: AudioNode,
+    buffer: AudioBuffer,
+    startHz: number,
+    endHz: number,
+    q: number,
+    startTime: number,
+    duration: number,
+    peakGain: number,
+    stops: (() => void)[]
+  ): void {
+    const src = this.startNoise(buffer, startTime, duration, stops);
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.setValueAtTime(q, startTime);
+    bp.frequency.setValueAtTime(clamp(startHz, 180, 14000), startTime);
+    if (Math.abs(endHz - startHz) > 10) {
+      bp.frequency.exponentialRampToValueAtTime(clamp(endHz, 120, 12000), startTime + duration);
+    }
+    const env = this.ctx.createGain();
+    env.gain.setValueAtTime(Math.max(0.001, peakGain), startTime);
+    env.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+    src.connect(bp);
+    bp.connect(env);
+    env.connect(dest);
   }
 
   private fmTone(
