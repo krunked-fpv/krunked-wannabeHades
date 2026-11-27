@@ -1,7 +1,7 @@
 /**
  * GameRenderer — Unified Rendering Facade for Krunked WannabeHades.
  *
- * Automatically initializes the 6-pass WebGL2 Supergiant Ink-Cel pipeline and
+ * Automatically initializes the 6-pass WebGL2 Mythic Ink-Cel pipeline and
  * gracefully falls back to Canvas2DInkCelRenderer if WebGL2 is unavailable.
  * Guarantees exact inverse camera/isometric math for laser-precise `screenToWorld`
  * aiming, smooth `interpAlpha` interpolation (with `classicSnap60Hz` toggle),

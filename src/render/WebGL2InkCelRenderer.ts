@@ -1,5 +1,5 @@
 /**
- * WebGL2InkCelRenderer — 6-Pass Supergiant Hades Ink-Cel WebGL2 Pipeline.
+ * WebGL2InkCelRenderer — 6-Pass Mythic Ink-Cel WebGL2 Pipeline.
  *
  *   Pass 1: Deep Abyssal Chasm Parallax & Animated Underworld Mist (sceneFBO)
  *   Pass 2: Isometric Carved Stone Chamber, Cliff Drop, Greek Meander Trim, Pits,
@@ -959,6 +959,14 @@ export class WebGL2InkCelRenderer implements RenderBackend {
         const o = state.room.obstacles[i];
         if (Math.abs(x - o.pos.x) < o.halfW + 44 && Math.abs(y - o.pos.y) < o.halfH + 44) return true;
       }
+      for (let i = 0; i < state.room.hazards.length; i++) {
+        const h = state.room.hazards[i];
+        if (Math.hypot(x - h.pos.x, y - h.pos.y) < h.radius + 48) return true;
+      }
+      for (let i = 0; i < this.braziers.length; i++) {
+        const br = this.braziers[i];
+        if (Math.hypot(x - br.x, y - br.y) < 110) return true;
+      }
       return false;
     };
 
@@ -978,12 +986,77 @@ export class WebGL2InkCelRenderer implements RenderBackend {
 
     if (b.maxX - b.minX > 900) {
       tryAddBrazier(midX, b.minY + inset * 0.85);
-      tryAddBrazier(midX, b.maxY - inset * 0.85);
+      // Flank the southern Hero entry lane symmetrically instead of placing a brazier at center-south spawn
+      tryAddBrazier(midX - 210, b.maxY - inset * 0.85);
+      tryAddBrazier(midX + 210, b.maxY - inset * 0.85);
     }
     if (b.maxY - b.minY > 750) {
       tryAddBrazier(b.minX + inset * 0.85, midY);
       tryAddBrazier(b.maxX - inset * 0.85, midY);
     }
+  }
+
+  /**
+   * Exact slab ray-AABB intersection matching `src/sim/bosses.ts` pillar LoS occlusion.
+   * Returns clipped distance along ray `(ox, oy) + t * (dirX, dirY)` up to `maxLen`.
+   */
+  private clipRayToObstacles(
+    obstacles: readonly ArenaObstacle[],
+    ox: number,
+    oy: number,
+    dirX: number,
+    dirY: number,
+    maxLen: number
+  ): number {
+    let bestT = maxLen;
+    for (let i = 0; i < obstacles.length; i++) {
+      const obs = obstacles[i];
+      if (!obs.blocksProjectiles) continue;
+      if (obs.destructible && (obs.hp ?? 1) <= 0) continue;
+
+      const minX = obs.pos.x - obs.halfW;
+      const maxX = obs.pos.x + obs.halfW;
+      const minY = obs.pos.y - obs.halfH;
+      const maxY = obs.pos.y + obs.halfH;
+
+      let tMin = 0;
+      let tMax = bestT;
+
+      if (Math.abs(dirX) < 1e-6) {
+        if (ox < minX || ox > maxX) continue;
+      } else {
+        let t1 = (minX - ox) / dirX;
+        let t2 = (maxX - ox) / dirX;
+        if (t1 > t2) {
+          const tmp = t1;
+          t1 = t2;
+          t2 = tmp;
+        }
+        if (t1 > tMin) tMin = t1;
+        if (t2 < tMax) tMax = t2;
+        if (tMin > tMax) continue;
+      }
+
+      if (Math.abs(dirY) < 1e-6) {
+        if (oy < minY || oy > maxY) continue;
+      } else {
+        let t1 = (minY - oy) / dirY;
+        let t2 = (maxY - oy) / dirY;
+        if (t1 > t2) {
+          const tmp = t1;
+          t1 = t2;
+          t2 = tmp;
+        }
+        if (t1 > tMin) tMin = t1;
+        if (t2 < tMax) tMax = t2;
+        if (tMin > tMax) continue;
+      }
+
+      if (tMin > 0.5 && tMin < bestT && tMax > 0) {
+        bestT = tMin;
+      }
+    }
+    return bestT;
   }
 
   // ============================================================================
@@ -1048,7 +1121,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     // PASS 2: Isometric Stone Chamber, Cliff Drop, Meander Trim, Pits, Decals & Telegraphs
     // ------------------------------------------------------------------------
     this.renderChamberFloorAndDecals(state, cam, vfx, theme, timeSec);
-    this.renderTelegraphs(state.room.telegraphs, cam, timeSec);
+    this.renderTelegraphs(state.room.telegraphs, state.room.obstacles, cam, timeSec);
     this.renderContactShadows(state, prevState, cam);
 
     // ------------------------------------------------------------------------
@@ -1476,18 +1549,135 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     }
 
     if (h.kind === 'lava_pool' || h.kind === 'boiling_geyser') {
-      const pulse = 0.92 + 0.08 * Math.sin(timeSec * 4.5 + h.pos.x * 0.02);
-      this.pushEllipseFill(sx, sy, rx, ry, 20, 0.95, 0.28, 0.08, 0.88, 1.35 * pulse);
-      this.pushEllipseFill(sx, sy, rx * 0.68, ry * 0.68, 16, 1.0, 0.72, 0.2, 0.85, 1.8 * pulse);
-      this.pushEllipseRing(sx, sy, rx + 3 * cam.zoom, ry + 2 * cam.zoom, rx - 3 * cam.zoom, ry - 2 * cam.zoom, 20, 0.05, 0.03, 0.06, 0.95);
+      const seed = h.pos.x * 0.037 + h.pos.y * 0.023;
+      const pulse = 0.92 + 0.08 * Math.sin(timeSec * 4.2 + seed);
+      const curbX = Math.max(7.5 * cam.zoom, rx * 0.11);
+      const curbY = Math.max(4.8 * cam.zoom, ry * 0.11);
+
+      // 1. Grounded contact shadow & recessed 3D basalt crater drop-wall
+      this.pushEllipseFill(sx, sy + 5 * cam.zoom, rx + curbX + 3.5 * cam.zoom, ry + curbY + 2.5 * cam.zoom, 24, 0.04, 0.02, 0.04, 0.72);
+      // 2. Thick jet-black comic ink outer rim
+      this.pushEllipseFill(sx, sy + 2.5 * cam.zoom, rx + curbX + 3.2 * cam.zoom, ry + curbY + 2.2 * cam.zoom, 24, 0.04, 0.02, 0.05, 0.98);
+      // 3. Sculpted 3D volcanic basalt curb (shadowed outer lip + warm fire-lit top bevel)
+      this.pushEllipseFill(sx, sy + 2.5 * cam.zoom, rx + curbX, ry + curbY, 24, 0.16, 0.09, 0.1, 0.98);
+      this.pushEllipseFill(sx, sy - 0.5 * cam.zoom, rx + curbX * 0.96, ry + curbY * 0.96, 24, 0.34, 0.18, 0.14, 0.98);
+      // Subtle fire-lit inner stone lip bevel
+      this.pushEllipseRing(sx, sy, rx + 3.2 * cam.zoom, ry + 2.2 * cam.zoom, rx - 0.5 * cam.zoom, ry - 0.5 * cam.zoom, 24, 0.74, 0.28, 0.12, 0.92, 0.2);
+
+      // 4. Deep volcanic magma basin (shifted inner glow creates realistic recessed northern rim shadow!)
+      this.pushEllipseFill(sx, sy, rx, ry, 24, 0.58, 0.11, 0.04, 0.98, 0.28);
+      this.pushEllipseFill(sx, sy + ry * 0.07, rx * 0.84, ry * 0.76, 20, 0.92, 0.32, 0.06, 0.94, 0.46 * pulse);
+
+      // 5. Animated molten magma flow + jagged volcanic fissure veins (organic caldera crust, zero pareidolia!)
+      const driftX = Math.sin(timeSec * 1.1 + seed) * rx * 0.06;
+      const driftY = Math.cos(timeSec * 0.9 + seed) * ry * 0.05;
+      this.pushEllipseFill(sx + driftX, sy + ry * 0.09 + driftY, rx * 0.64, ry * 0.52, 18, 0.98, 0.48, 0.08, 0.88, 0.56 * pulse);
+      this.pushEllipseFill(sx - driftX * 0.8, sy + ry * 0.14, rx * 0.42, ry * 0.3, 14, 1.0, 0.72, 0.16, 0.82, 0.78 * pulse);
+
+      // Jagged glowing volcanic fissure cracks + dark basalt crust ridge bands across the caldera
+      const crA = Math.sin(seed * 3.1) * 0.35;
+      const v1x = sx - rx * 0.56;
+      const v1y = sy - ry * 0.12 + crA * ry * 0.25;
+      const v2x = sx - rx * 0.12 + driftX * 0.6;
+      const v2y = sy + ry * 0.18 + driftY * 0.5;
+      const v3x = sx + rx * 0.24 - driftX * 0.4;
+      const v3y = sy - ry * 0.06 - driftY * 0.4;
+      const v4x = sx + rx * 0.58;
+      const v4y = sy + ry * 0.22 - crA * ry * 0.2;
+      // Dark volcanic crust shadow flanking fissure
+      this.pushLine(v1x, v1y - 4 * cam.zoom, v2x, v2y - 4 * cam.zoom, 6.5 * cam.zoom, 0.24, 0.07, 0.05, 0.72);
+      this.pushLine(v2x, v2y - 4 * cam.zoom, v3x, v3y - 4 * cam.zoom, 5.5 * cam.zoom, 0.24, 0.07, 0.05, 0.68);
+      this.pushLine(v3x, v3y - 4 * cam.zoom, v4x, v4y - 4 * cam.zoom, 5.0 * cam.zoom, 0.24, 0.07, 0.05, 0.68);
+      // Blazing white-gold molten vein cutting through the crust
+      this.pushLine(v1x, v1y, v2x, v2y, 3.0 * cam.zoom, 1.0, 0.84, 0.28, 0.92, 0.98 * pulse);
+      this.pushLine(v2x, v2y, v3x, v3y, 2.8 * cam.zoom, 1.0, 0.88, 0.36, 0.94, 1.05 * pulse);
+      this.pushLine(v3x, v3y, v4x, v4y, 2.4 * cam.zoom, 1.0, 0.82, 0.26, 0.9, 0.95 * pulse);
+
+      // Animated popping magma bubbles
+      for (let bIdx = 0; bIdx < 3; bIdx++) {
+        const phase = (timeSec * 0.85 + seed + bIdx * 0.33) % 1;
+        const ang = seed + bIdx * 2.15;
+        const bx = sx + Math.cos(ang) * rx * 0.46;
+        const by = sy + ry * 0.08 + Math.sin(ang) * ry * 0.42;
+        const br = (0.04 + phase * 0.075) * rx;
+        const ba = Math.sin(phase * Math.PI) * 0.9;
+        this.pushEllipseRing(bx, by, br, br * cam.isoScaleY, Math.max(0.5, br - 2.2 * cam.zoom), Math.max(0.5, (br - 2.2 * cam.zoom) * cam.isoScaleY), 10, 1.0, 0.84, 0.34, ba, 0.95);
+      }
+
+      // 6. Crisp jet-black inner basin contour + carved stone-curb radial seam ticks
+      this.pushEllipseRing(sx, sy, rx + 1.6 * cam.zoom, ry + 1.1 * cam.zoom, Math.max(1, rx - 2.0 * cam.zoom), Math.max(1, ry - 1.4 * cam.zoom), 24, 0.04, 0.02, 0.05, 0.96);
+      for (let sIdx = 0; sIdx < 8; sIdx++) {
+        const a = sIdx * (Math.PI / 4) + 0.2;
+        const ca = Math.cos(a);
+        const sa = Math.sin(a);
+        this.pushLine(
+          sx + ca * (rx + 1 * cam.zoom),
+          sy + sa * (ry + 0.6 * cam.zoom),
+          sx + ca * (rx + curbX),
+          sy + sa * (ry + curbY),
+          2.2 * cam.zoom,
+          0.05,
+          0.02,
+          0.05,
+          0.88
+        );
+      }
       return;
     }
 
     if (h.kind === 'poison_pool') {
-      const pulse = 0.94 + 0.06 * Math.sin(timeSec * 3.8 + h.pos.y * 0.03);
-      this.pushEllipseFill(sx, sy, rx, ry, 18, 0.45, 0.82, 0.16, 0.76, 0.48 * pulse);
-      this.pushEllipseFill(sx, sy, rx * 0.62, ry * 0.62, 14, 0.72, 0.98, 0.24, 0.55, 0.72 * pulse);
-      this.pushEllipseRing(sx, sy, rx, ry, rx - 4 * cam.zoom, ry - 2.5 * cam.zoom, 18, 0.05, 0.09, 0.04, 0.92);
+      const seed = h.pos.x * 0.041 + h.pos.y * 0.029;
+      const pulse = 0.93 + 0.07 * Math.sin(timeSec * 3.4 + seed);
+      const curbX = Math.max(7.5 * cam.zoom, rx * 0.11);
+      const curbY = Math.max(4.8 * cam.zoom, ry * 0.11);
+
+      // 1. Grounded drop shadow & carved 3D mossy crypt-stone basin curb (matches curing_pool masonry!)
+      this.pushEllipseFill(sx, sy + 5 * cam.zoom, rx + curbX + 3.5 * cam.zoom, ry + curbY + 2.5 * cam.zoom, 24, 0.03, 0.05, 0.03, 0.72);
+      // 2. Bold jet-black comic ink outer rim
+      this.pushEllipseFill(sx, sy + 2.5 * cam.zoom, rx + curbX + 3.2 * cam.zoom, ry + curbY + 2.2 * cam.zoom, 24, 0.04, 0.05, 0.04, 0.98);
+      // 3. Carved crypt-stone rim bevel (shadowed lower wall + lit mossy-slate upper lip)
+      this.pushEllipseFill(sx, sy + 2.5 * cam.zoom, rx + curbX, ry + curbY, 24, 0.16, 0.21, 0.14, 0.98);
+      this.pushEllipseFill(sx, sy - 0.5 * cam.zoom, rx + curbX * 0.96, ry + curbY * 0.96, 24, 0.34, 0.42, 0.28, 0.98);
+      this.pushEllipseRing(sx, sy, rx + 3.0 * cam.zoom, ry + 2.0 * cam.zoom, rx - 0.5 * cam.zoom, ry - 0.5 * cam.zoom, 24, 0.48, 0.64, 0.34, 0.85, 0.12);
+
+      // 4. Deep recessed venomous emerald-bile liquid (southern shift yields sunken northern lip depth!)
+      this.pushEllipseFill(sx, sy, rx, ry, 24, 0.11, 0.32, 0.08, 0.96, 0.12);
+      this.pushEllipseFill(sx, sy + ry * 0.07, rx * 0.84, ry * 0.76, 20, 0.32, 0.72, 0.14, 0.92, 0.28 * pulse);
+
+      // 5. Swirling toxic acid sheen + rising venomous bubbles
+      const swX = Math.sin(timeSec * 1.3 + seed) * rx * 0.09;
+      const swY = Math.cos(timeSec * 1.1 + seed) * ry * 0.08;
+      this.pushEllipseFill(sx + swX, sy + ry * 0.08 + swY, rx * 0.52, ry * 0.44, 16, 0.58, 0.94, 0.2, 0.72, 0.42 * pulse);
+
+      for (let bIdx = 0; bIdx < 4; bIdx++) {
+        const phase = (timeSec * 0.95 + seed + bIdx * 0.25) % 1;
+        const ang = seed * 1.3 + bIdx * 1.65;
+        const bx = sx + Math.cos(ang) * rx * 0.48;
+        const by = sy + ry * 0.08 + Math.sin(ang) * ry * 0.44;
+        const br = (0.045 + phase * 0.07) * rx;
+        const ba = Math.sin(phase * Math.PI) * 0.92;
+        this.pushEllipseFill(bx, by, br + 1.4 * cam.zoom, (br + 1.4 * cam.zoom) * cam.isoScaleY, 10, 0.05, 0.14, 0.04, ba * 0.88);
+        this.pushEllipseFill(bx, by, br, br * cam.isoScaleY, 10, 0.76, 1.0, 0.38, ba, 0.55);
+      }
+
+      // 6. Crisp jet-black inner basin ink rim + carved stone curb joints
+      this.pushEllipseRing(sx, sy, rx + 1.6 * cam.zoom, ry + 1.1 * cam.zoom, Math.max(1, rx - 2.0 * cam.zoom), Math.max(1, ry - 1.4 * cam.zoom), 24, 0.04, 0.07, 0.04, 0.96);
+      for (let sIdx = 0; sIdx < 8; sIdx++) {
+        const a = sIdx * (Math.PI / 4) + 0.35;
+        const ca = Math.cos(a);
+        const sa = Math.sin(a);
+        this.pushLine(
+          sx + ca * (rx + 1 * cam.zoom),
+          sy + sa * (ry + 0.6 * cam.zoom),
+          sx + ca * (rx + curbX),
+          sy + sa * (ry + curbY),
+          2.2 * cam.zoom,
+          0.04,
+          0.06,
+          0.04,
+          0.86
+        );
+      }
       return;
     }
 
@@ -1524,6 +1714,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
 
   private renderTelegraphs(
     telegraphs: readonly TelegraphShape[],
+    obstacles: readonly ArenaObstacle[],
     cam: CameraView,
     timeSec: number
   ): void {
@@ -1613,10 +1804,15 @@ export class WebGL2InkCelRenderer implements RenderBackend {
         this.pushLine(sx, sy, sx + Math.cos(t.angle - halfArc) * rx, sy + Math.sin(t.angle - halfArc) * ry, 3 * cam.zoom, r, g, b, 0.92, rimEmissive);
         this.pushLine(sx, sy, sx + Math.cos(t.angle + halfArc) * rx, sy + Math.sin(t.angle + halfArc) * ry, 3 * cam.zoom, r, g, b, 0.92, rimEmissive);
       } else if (t.kind === 'line' || t.kind === 'rect') {
-        const len = t.length ?? t.radius;
-        const halfW = (t.width ?? 44) * 0.5;
+        const rawLen = t.length ?? t.radius;
+        const laneW = t.width ?? 44;
+        const halfW = laneW * 0.5;
         const c = Math.cos(t.angle);
         const s = Math.sin(t.angle);
+        const len =
+          t.kind === 'line' && laneW <= 96
+            ? this.clipRayToObstacles(obstacles, t.pos.x, t.pos.y, c, s, rawLen)
+            : rawLen;
         const px = -s * halfW;
         const py = c * halfW;
 
@@ -1629,7 +1825,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
         const p3x = this.wxToSx(t.pos.x + c * len + px, cam);
         const p3y = this.wyToSy(t.pos.y + s * len + py, 0, cam);
 
-        // Full lane footprint
+        // Full lane footprint (clipped cleanly at any blocking pillar AABB!)
         this.pushQuadSolid(p0x, p0y, p1x, p1y, p2x, p2y, p3x, p3y, cr, cg, cb, 0.22, 0.35);
 
         // Fill-up progress beam along lane
@@ -1640,11 +1836,11 @@ export class WebGL2InkCelRenderer implements RenderBackend {
         const f3y = this.wyToSy(t.pos.y + s * fLen + py, 0, cam);
         this.pushQuadSolid(p0x, p0y, p1x, p1y, f2x, f2y, f3x, f3y, r, g, b, 0.42 + prog * 0.24, rimEmissive);
 
-        // Razor borders
+        // Razor borders (+ reinforced stopper bar when occluded by a pillar)
         const bw = 3.2 * cam.zoom;
         this.pushLine(p0x, p0y, p3x, p3y, bw, r, g, b, 0.95, rimEmissive);
         this.pushLine(p1x, p1y, p2x, p2y, bw, r, g, b, 0.95, rimEmissive);
-        this.pushLine(p2x, p2y, p3x, p3y, bw, r, g, b, 0.95, rimEmissive);
+        this.pushLine(p2x, p2y, p3x, p3y, len < rawLen - 0.5 ? bw * 1.55 : bw, r, g, b, 0.98, rimEmissive + 0.2);
       }
     }
   }
@@ -1783,10 +1979,25 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     const heroPos = this.interpPlayerPos(state, prevState, cam.interpAlpha);
     this.pushSortItem('hero', heroPos.y, 0, heroPos.x, heroPos.y);
 
-    // Projectiles
+    // Projectiles (clip beam sortY to pillar impact face so occluded beams never cross foreground pillars!)
     for (let i = 0; i < state.projectiles.length; i++) {
       const pr = state.projectiles[i];
-      this.pushSortItem('projectile', pr.pos.y + 8, i, pr.pos.x, pr.pos.y);
+      if (pr.kind === 'beam') {
+        const c = Math.cos(pr.angle);
+        const s = Math.sin(pr.angle);
+        const startOffset = pr.targetPos ? 0 : 28;
+        const ox = pr.startPos.x + c * startOffset;
+        const oy = pr.startPos.y + s * startOffset;
+        const rawLen = pr.targetPos
+          ? Math.min(pr.range, Math.hypot(pr.targetPos.x - ox, pr.targetPos.y - oy))
+          : Math.min(pr.range, 920);
+        const clippedLen = this.clipRayToObstacles(state.room.obstacles, ox, oy, c, s, Math.max(0, rawLen));
+        const hitPillar = clippedLen < rawLen - 0.5;
+        const hitY = oy + s * clippedLen;
+        this.pushSortItem('projectile', hitPillar ? hitY : oy + 8, i, ox, oy);
+      } else {
+        this.pushSortItem('projectile', pr.pos.y + 8, i, pr.pos.x, pr.pos.y);
+      }
     }
 
     // Insertion sort on pre-allocated pool (nearly sorted frame-to-frame, O(N), zero alloc!)
@@ -1830,7 +2041,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
           this.renderHero(state, item.x, item.y, cam, settings, timeSec);
           break;
         case 'projectile':
-          this.renderProjectile(state.projectiles[item.idx], cam, timeSec);
+          this.renderProjectile(state.projectiles[item.idx], state.room.obstacles, cam, timeSec);
           break;
       }
     }
@@ -2357,7 +2568,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       );
     }
 
-    // Main Ink-Cel Character Sprite (with crisp Supergiant white hit-flash!)
+    // Main Ink-Cel Character Sprite (with crisp comic-ink white hit-flash!)
     const flash = settings.hitFlash && e.hitFlashTimer > 0 ? Math.min(1, e.hitFlashTimer * 12) : 0;
     const windupTintR = e.aiState === 'windup' ? 1.25 : 1.0;
     const windupTintG = e.aiState === 'windup' ? 0.82 : 1.0;
@@ -2433,7 +2644,12 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     }
   }
 
-  private renderProjectile(pr: ProjectileState, cam: CameraView, timeSec: number): void {
+  private renderProjectile(
+    pr: ProjectileState,
+    obstacles: readonly ArenaObstacle[],
+    cam: CameraView,
+    timeSec: number
+  ): void {
     const lobZ =
       pr.isLob && pr.lobDuration > 0
         ? Math.sin(Math.min(1, pr.lobElapsed / pr.lobDuration) * Math.PI) * pr.lobHeight
@@ -2460,12 +2676,55 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     }
 
     if (pr.kind === 'laser' || pr.kind === 'beam') {
-      const len = Math.min(pr.range, 560);
-      const x1 = this.wxToSx(pr.pos.x + Math.cos(pr.angle) * len, cam);
-      const y1 = this.wyToSy(pr.pos.y + Math.sin(pr.angle) * len, 22, cam);
-      this.pushLine(sx, sy, x1, y1, (pr.radius * 1.4) * cam.zoom, 0.05, 0.02, 0.06, 0.9);
-      this.pushLine(sx, sy, x1, y1, pr.radius * cam.zoom, r, g, b, 0.95, 1.9);
-      this.pushLine(sx, sy, x1, y1, pr.radius * 0.42 * cam.zoom, 1, 0.98, 0.92, 1, 2.5);
+      const c = Math.cos(pr.angle);
+      const s = Math.sin(pr.angle);
+      let ox: number;
+      let oy: number;
+      let rawLen: number;
+
+      if (pr.kind === 'beam') {
+        const startOffset = pr.targetPos ? 0 : 28;
+        ox = pr.startPos.x + c * startOffset;
+        oy = pr.startPos.y + s * startOffset;
+        rawLen = pr.targetPos
+          ? Math.min(pr.range, Math.hypot(pr.targetPos.x - ox, pr.targetPos.y - oy))
+          : Math.min(pr.range, 920);
+      } else {
+        const travelDx = pr.pos.x - pr.startPos.x;
+        const travelDy = pr.pos.y - pr.startPos.y;
+        const travelDist = Math.hypot(travelDx, travelDy);
+        if (travelDist > 4) {
+          const preClip = this.clipRayToObstacles(
+            obstacles,
+            pr.startPos.x,
+            pr.startPos.y,
+            travelDx / travelDist,
+            travelDy / travelDist,
+            travelDist
+          );
+          if (preClip < travelDist - 1) return;
+        }
+        ox = pr.pos.x;
+        oy = pr.pos.y;
+        rawLen = Math.min(pr.range, 480);
+      }
+
+      const len = this.clipRayToObstacles(obstacles, ox, oy, c, s, Math.max(0, rawLen));
+      const hitPillar = len < rawLen - 0.5;
+      const x0 = this.wxToSx(ox, cam);
+      const y0 = this.wyToSy(oy, 24, cam);
+      const x1 = this.wxToSx(ox + c * len, cam);
+      const y1 = this.wyToSy(oy + s * len, 24, cam);
+
+      this.pushLine(x0, y0, x1, y1, (pr.radius * 1.48) * cam.zoom, 0.05, 0.02, 0.06, 0.94);
+      this.pushLine(x0, y0, x1, y1, pr.radius * cam.zoom, r, g, b, 0.96, 1.45);
+      this.pushLine(x0, y0, x1, y1, pr.radius * 0.42 * cam.zoom, 1, 0.98, 0.92, 1, 2.2);
+
+      if (hitPillar) {
+        // Pillar impact scorch flare & comic starburst where the beam terminates against stone!
+        this.pushSprite('vfx_glow_soft', x1, y1, 0.65 * cam.zoom, 0.65 * cam.zoom, 0, r, g, b, 0.8, 0, 1.5);
+        this.pushSprite('vfx_hit_spark', x1, y1, 0.54 * cam.zoom, 0.54 * cam.zoom, timeSec * 14, 1, 0.94, 0.78, 0.95, 0, 2.0);
+      }
       return;
     }
 
@@ -2606,7 +2865,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       }
     };
 
-    // Layer 1: Bold jet-black comic ink outer rim (unmistakable Supergiant hand-inked slash!)
+    // Layer 1: Bold jet-black comic ink outer rim (unmistakable painterly hand-inked slash!)
     drawRibbonBand(6.5, 1.14, 0.04, 0.02, 0.07, fade * 0.96, 0);
     // Layer 2: Rich saturated Boon-colored outer crescent (low emissive keeps Voltaris electric #FFFA40, never beige!)
     drawRibbonBand(2.0, 1.0, rb.r, rb.g, rb.b, fade * 0.95, 0.18);
