@@ -2,14 +2,17 @@
  * ParticlesAndDecals — Pre-allocated fixed-size object pools (ZERO per-frame GC churn!)
  *
  * Manages:
- *  - Painterly Bezier Weapon Slash Ribbons (tinted by active Attack/Special Boon color + hot core!)
+ *  - Multi-Layer Sweeping Curved Comic Weapon Slash Ribbons (tinted by Patron Boon color + white-gold blade edge!)
  *  - Prince Pyreus Fiery Footsteps (`FireFootstep`) & glowing ember scorches
- *  - Comic Hit Sparks, Gold Armor-Shatter Shards, Patron Boon VFX (lightning, surf, deflect rings, roses)
- *  - Boss Phase Shockwaves, Persistent Room Floor Decals (scorch craters, blood-ichor, cracks)
- *  - Post-process screen pulses (hit flash, death defiance desaturation, final-kill dramatic pulse)
+ *  - Directional Cone-Aligned Impact Hit-Spark Streaks (`spark_streak`) + Brief Crisp Starburst (`impact_burst`)
+ *  - Gold Armor-Shatter Shards, Patron Boon VFX (lightning, surf, deflect rings, roses)
+ *  - Persistent Biome/Faction-Grounded Floor Decals (`crater`, `scorch`, `ichor`, `crack`, `foot_scorch`)
+ *  - Post-process screen pulses & impulses (hit flash, death defiance, final kill, chromatic aberration, radial shockwave)
  */
 
 import type {
+  BiomeId,
+  EnemyArchetypeId,
   PatronId,
   SimEvent,
   SimState,
@@ -18,6 +21,7 @@ import type {
 } from '../contracts/index.js';
 import { PATRON_CONSTANTS } from '../contracts/index.js';
 import { hexToRgbaTuple } from '../assets/ProceduralFonts.js';
+import type { ScreenFxImpulse } from './GameRenderer.js';
 
 export type SlashRibbonKind = 'arc' | 'nova' | 'thrust' | 'whip';
 
@@ -44,6 +48,8 @@ export interface SlashRibbon {
 export type ParticleKind =
   | 'ember_footstep'
   | 'spark'
+  | 'spark_streak'
+  | 'impact_burst'
   | 'shard'
   | 'bolt'
   | 'splash'
@@ -78,7 +84,7 @@ export interface Particle {
   emissive: number;
 }
 
-export type DecalKind = 'scorch' | 'ichor' | 'crack' | 'foot_scorch';
+export type DecalKind = 'scorch' | 'ichor' | 'crack' | 'crater' | 'foot_scorch';
 
 export interface FloorDecal {
   active: boolean;
@@ -113,6 +119,21 @@ export class ParticlesAndDecals {
   public hitFlashPulse = 0;
   public deathDefiancePulse = 0;
   public finalKillPulse = 0;
+
+  // Pass 6 Post-FX impulse state (chromatic aberration & radial shockwave ring)
+  public chromaticAmount = 0;
+  public shockwaveActive = false;
+  public shockwaveHasWorld = false;
+  public shockwaveWorldX = 0;
+  public shockwaveWorldY = 0;
+  public shockwaveElapsed = 0;
+  public shockwaveDuration = 0.42;
+  public shockwaveRadius = 0;
+  public shockwaveAmp = 0;
+  public shockwaveMaxAmp = 0;
+  public shockwaveR = 1.0;
+  public shockwaveG = 0.86;
+  public shockwaveB = 0.42;
 
   // Deterministic lightweight visual RNG (strictly cosmetic, never touches SimState!)
   private vfxSeed = 0x51a7c0de;
@@ -228,8 +249,77 @@ export class ParticlesAndDecals {
     this.hitFlashPulse = 0;
     this.deathDefiancePulse = 0;
     this.finalKillPulse = 0;
+    this.chromaticAmount = 0;
+    this.shockwaveActive = false;
+    this.shockwaveHasWorld = false;
+    this.shockwaveElapsed = 0;
+    this.shockwaveRadius = 0;
+    this.shockwaveAmp = 0;
+    this.shockwaveMaxAmp = 0;
     this.lastHeroX = Number.NaN;
     this.lastHeroY = Number.NaN;
+  }
+
+  /**
+   * Triggers chromatic aberration and/or radial shockwave distortion pulses
+   * consumed by Pass 6 (`COMPOSITE_FRAG`) and Canvas2D post-overlay.
+   */
+  public triggerScreenFx(fx: ScreenFxImpulse): void {
+    const strength = Math.max(0, Math.min(1, Number.isFinite(fx.intensity) ? fx.intensity : 0.6));
+    if (strength <= 0.001) return;
+
+    const [tr, tg, tb] = fx.colorHex ? hexToRgbaTuple(fx.colorHex) : [1.0, 0.88, 0.44];
+
+    const startWave = (maxAmp: number, duration: number) => {
+      if (this.shockwaveActive && this.shockwaveAmp > maxAmp * 0.9) return;
+      this.shockwaveActive = true;
+      this.shockwaveElapsed = 0;
+      this.shockwaveDuration = duration;
+      this.shockwaveRadius = 0.02;
+      this.shockwaveMaxAmp = Math.min(0.028, maxAmp);
+      this.shockwaveAmp = this.shockwaveMaxAmp;
+      this.shockwaveHasWorld =
+        typeof fx.worldX === 'number' &&
+        Number.isFinite(fx.worldX) &&
+        typeof fx.worldY === 'number' &&
+        Number.isFinite(fx.worldY);
+      if (this.shockwaveHasWorld) {
+        this.shockwaveWorldX = fx.worldX as number;
+        this.shockwaveWorldY = fx.worldY as number;
+      }
+      this.shockwaveR = tr;
+      this.shockwaveG = tg;
+      this.shockwaveB = tb;
+    };
+
+    switch (fx.kind) {
+      case 'chromatic':
+        this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.011 * strength));
+        break;
+      case 'crit_burst':
+        this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.0075 * strength));
+        if (strength >= 0.6) {
+          startWave(0.011 * strength, 0.28);
+        }
+        break;
+      case 'shockwave':
+        this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.006 * strength));
+        startWave(0.019 * strength, 0.36);
+        break;
+      case 'greater_call':
+        this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.012 * strength));
+        startWave(0.024 * strength, 0.46);
+        break;
+      case 'boss_phase':
+        this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.0125 * strength));
+        startWave(0.026 * strength, 0.5);
+        break;
+      case 'death_defiance':
+        this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.014 * strength));
+        this.deathDefiancePulse = Math.max(this.deathDefiancePulse, Math.min(1, strength));
+        startWave(0.028 * strength, 0.54);
+        break;
+    }
   }
 
   private allocRibbon(): SlashRibbon {
@@ -284,8 +374,29 @@ export class ParticlesAndDecals {
         return { patronId: boon.patronId, r, g, b, coreR: cr, coreG: cg, coreB: cb };
       }
     }
-    // Default fiery Stygian crimson-ember
-    return { patronId: null, r: 1.0, g: 0.28, b: 0.22, coreR: 1.0, coreG: 0.94, coreB: 0.72 };
+    // Default fiery Stygian crimson-ember with incandescent white-gold core
+    return { patronId: null, r: 1.0, g: 0.24, b: 0.2, coreR: 1.0, coreG: 0.97, coreB: 0.86 };
+  }
+
+  private getFactionIchorColor(
+    biome: BiomeId,
+    archetype?: EnemyArchetypeId,
+    isBoss = false
+  ): [number, number, number] {
+    if (isBoss) return [0.58, 0.08, 0.34];
+    if (archetype === 'giant_vermin' || archetype === 'venom_satyr' || biome === 'crypt_of_bile') {
+      return [0.34, 0.58, 0.1];
+    }
+    if (archetype === 'lava_gorgon' || archetype === 'infernal_bomber' || archetype === 'slag_thrower' || biome === 'cinder_mire') {
+      return [0.56, 0.16, 0.07];
+    }
+    if (biome === 'verdant_colosseum') {
+      return [0.54, 0.12, 0.28];
+    }
+    if (biome === 'frozen_summit') {
+      return [0.26, 0.16, 0.48];
+    }
+    return [0.2, 0.46, 0.36]; // Obsidian Pit spectral jade-obsidian ichor
   }
 
   public spawnSlashRibbon(
@@ -395,6 +506,95 @@ export class ParticlesAndDecals {
     d.maxLife = maxLife;
   }
 
+  /**
+   * Spawns a directional cone-aligned impact shower (`±32°` forward knockback cone +
+   * perpendicular rebound sparks + brief `45ms` bright white-gold comic starburst).
+   */
+  private spawnDirectionalImpactSparks(
+    x: number,
+    y: number,
+    impactAngle: number,
+    count: number,
+    r: number,
+    g: number,
+    b: number,
+    isCrit: boolean
+  ): void {
+    // 1. Crisp 45ms incandescent white-gold comic starburst at exact impact point
+    this.spawnParticle(
+      'impact_burst',
+      x,
+      y,
+      26,
+      0,
+      0,
+      0,
+      isCrit ? 62 : 42,
+      isCrit ? 18 : 10,
+      1.0,
+      isCrit ? 0.94 : 0.97,
+      isCrit ? 0.62 : 0.84,
+      1.0,
+      isCrit ? 0.062 : 0.046,
+      isCrit ? 2.6 : 2.1,
+      impactAngle + this.randRange(-0.4, 0.4),
+      0
+    );
+
+    // 2. Forward knockback cone (±32° = ±0.56 rad) razor-sharp spark streak darts
+    const coneHalf = 0.56;
+    for (let k = 0; k < count; k++) {
+      const a = impactAngle + this.randRange(-coneHalf, coneHalf);
+      const spd = this.randRange(isCrit ? 260 : 185, isCrit ? 580 : 410);
+      this.spawnParticle(
+        'spark_streak',
+        x + Math.cos(a) * this.randRange(2, 10),
+        y + Math.sin(a) * this.randRange(2, 8),
+        24 + this.randRange(-4, 10),
+        Math.cos(a) * spd,
+        Math.sin(a) * spd,
+        this.randRange(20, 95),
+        isCrit ? this.randRange(32, 46) : this.randRange(22, 34),
+        4,
+        r,
+        g,
+        b,
+        1.0,
+        isCrit ? this.randRange(0.18, 0.30) : this.randRange(0.14, 0.24),
+        isCrit ? 2.3 : 1.75,
+        a,
+        0
+      );
+    }
+
+    // 3. 2-3 perpendicular rebound sparks shearing off armor/flesh
+    const reboundCount = isCrit ? 3 : 2;
+    for (let k = 0; k < reboundCount; k++) {
+      const side = (k & 1) === 0 ? 1 : -1;
+      const a = impactAngle + side * (Math.PI * 0.5 + this.randRange(-0.3, 0.3));
+      const spd = this.randRange(160, 320);
+      this.spawnParticle(
+        'spark_streak',
+        x,
+        y,
+        26,
+        Math.cos(a) * spd,
+        Math.sin(a) * spd,
+        this.randRange(35, 110),
+        isCrit ? 28 : 20,
+        3,
+        1.0,
+        0.96,
+        0.82,
+        0.95,
+        0.18,
+        2.0,
+        a,
+        0
+      );
+    }
+  }
+
   private spawnPatronAccentBurst(patronId: PatronId, x: number, y: number, intensity = 1): void {
     const def = PATRON_CONSTANTS[patronId];
     const [r, g, b] = hexToRgbaTuple(def.colorHex);
@@ -502,23 +702,23 @@ export class ParticlesAndDecals {
       default: {
         for (let i = 0; i < count; i++) {
           const a = this.randRange(0, Math.PI * 2);
-          const spd = this.randRange(80, 220 * intensity);
+          const spd = this.randRange(110, 260 * intensity);
           this.spawnParticle(
-            'spark',
+            'spark_streak',
             x,
             y,
             20,
             Math.cos(a) * spd,
             Math.sin(a) * spd,
             this.randRange(20, 80),
-            22 * intensity,
+            24 * intensity,
             4,
             r,
             g,
             b,
             1,
-            0.28,
-            1.6,
+            0.24,
+            1.65,
             a,
             0
           );
@@ -559,7 +759,6 @@ export class ParticlesAndDecals {
       switch (ev.type) {
         case 'room_entered': {
           this.clearRoomDecals();
-          // Subtle upright rising underworld embers scattered around hero boots (no circular wreath!)
           for (let k = 0; k < 7; k++) {
             const ox = this.randRange(-26, 26);
             const oy = this.randRange(-12, 12);
@@ -588,7 +787,6 @@ export class ParticlesAndDecals {
 
         case 'attack_swing': {
           const tint = this.getSlotPatronColor(state, 'attack');
-          // Bespoke VFX for ranged Arms (Adamant Rail muzzle flash, Heart-Seeking Bow burst)
           if (ev.weaponId === 'adamant_rail') {
             this.spawnParticle(
               'muzzle_flash',
@@ -598,26 +796,44 @@ export class ParticlesAndDecals {
               Math.cos(ev.angle) * 60,
               Math.sin(ev.angle) * 60,
               0,
-              34,
+              38,
               18,
               tint.r,
               tint.g,
               tint.b,
               1,
               0.11,
-              1.4,
+              1.6,
               ev.angle,
               0
             );
-            for (let s = 0; s < 4; s++) {
-              const sa = ev.angle + this.randRange(-0.35, 0.35);
-              this.spawnParticle('spark', ev.pos.x + Math.cos(ev.angle) * 40, ev.pos.y + Math.sin(ev.angle) * 40, 30, Math.cos(sa) * 280, Math.sin(sa) * 280, 20, 14, 3, tint.coreR, tint.coreG, tint.coreB, 1, 0.16, 1.5, sa, 0);
+            for (let s = 0; s < 5; s++) {
+              const sa = ev.angle + this.randRange(-0.32, 0.32);
+              this.spawnParticle(
+                'spark_streak',
+                ev.pos.x + Math.cos(ev.angle) * 40,
+                ev.pos.y + Math.sin(ev.angle) * 40,
+                30,
+                Math.cos(sa) * this.randRange(260, 420),
+                Math.sin(sa) * this.randRange(260, 420),
+                20,
+                20,
+                3,
+                tint.coreR,
+                tint.coreG,
+                tint.coreB,
+                1,
+                0.15,
+                1.7,
+                sa,
+                0
+              );
             }
             break;
           }
           if (ev.weaponId === 'heart_seeking_bow') {
             this.spawnParticle(
-              'spark',
+              'impact_burst',
               ev.pos.x + Math.cos(ev.angle) * 36,
               ev.pos.y + Math.sin(ev.angle) * 36,
               30,
@@ -625,16 +841,38 @@ export class ParticlesAndDecals {
               0,
               0,
               46,
-              10,
+              12,
               tint.r,
               tint.g,
               tint.b,
               0.95,
-              0.18,
-              1.6,
+              0.12,
+              1.9,
               ev.angle,
               2
             );
+            for (let s = 0; s < 4; s++) {
+              const sa = ev.angle + this.randRange(-0.28, 0.28);
+              this.spawnParticle(
+                'spark_streak',
+                ev.pos.x + Math.cos(ev.angle) * 34,
+                ev.pos.y + Math.sin(ev.angle) * 34,
+                28,
+                Math.cos(sa) * 310,
+                Math.sin(sa) * 310,
+                16,
+                22,
+                3,
+                tint.coreR,
+                tint.coreG,
+                tint.coreB,
+                0.95,
+                0.15,
+                1.8,
+                sa,
+                0
+              );
+            }
             break;
           }
 
@@ -642,15 +880,15 @@ export class ParticlesAndDecals {
           const isThrust = ev.weaponId === 'eternal_spear' || (ev.weaponId === 'stygian_blade' && ev.comboStep === 2);
           const flip = ev.comboStep % 2 === 1 ? -1 : 1;
           const arcSpan = isThrust
-            ? 0.55
+            ? 0.58
             : ev.weaponId === 'twin_fists'
-              ? 1.75
+              ? 1.95
               : ev.weaponId === 'shield_of_chaos'
-                ? 2.2
+                ? 2.38
                 : ev.isDashStrike
-                  ? 2.55
-                  : 2.35;
-          const thickness = ev.weaponId === 'twin_fists' ? 38 : ev.isDashStrike ? 54 : isThrust ? 40 : 46;
+                  ? 2.75
+                  : 2.52;
+          const thickness = ev.weaponId === 'twin_fists' ? 42 : ev.isDashStrike ? 58 : isThrust ? 44 : 50;
 
           this.spawnSlashRibbon(
             isThrust ? 'thrust' : 'arc',
@@ -666,32 +904,35 @@ export class ParticlesAndDecals {
             tint.coreR,
             tint.coreG,
             tint.coreB,
-            ev.isDashStrike ? 0.24 : 0.21,
+            ev.isDashStrike ? 0.24 : 0.22,
             flip
           );
 
-          // Trailing sword-arc spark flecks
+          // Trailing outer-tip blade-arc droplets & directional speed sparks
           const sparkCount = ev.isDashStrike ? 9 : 6;
           for (let s = 0; s < sparkCount; s++) {
-            const sa = ev.angle + this.randRange(-arcSpan * 0.5, arcSpan * 0.5);
-            const dist = radius * this.randRange(0.55, 1.05);
+            const frac = (s + 0.5) / sparkCount;
+            const sa = ev.angle + (frac - 0.5) * arcSpan * flip;
+            const tangent = sa + (Math.PI * 0.5) * flip;
+            const dist = radius * this.randRange(0.68, 0.96);
+            const isInkDrop = s % 3 === 0;
             this.spawnParticle(
-              'spark',
+              isInkDrop ? 'shard' : 'spark_streak',
               ev.pos.x + Math.cos(sa) * dist,
               ev.pos.y + Math.sin(sa) * dist,
               24,
-              Math.cos(sa) * this.randRange(80, 220),
-              Math.sin(sa) * this.randRange(80, 220),
-              this.randRange(15, 70),
-              18,
+              Math.cos(tangent) * this.randRange(120, 260) + Math.cos(sa) * 55,
+              Math.sin(tangent) * this.randRange(120, 260) + Math.sin(sa) * 55,
+              this.randRange(12, 62),
+              isInkDrop ? 13 : 22,
               3,
-              tint.r,
-              tint.g,
-              tint.b,
-              0.95,
-              0.22,
-              1.6,
-              sa,
+              isInkDrop ? 0.04 : tint.r,
+              isInkDrop ? 0.025 : tint.g,
+              isInkDrop ? 0.06 : tint.b,
+              isInkDrop ? 0.88 : 0.96,
+              isInkDrop ? 0.2 : 0.2,
+              isInkDrop ? 0 : 1.75,
+              tangent,
               0
             );
           }
@@ -717,7 +958,7 @@ export class ParticlesAndDecals {
             ev.angle,
             Math.PI * 2,
             novaRadius,
-            58,
+            62,
             tint.r,
             tint.g,
             tint.b,
@@ -736,36 +977,37 @@ export class ParticlesAndDecals {
             0,
             0,
             32,
-            novaRadius * 1.15,
+            novaRadius * 1.18,
             tint.r,
             tint.g,
             tint.b,
             0.95,
             0.36,
-            2.0
+            2.1
           );
-          this.spawnDecal('scorch', ev.pos.x, ev.pos.y, 1.85, 1.85, this.randRange(0, 6.28), 1, 1, 1, 0.72, 24);
-          this.spawnDecal('crack', ev.pos.x, ev.pos.y, 1.5, 1.5, this.randRange(0, 6.28), 1, 1, 1, 0.68, 26);
+          // Persistent impact crater & scorch decals (16-22s fade)
+          this.spawnDecal('crater', ev.pos.x, ev.pos.y, 1.45, 1.45, this.randRange(0, 6.28), 1, 1, 1, 0.78, 20);
+          this.spawnDecal('scorch', ev.pos.x, ev.pos.y, 1.75, 1.75, this.randRange(0, 6.28), 1, 1, 1, 0.66, 18);
 
-          for (let s = 0; s < 16; s++) {
-            const a = (s / 16) * Math.PI * 2 + this.randRange(-0.15, 0.15);
-            const spd = this.randRange(180, 420);
+          for (let s = 0; s < 14; s++) {
+            const a = (s / 14) * Math.PI * 2 + this.randRange(-0.15, 0.15);
+            const spd = this.randRange(210, 440);
             this.spawnParticle(
-              'spark',
+              'spark_streak',
               ev.pos.x,
               ev.pos.y,
               18,
               Math.cos(a) * spd,
               Math.sin(a) * spd,
               this.randRange(40, 140),
-              26,
+              30,
               4,
               tint.coreR,
               tint.coreG,
               tint.coreB,
               1,
-              0.32,
-              1.9,
+              0.28,
+              2.0,
               a,
               0
             );
@@ -783,21 +1025,21 @@ export class ParticlesAndDecals {
           for (let k = 0; k < 6; k++) {
             const a = ev.angle + this.randRange(-0.4, 0.4);
             this.spawnParticle(
-              'spark',
+              'spark_streak',
               ev.pos.x,
               ev.pos.y,
               24,
-              Math.cos(a) * this.randRange(100, 260),
-              Math.sin(a) * this.randRange(100, 260),
+              Math.cos(a) * this.randRange(140, 300),
+              Math.sin(a) * this.randRange(140, 300),
               20,
-              16,
+              20,
               3,
               r,
               g,
               b,
               1,
-              0.24,
-              1.8,
+              0.22,
+              1.9,
               a,
               0
             );
@@ -814,7 +1056,6 @@ export class ParticlesAndDecals {
               }
             : this.getSlotPatronColor(state, 'dash');
 
-          // Fiery departure burst & ember trail
           for (let k = 0; k < 10; k++) {
             const t = k / 10;
             const px = ev.pos.x + (ev.endPos.x - ev.pos.x) * t * 0.45;
@@ -868,61 +1109,37 @@ export class ParticlesAndDecals {
         case 'damage': {
           if (ev.targetKind === 'player') {
             this.hitFlashPulse = Math.min(1, this.hitFlashPulse + 0.82);
-            for (let k = 0; k < 10; k++) {
-              const a = this.randRange(0, Math.PI * 2);
-              const spd = this.randRange(90, 260);
-              this.spawnParticle(
-                'spark',
-                ev.pos.x,
-                ev.pos.y,
-                26,
-                Math.cos(a) * spd,
-                Math.sin(a) * spd,
-                this.randRange(30, 100),
-                22,
-                4,
-                1.0,
-                0.22,
-                0.26,
-                1,
-                0.28,
-                1.6,
-                a,
-                0
-              );
+            this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.007));
+            // Derive incoming hit angle from nearest living enemy
+            let hitAngle = state.player.facingAngle + Math.PI;
+            let bestD2 = Number.POSITIVE_INFINITY;
+            for (let eIdx = 0; eIdx < state.enemies.length; eIdx++) {
+              const en = state.enemies[eIdx];
+              if (en.aiState === 'dead') continue;
+              const edx = ev.pos.x - en.pos.x;
+              const edy = ev.pos.y - en.pos.y;
+              const d2 = edx * edx + edy * edy;
+              if (d2 > 1 && d2 < bestD2) {
+                bestD2 = d2;
+                hitAngle = Math.atan2(edy, edx);
+              }
             }
+            this.spawnDirectionalImpactSparks(ev.pos.x, ev.pos.y, hitAngle, 9, 1.0, 0.24, 0.28, false);
           } else {
-            // Comic hit sparks + blood-ichor splat decal
-            const count = ev.crit ? 14 : ev.backstab ? 11 : 7;
-            const cr = ev.crit ? 1.0 : ev.backstab ? 0.85 : 1.0;
-            const cg = ev.crit ? 0.82 : ev.backstab ? 0.42 : 0.92;
-            const cb = ev.crit ? 0.2 : ev.backstab ? 1.0 : 0.72;
+            // Directional cone-aligned impact hit-sparks along attacker -> victim knockback vector
+            const dx = ev.pos.x - state.player.pos.x;
+            const dy = ev.pos.y - state.player.pos.y;
+            const impactAngle = dx * dx + dy * dy > 16 ? Math.atan2(dy, dx) : state.player.facingAngle;
 
-            for (let k = 0; k < count; k++) {
-              const a = this.randRange(0, Math.PI * 2);
-              const spd = this.randRange(110, ev.crit ? 380 : 260);
-              this.spawnParticle(
-                'spark',
-                ev.pos.x,
-                ev.pos.y,
-                26,
-                Math.cos(a) * spd,
-                Math.sin(a) * spd,
-                this.randRange(25, 110),
-                ev.crit ? 28 : 19,
-                3,
-                cr,
-                cg,
-                cb,
-                1,
-                ev.crit ? 0.3 : 0.22,
-                ev.crit ? 2.2 : 1.5,
-                a,
-                0
-              );
-            }
+            const count = ev.crit ? 14 : ev.backstab ? 10 : 7;
+            const cr = ev.crit ? 1.0 : ev.backstab ? 0.9 : 1.0;
+            const cg = ev.crit ? 0.86 : ev.backstab ? 0.44 : 0.94;
+            const cb = ev.crit ? 0.24 : ev.backstab ? 1.0 : 0.72;
+
+            this.spawnDirectionalImpactSparks(ev.pos.x, ev.pos.y, impactAngle, count, cr, cg, cb, ev.crit);
 
             if (ev.crit) {
+              this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.0052));
               this.spawnParticle(
                 'shockwave',
                 ev.pos.x,
@@ -932,38 +1149,49 @@ export class ParticlesAndDecals {
                 0,
                 0,
                 18,
-                110,
+                115,
                 1.0,
-                0.85,
-                0.24,
-                0.9,
+                0.86,
+                0.28,
+                0.92,
                 0.22,
-                2.2
+                2.25
               );
             }
 
-            // Blood-ichor floor decal
-            if (ev.amount >= 15) {
+            // Faction-tinted floor ichor decal (14-20s decay)
+            if (ev.amount >= 15 || ev.crit) {
+              let archetype: EnemyArchetypeId | undefined;
+              let isBoss = false;
+              for (let eIdx = 0; eIdx < state.enemies.length; eIdx++) {
+                if (state.enemies[eIdx].id === ev.targetId) {
+                  archetype = state.enemies[eIdx].archetype;
+                  isBoss = state.enemies[eIdx].isBoss;
+                  break;
+                }
+              }
+              const [ir, ig, ib] = this.getFactionIchorColor(state.room.biome, archetype, isBoss);
+              const s = ev.crit ? this.randRange(0.75, 1.15) : this.randRange(0.52, 0.92);
               this.spawnDecal(
                 'ichor',
-                ev.pos.x + this.randRange(-14, 14),
-                ev.pos.y + this.randRange(-10, 10),
-                this.randRange(0.55, 1.0),
-                this.randRange(0.55, 1.0),
-                this.randRange(0, 6.28),
-                0.48,
-                0.08,
-                0.38,
-                0.55,
-                26
+                ev.pos.x + Math.cos(impactAngle) * this.randRange(6, 18),
+                ev.pos.y + Math.sin(impactAngle) * this.randRange(4, 14),
+                s,
+                s,
+                impactAngle + this.randRange(-0.4, 0.4),
+                ir,
+                ig,
+                ib,
+                0.56,
+                this.randRange(14, 20)
               );
             }
 
-            // Armor shatter gold shards!
+            // Armor shatter gold shards + crater + subtle post-FX shockwave
             if (ev.armorBroken) {
               for (let k = 0; k < 16; k++) {
-                const a = this.randRange(0, Math.PI * 2);
-                const spd = this.randRange(140, 360);
+                const a = impactAngle + this.randRange(-1.45, 1.45);
+                const spd = this.randRange(150, 390);
                 this.spawnParticle(
                   'shard',
                   ev.pos.x,
@@ -975,10 +1203,10 @@ export class ParticlesAndDecals {
                   20,
                   7,
                   1.0,
-                  0.8,
+                  0.82,
                   0.26,
                   1,
-                  0.52,
+                  0.5,
                   1.9,
                   a,
                   this.randRange(-10, 10)
@@ -993,19 +1221,27 @@ export class ParticlesAndDecals {
                 0,
                 0,
                 24,
-                160,
+                165,
+                0.45,
+                0.94,
                 1.0,
-                0.78,
-                0.24,
                 1,
                 0.32,
                 2.2
               );
+              this.spawnDecal('crater', ev.pos.x, ev.pos.y, 0.95, 0.95, this.randRange(0, 6.28), 1, 1, 1, 0.65, 18);
+              this.triggerScreenFx({
+                kind: 'shockwave',
+                intensity: 0.5,
+                worldX: ev.pos.x,
+                worldY: ev.pos.y,
+                colorHex: '#6CEEFF',
+              });
             }
 
-            // Wall slam crack & shockwave!
+            // Wall slam stone crater & directional shockwave
             if (ev.wallSlam) {
-              this.spawnDecal('crack', ev.pos.x, ev.pos.y, 1.1, 1.1, this.randRange(0, 6.28), 1, 1, 1, 0.78, 28);
+              this.spawnDecal('crater', ev.pos.x, ev.pos.y, 1.25, 1.25, this.randRange(0, 6.28), 1, 1, 1, 0.82, 21);
               this.spawnParticle(
                 'shockwave',
                 ev.pos.x,
@@ -1015,13 +1251,13 @@ export class ParticlesAndDecals {
                 0,
                 0,
                 18,
-                125,
+                130,
                 1.0,
-                0.55,
+                0.58,
                 0.24,
-                0.9,
+                0.92,
                 0.26,
-                1.7
+                1.8
               );
             }
           }
@@ -1038,47 +1274,41 @@ export class ParticlesAndDecals {
             0,
             0,
             20,
-            135,
+            142,
             0.99,
-            0.8,
-            0.28,
+            0.84,
+            0.32,
             1,
             0.28,
             2.3
           );
-          for (let k = 0; k < 8; k++) {
-            const a = this.randRange(0, Math.PI * 2);
-            this.spawnParticle(
-              'spark',
-              ev.pos.x,
-              ev.pos.y,
-              24,
-              Math.cos(a) * 240,
-              Math.sin(a) * 240,
-              40,
-              22,
-              4,
-              0.55,
-              0.95,
-              1.0,
-              1,
-              0.24,
-              2.1,
-              a,
-              0
-            );
-          }
+          this.spawnDirectionalImpactSparks(ev.pos.x, ev.pos.y, state.player.facingAngle, 8, 0.52, 0.96, 1.0, true);
           break;
         }
 
         case 'enemy_death': {
           const big = ev.isBoss || ev.finalInRoom;
-          const count = big ? 28 : 14;
+          const count = big ? 26 : 14;
+          const dx = ev.pos.x - state.player.pos.x;
+          const dy = ev.pos.y - state.player.pos.y;
+          const killAngle = dx * dx + dy * dy > 16 ? Math.atan2(dy, dx) : state.player.facingAngle;
+
+          this.spawnDirectionalImpactSparks(
+            ev.pos.x,
+            ev.pos.y,
+            killAngle,
+            big ? 14 : 8,
+            ev.isBoss ? 1.0 : 0.96,
+            ev.isBoss ? 0.42 : 0.92,
+            ev.isBoss ? 0.72 : 0.45,
+            big
+          );
+
           for (let k = 0; k < count; k++) {
             const a = this.randRange(0, Math.PI * 2);
             const spd = this.randRange(70, big ? 360 : 230);
             this.spawnParticle(
-              k % 3 === 0 ? 'smoke' : 'spark',
+              k % 3 === 0 ? 'smoke' : 'spark_streak',
               ev.pos.x,
               ev.pos.y,
               26,
@@ -1087,29 +1317,38 @@ export class ParticlesAndDecals {
               this.randRange(40, 160),
               big ? 36 : 24,
               5,
-              ev.isBoss ? 0.95 : 0.45,
-              ev.isBoss ? 0.25 : 0.95,
-              ev.isBoss ? 0.85 : 0.72,
+              ev.isBoss ? 0.98 : 0.45,
+              ev.isBoss ? 0.28 : 0.95,
+              ev.isBoss ? 0.82 : 0.72,
               0.95,
-              big ? 0.65 : 0.44,
-              1.7,
+              big ? 0.58 : 0.4,
+              1.75,
               a,
-              this.randRange(-4, 4)
+              k % 3 === 0 ? this.randRange(-4, 4) : 0
             );
           }
+
+          const [ir, ig, ib] = this.getFactionIchorColor(state.room.biome, ev.archetype, ev.isBoss);
           this.spawnDecal(
             'ichor',
             ev.pos.x,
             ev.pos.y,
-            big ? 1.8 : 1.1,
-            big ? 1.8 : 1.1,
+            big ? 1.75 : 1.08,
+            big ? 1.75 : 1.08,
             this.randRange(0, 6.28),
-            ev.isBoss ? 0.62 : 0.25,
-            0.1,
-            0.48,
-            0.68,
-            30
+            ir,
+            ig,
+            ib,
+            0.7,
+            this.randRange(16, 22)
           );
+          if (big) {
+            this.spawnDecal('crater', ev.pos.x, ev.pos.y, 1.4, 1.4, this.randRange(0, 6.28), 1, 1, 1, 0.74, 22);
+          }
+          if (state.room.biome === 'cinder_mire' || ev.archetype === 'infernal_bomber') {
+            this.spawnDecal('scorch', ev.pos.x, ev.pos.y, 1.25, 1.25, this.randRange(0, 6.28), 1, 1, 1, 0.68, 18);
+          }
+
           if (ev.finalInRoom || ev.isBoss) {
             this.finalKillPulse = 1.0;
             this.spawnParticle(
@@ -1121,7 +1360,7 @@ export class ParticlesAndDecals {
               0,
               0,
               30,
-              big ? 320 : 210,
+              big ? 340 : 210,
               1.0,
               0.88,
               0.42,
@@ -1129,6 +1368,13 @@ export class ParticlesAndDecals {
               0.46,
               2.4
             );
+            this.triggerScreenFx({
+              kind: 'shockwave',
+              intensity: ev.isBoss ? 0.85 : 0.55,
+              worldX: ev.pos.x,
+              worldY: ev.pos.y,
+              colorHex: '#FFE072',
+            });
           }
           break;
         }
@@ -1143,10 +1389,10 @@ export class ParticlesAndDecals {
             0,
             0,
             36,
-            420,
-            0.95,
+            440,
+            1.0,
             0.22,
-            0.88,
+            0.34,
             1,
             0.55,
             2.5
@@ -1157,18 +1403,26 @@ export class ParticlesAndDecals {
             ev.pos.y,
             0,
             Math.PI * 2,
-            250,
-            46,
-            0.92,
-            0.18,
-            0.82,
-            1.0,
-            0.82,
+            260,
+            50,
             0.96,
-            0.45,
+            0.18,
+            0.36,
+            1.0,
+            0.9,
+            0.74,
+            0.46,
             1
           );
-          this.spawnDecal('scorch', ev.pos.x, ev.pos.y, 2.2, 2.2, 0, 1, 1, 1, 0.78, 35);
+          this.spawnDecal('crater', ev.pos.x, ev.pos.y, 1.9, 1.9, this.randRange(0, 6.28), 1, 1, 1, 0.82, 22);
+          this.spawnDecal('scorch', ev.pos.x, ev.pos.y, 2.1, 2.1, 0, 1, 1, 1, 0.72, 22);
+          this.triggerScreenFx({
+            kind: 'boss_phase',
+            intensity: 0.9,
+            worldX: ev.pos.x,
+            worldY: ev.pos.y,
+            colorHex: '#FF2E46',
+          });
           break;
         }
 
@@ -1178,21 +1432,21 @@ export class ParticlesAndDecals {
           for (let k = 0; k < 6; k++) {
             const a = this.randRange(0, Math.PI * 2);
             this.spawnParticle(
-              'spark',
+              'spark_streak',
               ev.pos.x,
               ev.pos.y,
               26,
-              Math.cos(a) * 140,
-              Math.sin(a) * 140,
+              Math.cos(a) * 165,
+              Math.sin(a) * 165,
               55,
-              18,
+              20,
               4,
               r,
               g,
               b,
               1,
-              0.3,
-              1.8,
+              0.26,
+              1.85,
               a,
               0
             );
@@ -1202,7 +1456,8 @@ export class ParticlesAndDecals {
 
         case 'god_call': {
           this.spawnPatronAccentBurst(ev.patronId, ev.pos.x, ev.pos.y, ev.greater ? 2.2 : 1.4);
-          const [r, g, b] = hexToRgbaTuple(PATRON_CONSTANTS[ev.patronId].colorHex);
+          const colorHex = PATRON_CONSTANTS[ev.patronId].colorHex;
+          const [r, g, b] = hexToRgbaTuple(colorHex);
           this.spawnParticle(
             'shockwave',
             ev.pos.x,
@@ -1220,6 +1475,15 @@ export class ParticlesAndDecals {
             0.48,
             2.5
           );
+          if (ev.greater) {
+            this.triggerScreenFx({
+              kind: 'greater_call',
+              intensity: 0.85,
+              worldX: ev.pos.x,
+              worldY: ev.pos.y,
+              colorHex,
+            });
+          }
           break;
         }
 
@@ -1262,6 +1526,13 @@ export class ParticlesAndDecals {
               2.2
             );
           }
+          this.triggerScreenFx({
+            kind: 'death_defiance',
+            intensity: 1.0,
+            worldX: ev.pos.x,
+            worldY: ev.pos.y,
+            colorHex: '#FFD266',
+          });
           break;
         }
 
@@ -1272,20 +1543,20 @@ export class ParticlesAndDecals {
           for (let k = 0; k < 10; k++) {
             const a = (k / 10) * Math.PI * 2;
             this.spawnParticle(
-              'spark',
+              'spark_streak',
               ev.pos.x,
               ev.pos.y,
               22,
-              Math.cos(a) * 120,
-              Math.sin(a) * 120,
+              Math.cos(a) * 145,
+              Math.sin(a) * 145,
               90,
-              18,
+              20,
               3,
               r,
               g,
               b,
               1,
-              0.36,
+              0.32,
               1.9,
               a,
               0
@@ -1303,21 +1574,20 @@ export class ParticlesAndDecals {
   private weaponSlashRadius(weaponId: WeaponId, comboStep: number, isDashStrike: boolean): number {
     switch (weaponId) {
       case 'stygian_blade':
-        return isDashStrike ? 225 : comboStep === 2 ? 255 : 210;
+        return isDashStrike ? 232 : comboStep === 2 ? 260 : 218;
       case 'eternal_spear':
-        return 300;
+        return 306;
       case 'shield_of_chaos':
-        return 155;
+        return 162;
       case 'twin_fists':
-        return 135;
+        return 142;
       default:
-        return 165;
+        return 172;
     }
   }
 
   /**
-   * Advances all pools by `dt` seconds and spawns Prince Pyreus's fiery footprints
-   * (`FireFootstep`) plus ambient underworld embers. Zero allocations!
+   * Advances all pools and post-FX pulses by `dt` seconds. Zero allocations!
    */
   public update(dt: number, state: SimState): void {
     const safeDt = Math.min(0.05, Math.max(0, dt));
@@ -1329,6 +1599,20 @@ export class ParticlesAndDecals {
       state.run.finalKillSlowTimer > 0 ? 0.85 : 0,
       Math.max(0, this.finalKillPulse - safeDt * 1.8)
     );
+    this.chromaticAmount = Math.max(0, this.chromaticAmount - safeDt * 0.068);
+
+    if (this.shockwaveActive) {
+      this.shockwaveElapsed += safeDt;
+      const t = this.shockwaveElapsed / Math.max(0.05, this.shockwaveDuration);
+      if (t >= 1) {
+        this.shockwaveActive = false;
+        this.shockwaveAmp = 0;
+        this.shockwaveRadius = 0;
+      } else {
+        this.shockwaveRadius = 0.03 + 1.16 * Math.pow(t, 0.78);
+        this.shockwaveAmp = this.shockwaveMaxAmp * Math.pow(1 - t, 1.35);
+      }
+    }
 
     // Prince Pyreus Fiery Footsteps (`FireFootstep`)
     const hx = state.player.pos.x;
@@ -1347,10 +1631,7 @@ export class ParticlesAndDecals {
           const fx = hx + Math.cos(perp) * (this.footSide * 9);
           const fy = hy + Math.sin(perp) * (this.footSide * 6);
 
-          // Glowing ember footprint scorch on flagstones
           this.spawnDecal('foot_scorch', fx, fy, 0.34, 0.34, moveAngle, 1.0, 0.45, 0.14, 0.62, 1.25);
-
-          // Rising fiery footstep flame & ash spark
           this.spawnParticle(
             'ember_footstep',
             fx,
@@ -1376,10 +1657,11 @@ export class ParticlesAndDecals {
     this.lastHeroX = hx;
     this.lastHeroY = hy;
 
-    // Biome-specific ambient atmospheric particles (Cinder embers, Verdant petals, Crypt spores, Frozen snow!)
+    // Biome-specific ambient atmospheric particles
     this.ambientTimer += safeDt;
     const biome = state.room.biome;
-    const spawnInterval = biome === 'frozen_summit' || biome === 'verdant_colosseum' || biome === 'cinder_mire' ? 0.09 : 0.16;
+    const spawnInterval =
+      biome === 'frozen_summit' || biome === 'verdant_colosseum' || biome === 'cinder_mire' ? 0.085 : 0.15;
     if (this.ambientTimer >= spawnInterval) {
       this.ambientTimer = 0;
       const b = state.room.bounds;
@@ -1392,15 +1674,15 @@ export class ParticlesAndDecals {
           rx,
           ry,
           this.randRange(180, 290),
-          this.randRange(-48, -14),
-          this.randRange(12, 34),
-          this.randRange(-72, -38),
+          this.randRange(-56, -18),
+          this.randRange(14, 38),
+          this.randRange(-76, -40),
           this.randRange(10, 18),
           this.randRange(8, 14),
           0.9,
           0.96,
           1.0,
-          0.82,
+          0.84,
           3.2,
           0.35,
           this.randRange(0, 6.28),
@@ -1412,7 +1694,7 @@ export class ParticlesAndDecals {
           rx,
           ry,
           this.randRange(120, 240),
-          this.randRange(26, 68),
+          this.randRange(28, 72),
           this.randRange(8, 28),
           this.randRange(-46, -22),
           this.randRange(12, 20),
@@ -1422,7 +1704,7 @@ export class ParticlesAndDecals {
           0.78,
           0.88,
           3.0,
-          0.3,
+          0.32,
           this.randRange(0, 6.28),
           this.randRange(-4, 4)
         );
@@ -1442,7 +1724,7 @@ export class ParticlesAndDecals {
           0.14,
           0.85,
           1.4,
-          1.4,
+          1.45,
           this.randRange(-0.4, 0.4),
           this.randRange(-3, 3)
         );
@@ -1460,9 +1742,9 @@ export class ParticlesAndDecals {
           0.66,
           0.92,
           0.22,
-          0.6,
+          0.62,
           1.6,
-          0.8
+          0.85
         );
       } else {
         const isSanctum = biome === 'sanctum_hub';
@@ -1476,10 +1758,10 @@ export class ParticlesAndDecals {
           this.randRange(18, 46),
           this.randRange(5, 10),
           2,
-          isSanctum ? 1.0 : 0.36,
-          isSanctum ? 0.62 : 0.94,
-          isSanctum ? 0.28 : 0.68,
-          0.52,
+          isSanctum ? 0.96 : 0.2,
+          isSanctum ? 0.72 : 0.94,
+          isSanctum ? 0.3 : 0.72,
+          0.54,
           1.5,
           1.2
         );
@@ -1516,11 +1798,16 @@ export class ParticlesAndDecals {
       p.z = Math.max(0, p.z + p.vz * safeDt);
       p.angle += p.spin * safeDt;
 
-      // Air drag & subtle gravity on shards/splashes
       if (p.kind === 'shard' || p.kind === 'splash') {
         p.vz -= 460 * safeDt;
         p.vx *= 1 - 1.8 * safeDt;
         p.vy *= 1 - 1.8 * safeDt;
+      } else if (p.kind === 'spark_streak') {
+        p.vx *= 1 - 3.6 * safeDt;
+        p.vy *= 1 - 3.6 * safeDt;
+        if (p.vx * p.vx + p.vy * p.vy > 4) {
+          p.angle = Math.atan2(p.vy, p.vx);
+        }
       } else if (p.kind === 'spark') {
         p.vx *= 1 - 4.2 * safeDt;
         p.vy *= 1 - 4.2 * safeDt;

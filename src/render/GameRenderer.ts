@@ -1,22 +1,25 @@
 /**
  * GameRenderer — Unified Rendering Facade for Krunked WannabeHades.
  *
- * Automatically initializes the 6-pass WebGL2 Mythic Ink-Cel pipeline and
+ * Automatically initializes the 7-pass WebGL2 Mythic Ink-Cel pipeline and
  * gracefully falls back to Canvas2DInkCelRenderer if WebGL2 is unavailable.
- * Guarantees exact inverse camera/isometric math for laser-precise `screenToWorld`
- * aiming, smooth `interpAlpha` interpolation (with `classicSnap60Hz` toggle),
- * live `BUILTIN <-> CUSTOM_PACK` sprite override swapping (`attachCustomPack`),
- * cached comic-ink Patron portrait URLs, and live `RenderStats`.
+ * Guarantees exact inverse camera/isometric/feel-offset math for laser-precise
+ * `screenToWorld` aiming, smooth `interpAlpha` interpolation (`classicSnap60Hz`
+ * toggle), live `BUILTIN <-> CUSTOM_PACK` sprite override swapping, async WOFF2
+ * font atlas re-baking (`rebakeFontAtlas`), cosmetic camera feel offsets
+ * (`setCameraFeelOffset`), Pass 6 post-FX impulses (`triggerScreenFx`), cached
+ * comic-ink Patron portrait URLs, and live `RenderStats`.
  */
 
-import type { PatronId, RenderSettings, SimEvent, SimState, Vec2 } from '../contracts/index.js';
+import type { BiomeId, PatronId, RenderSettings, SimEvent, SimState, Vec2 } from '../contracts/index.js';
 import { SIM_CONSTANTS } from '../contracts/index.js';
 import type { BakedAtlas } from '../assets/ProceduralInkCelAtlas.js';
 import {
   bakeProceduralInkCelAtlas,
   buildCompositeCustomAtlas,
 } from '../assets/ProceduralInkCelAtlas.js';
-import { bakeProceduralFontAtlas } from '../assets/ProceduralFonts.js';
+import * as ProceduralFonts from '../assets/ProceduralFonts.js';
+import type { BakedFontAtlas } from '../assets/ProceduralFonts.js';
 import { getPatronPortraitDataUrl as getCachedPatronPortraitDataUrl } from '../assets/ProceduralPortraits.js';
 import { ParticlesAndDecals } from './ParticlesAndDecals.js';
 import { WebGL2InkCelRenderer } from './WebGL2InkCelRenderer.js';
@@ -50,6 +53,40 @@ export interface CustomPackProvider {
   getCustomPortraitUrl?(patronId: PatronId): string | null;
 }
 
+// ============================================================================
+// Cross-Module Camera Feel & Post-FX Contracts (Section 7.4)
+// ============================================================================
+
+export interface CameraFeelOffset {
+  readonly offsetX: number; // World-space X offset (aim look-ahead + directional recoil)
+  readonly offsetY: number; // World-space Y offset (aim look-ahead + directional recoil)
+  readonly zoomMult: number; // Multiplicative zoom punch (default 1.0, clamped 0.96..1.09)
+  readonly shakeX: number; // Extra cosmetic shake X (world px, scaled by settings.screenShake)
+  readonly shakeY: number; // Extra cosmetic shake Y (world px, scaled by settings.screenShake)
+}
+
+export type ScreenFxKind =
+  | 'chromatic'
+  | 'shockwave'
+  | 'crit_burst'
+  | 'boss_phase'
+  | 'greater_call'
+  | 'death_defiance';
+
+export interface ScreenFxImpulse {
+  readonly kind: ScreenFxKind;
+  readonly intensity: number; // 0..1 normalized strength
+  readonly worldX?: number; // Optional world-space epicenter for radial shockwave
+  readonly worldY?: number;
+  readonly colorHex?: string; // Optional tint color hex
+}
+
+export interface GameRendererFeelHooks {
+  setCameraFeelOffset(offset: CameraFeelOffset): void;
+  triggerScreenFx(fx: ScreenFxImpulse): void;
+  rebakeFontAtlas(): void;
+}
+
 export interface CameraView {
   camX: number;
   camY: number;
@@ -67,6 +104,7 @@ export interface RenderBackend {
   readonly kind: 'webgl2' | 'canvas2d';
   resize(width: number, height: number, dpr: number): void;
   setAtlasCanvas?(canvas: HTMLCanvasElement): void;
+  setFontAtlas?(fontAtlas: BakedFontAtlas): void;
   render(
     state: SimState,
     prevState: SimState | null,
@@ -78,7 +116,22 @@ export interface RenderBackend {
   dispose(): void;
 }
 
-export class GameRenderer {
+function getBiomeFramingZoomBoost(biome: BiomeId): number {
+  switch (biome) {
+    case 'frozen_summit':
+      return 1.11;
+    case 'obsidian_pit':
+      return 1.08;
+    case 'cinder_mire':
+    case 'verdant_colosseum':
+    case 'crypt_of_bile':
+    case 'sanctum_hub':
+    default:
+      return 1.06;
+  }
+}
+
+export class GameRenderer implements GameRendererFeelHooks {
   private canvas: HTMLCanvasElement | null = null;
   private backend: RenderBackend | null = null;
   private baseAtlas: BakedAtlas | null = null;
@@ -92,6 +145,15 @@ export class GameRenderer {
   private viewW = 1280;
   private viewH = 720;
   private dpr = 1;
+
+  // Pre-allocated mutable presentation-layer camera feel offsets (zero GC!)
+  private readonly feelOffset = {
+    offsetX: 0,
+    offsetY: 0,
+    zoomMult: 1,
+    shakeX: 0,
+    shakeY: 0,
+  };
 
   // Reusable CameraView struct (zero per-frame allocations)
   private readonly cameraView: CameraView = {
@@ -117,14 +179,16 @@ export class GameRenderer {
     this.canvas = canvas;
 
     const atlas = bakeProceduralInkCelAtlas();
-    const fontAtlas = bakeProceduralFontAtlas();
+    const fontAtlas = ProceduralFonts.bakeProceduralFontAtlas();
     this.baseAtlas = atlas;
 
     const glBackend = WebGL2InkCelRenderer.tryCreate(canvas, atlas, fontAtlas);
     if (glBackend) {
       this.backend = glBackend;
     } else {
-      this.backend = new Canvas2DInkCelRenderer(canvas, atlas);
+      const c2d = new Canvas2DInkCelRenderer(canvas, atlas);
+      c2d.setFontAtlas(fontAtlas);
+      this.backend = c2d;
     }
 
     if (this.customPack) {
@@ -192,21 +256,47 @@ export class GameRenderer {
     }
   }
 
+  public setCameraFeelOffset(offset: CameraFeelOffset): void {
+    this.feelOffset.offsetX = Number.isFinite(offset.offsetX) ? offset.offsetX : 0;
+    this.feelOffset.offsetY = Number.isFinite(offset.offsetY) ? offset.offsetY : 0;
+    const rawZoom = Number.isFinite(offset.zoomMult) && offset.zoomMult > 0 ? offset.zoomMult : 1;
+    this.feelOffset.zoomMult = Math.max(0.92, Math.min(1.12, rawZoom));
+    this.feelOffset.shakeX = Number.isFinite(offset.shakeX) ? offset.shakeX : 0;
+    this.feelOffset.shakeY = Number.isFinite(offset.shakeY) ? offset.shakeY : 0;
+  }
+
+  public triggerScreenFx(fx: ScreenFxImpulse): void {
+    this.vfx.triggerScreenFx(fx);
+  }
+
+  public rebakeFontAtlas(): void {
+    const fontsModule = ProceduralFonts as typeof ProceduralFonts & {
+      rebakeProceduralFontAtlas?: () => BakedFontAtlas;
+    };
+    const freshFontAtlas =
+      fontsModule.rebakeProceduralFontAtlas?.() ?? ProceduralFonts.bakeProceduralFontAtlas();
+    this.backend?.setFontAtlas?.(freshFontAtlas);
+  }
+
   public consumeEvents(events: readonly SimEvent[], state: SimState): void {
     if (events.length === 0) return;
     this.vfx.consumeEvents(events, state);
   }
 
-  private computeEffectiveZoom(state: SimState, prevState: SimState | null, alpha: number): number {
+  private computeEffectiveZoom(
+    state: SimState,
+    prevState: SimState | null,
+    alpha: number,
+    viewW = this.viewW,
+    viewH = this.viewH
+  ): number {
     const curZoom =
       state.camera.zoom > 0.05 ? state.camera.zoom : state.room.zoom > 0.05 ? state.room.zoom : 0.85;
     const prevZoom = prevState && prevState.camera.zoom > 0.05 ? prevState.camera.zoom : curZoom;
     const baseZoom = prevState ? prevZoom + (curZoom - prevZoom) * alpha : curZoom;
-    const viewportScale = Math.max(
-      0.55,
-      Math.min(1.5, Math.min(this.viewW / 1280, this.viewH / 720))
-    );
-    return baseZoom * viewportScale;
+    const viewportScale = Math.max(0.55, Math.min(1.5, Math.min(viewW / 1280, viewH / 720)));
+    const framingBoost = getBiomeFramingZoomBoost(state.room.biome);
+    return Math.max(0.05, baseZoom * viewportScale * framingBoost * this.feelOffset.zoomMult);
   }
 
   private updateCameraView(
@@ -235,10 +325,10 @@ export class GameRenderer {
       }
     }
 
-    this.cameraView.camX = camX;
-    this.cameraView.camY = camY;
-    this.cameraView.shakeX = settings?.screenShake ? state.camera.shakeX : 0;
-    this.cameraView.shakeY = settings?.screenShake ? state.camera.shakeY : 0;
+    this.cameraView.camX = camX + this.feelOffset.offsetX;
+    this.cameraView.camY = camY + this.feelOffset.offsetY;
+    this.cameraView.shakeX = (settings?.screenShake ? state.camera.shakeX : 0) + this.feelOffset.shakeX;
+    this.cameraView.shakeY = (settings?.screenShake ? state.camera.shakeY : 0) + this.feelOffset.shakeY;
     this.cameraView.zoom = this.computeEffectiveZoom(state, prevState, alpha);
     this.cameraView.isoScaleY = SIM_CONSTANTS.isoScaleY;
     this.cameraView.viewW = this.viewW;
@@ -284,8 +374,8 @@ export class GameRenderer {
   }
 
   /**
-   * Exact inverse of camera zoom, camera center, screen center, and 2:1 isometric
-   * projection (`SIM_CONSTANTS.isoScaleY = 0.56`) so mouse aiming is laser-precise.
+   * Exact inverse of camera zoom, framing boost, feel offset/zoom, screen center, and 2:1
+   * isometric projection (`SIM_CONSTANTS.isoScaleY = 0.56`) so mouse aiming NEVER drifts!
    */
   public screenToWorld(clientX: number, clientY: number, state: SimState): Vec2 {
     const rect = this.canvas?.getBoundingClientRect();
@@ -295,16 +385,9 @@ export class GameRenderer {
     const sy = rect ? clientY - rect.top : clientY;
 
     const hasCamera = state.camera.zoom > 0.05;
-    const camX = hasCamera ? state.camera.x : state.player.pos.x;
-    const camY = hasCamera ? state.camera.y : state.player.pos.y;
-    const baseZoom =
-      state.camera.zoom > 0.05
-        ? state.camera.zoom
-        : state.room.zoom > 0.05
-          ? state.room.zoom
-          : 0.85;
-    const viewportScale = Math.max(0.55, Math.min(1.5, Math.min(viewW / 1280, viewH / 720)));
-    const zoom = Math.max(0.05, baseZoom * viewportScale);
+    const camX = (hasCamera ? state.camera.x : state.player.pos.x) + this.feelOffset.offsetX;
+    const camY = (hasCamera ? state.camera.y : state.player.pos.y) + this.feelOffset.offsetY;
+    const zoom = this.computeEffectiveZoom(state, null, 1, viewW, viewH);
 
     return {
       x: camX + (sx - viewW * 0.5) / zoom,
@@ -339,6 +422,11 @@ export class GameRenderer {
       this.backend = null;
     }
     this.vfx.reset();
+    this.feelOffset.offsetX = 0;
+    this.feelOffset.offsetY = 0;
+    this.feelOffset.zoomMult = 1;
+    this.feelOffset.shakeX = 0;
+    this.feelOffset.shakeY = 0;
     this.canvas = null;
   }
 }
