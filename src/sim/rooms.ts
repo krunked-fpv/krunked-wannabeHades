@@ -374,11 +374,15 @@ export function loadRoom(
   state.projectiles = [];
   state.floatingNumbers = [];
 
-  // Restore Bloodstones on chamber entry
+  // Restore Bloodstones & dash state cleanly on chamber entry (no leak across warps)
   state.player.castAmmo = state.player.maxCastAmmo;
   state.player.castCooldown = 0;
   state.player.castChargeTimer = 0;
   state.player.dashTimer = 0;
+  state.player.dashCooldown = 0;
+  state.player.dashRegenTimer = 0;
+  state.player.dashStrikeWindowTimer = 0;
+  state.player.dashGhosts = [];
   state.player.dashCharges = state.player.maxDashCharges;
   state.player.vel.x = 0;
   state.player.vel.y = 0;
@@ -889,32 +893,30 @@ export function createGameplayHooks(): SimGameplayHooks {
 
       const meta = getRoomMeta(state);
 
-      // Run elapsed clock & Tight Deadline vow
-      if (state.run.active && !state.run.inHub && !state.run.victory && !state.run.defeat) {
-        state.run.elapsedSeconds += dt;
-        if (state.run.tightDeadlineTimer !== null) {
-          state.run.tightDeadlineTimer = Math.max(
-            0,
-            state.run.tightDeadlineTimer - dt
-          );
-          if (state.run.tightDeadlineTimer <= 0 && !state.player.isDead) {
-            meta.tightDeadlineTickAcc += dt;
-            if (meta.tightDeadlineTickAcc >= 1.0) {
-              meta.tightDeadlineTickAcc -= 1.0;
-              ctx.dealDamageToPlayer(state, 5, {
-                source: 'hazard',
-                ignoreIframes: true,
-                canDodge: false,
-              });
-            }
-          }
+      // Note: src/sim/step.ts is the sole 1x owner of run.elapsedSeconds,
+      // room.encounterTimer, run.tightDeadlineTimer, and room.telegraphs.
+      // Only enforce Tight Deadline expiry tick damage once step.ts ticks it to 0.
+      if (
+        state.run.active &&
+        !state.run.inHub &&
+        !state.run.victory &&
+        !state.run.defeat &&
+        state.run.tightDeadlineTimer !== null &&
+        state.run.tightDeadlineTimer <= 0 &&
+        !state.player.isDead
+      ) {
+        meta.tightDeadlineTickAcc += dt;
+        if (meta.tightDeadlineTickAcc >= 1.0) {
+          meta.tightDeadlineTickAcc -= 1.0;
+          ctx.dealDamageToPlayer(state, 5, {
+            source: 'hazard',
+            ignoreIframes: true,
+            canDodge: false,
+          });
         }
       }
 
-      // Encounter timer & no-damage tracking
-      if (!state.room.cleared && state.room.combatStarted) {
-        state.room.encounterTimer += dt;
-      }
+      // No-damage chamber tracking
       if (state.player.hp < meta.lastPlayerHp) {
         state.room.noDamageTaken = false;
       }
