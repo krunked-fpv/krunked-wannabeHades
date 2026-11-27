@@ -17,6 +17,7 @@ import {
   type InputFrame,
   type RenderSettings,
   type ScreenId,
+  type SimEvent,
   type SimState,
 } from '../contracts/index.js';
 import { InputManager, type MenuNavInput } from '../input/InputManager.js';
@@ -124,6 +125,25 @@ export class GameApp {
   private lastRenderMs = 0;
   private simAccumulator = 0;
   private disposed = false;
+
+  // Latched one-shot gameplay inputs so >60Hz displays (120Hz/144Hz) NEVER drop presses
+  // on RAF frames where simAccumulator < fixedDt (0 sim ticks executed).
+  private readonly pendingOneShots = {
+    attackPressed: false,
+    specialPressed: false,
+    castPressed: false,
+    dashPressed: false,
+    callPressed: false,
+    reloadPressed: false,
+    interactPressed: false,
+    pausePressed: false,
+    rerollPressed: false,
+    boonSelectIndex: null as number | null,
+  };
+
+  // Buffered SimEvents retained until HudOverlay.processToasts() consumes them on ui.update()
+  private pendingUiEvents: SimEvent[] = [];
+  private lastUiToastTick = -1;
 
   private readonly handleResizeBound: () => void;
   private readonly handleGestureUnlockBound: () => void;
@@ -339,6 +359,7 @@ export class GameApp {
     this.screen = 'hub';
     this.prevState = null;
     this.simAccumulator = 0;
+    this.clearPendingOneShots();
     this.drainEvents();
     this.audio.updateMusic(this.state, this.screen);
     this.persistSave();
@@ -354,6 +375,7 @@ export class GameApp {
     this.screen = 'playing';
     this.prevState = null;
     this.simAccumulator = 0;
+    this.clearPendingOneShots();
     this.drainEvents();
     this.audio.updateMusic(this.state, this.screen);
     this.persistSave();
@@ -413,12 +435,75 @@ export class GameApp {
     this.screen = this.state.room.biome === 'sanctum_hub' ? 'hub' : 'playing';
   }
 
+  private clearPendingOneShots(): void {
+    this.pendingOneShots.attackPressed = false;
+    this.pendingOneShots.specialPressed = false;
+    this.pendingOneShots.castPressed = false;
+    this.pendingOneShots.dashPressed = false;
+    this.pendingOneShots.callPressed = false;
+    this.pendingOneShots.reloadPressed = false;
+    this.pendingOneShots.interactPressed = false;
+    this.pendingOneShots.pausePressed = false;
+    this.pendingOneShots.rerollPressed = false;
+    this.pendingOneShots.boonSelectIndex = null;
+  }
+
+  private latchOneShots(frame: InputFrame): void {
+    if (frame.attackPressed) this.pendingOneShots.attackPressed = true;
+    if (frame.specialPressed) this.pendingOneShots.specialPressed = true;
+    if (frame.castPressed) this.pendingOneShots.castPressed = true;
+    if (frame.dashPressed) this.pendingOneShots.dashPressed = true;
+    if (frame.callPressed) this.pendingOneShots.callPressed = true;
+    if (frame.reloadPressed) this.pendingOneShots.reloadPressed = true;
+    if (frame.interactPressed) this.pendingOneShots.interactPressed = true;
+    if (frame.pausePressed) this.pendingOneShots.pausePressed = true;
+    if (frame.rerollPressed) this.pendingOneShots.rerollPressed = true;
+    if (frame.boonSelectIndex !== null) {
+      this.pendingOneShots.boonSelectIndex = frame.boonSelectIndex;
+    }
+  }
+
+  private applyAndClearOneShots(frame: InputFrame): InputFrame {
+    const merged: InputFrame = {
+      ...frame,
+      attackPressed: frame.attackPressed || this.pendingOneShots.attackPressed,
+      specialPressed: frame.specialPressed || this.pendingOneShots.specialPressed,
+      castPressed: frame.castPressed || this.pendingOneShots.castPressed,
+      dashPressed: frame.dashPressed || this.pendingOneShots.dashPressed,
+      callPressed: frame.callPressed || this.pendingOneShots.callPressed,
+      reloadPressed: frame.reloadPressed || this.pendingOneShots.reloadPressed,
+      interactPressed: frame.interactPressed || this.pendingOneShots.interactPressed,
+      pausePressed: frame.pausePressed || this.pendingOneShots.pausePressed,
+      rerollPressed: Boolean(frame.rerollPressed || this.pendingOneShots.rerollPressed),
+      boonSelectIndex: frame.boonSelectIndex ?? this.pendingOneShots.boonSelectIndex,
+    };
+    this.clearPendingOneShots();
+    return merged;
+  }
+
   private drainEvents(): void {
     if (this.state.events.length === 0) return;
 
     const batch = this.state.events.splice(0, this.state.events.length);
     this.renderer.consumeEvents(batch, this.state);
     this.audio.handleSimEvents(batch);
+
+    // Retain toast-relevant events for HudOverlay.processToasts() on the next ui.update()
+    for (let i = 0; i < batch.length; i++) {
+      const ev = batch[i];
+      if (
+        ev.type === 'ui_toast' ||
+        ev.type === 'room_cleared' ||
+        ev.type === 'death_defiance' ||
+        ev.type === 'god_call' ||
+        ev.type === 'boss_phase'
+      ) {
+        this.pendingUiEvents.push(ev);
+      }
+    }
+    if (this.pendingUiEvents.length > 32) {
+      this.pendingUiEvents.splice(0, this.pendingUiEvents.length - 32);
+    }
 
     let shouldSave = false;
     let roomChanged = false;
@@ -485,14 +570,22 @@ export class GameApp {
     // 3. Fixed 60Hz deterministic simulation substeps
     const simRunningNow = this.isGameplaySimRunning();
     if (simRunningNow) {
+      // Always latch one-shot presses before checking accumulator so 120Hz/144Hz RAF frames
+      // with 0 sim substeps never drop dash/attack/special/cast/interact presses!
+      this.latchOneShots(polledInput);
       this.simAccumulator += clampedDt;
       let steps = 0;
-      let stepInput = polledInput;
+      let stepInput: InputFrame | null = null;
 
       while (
         this.simAccumulator >= SIM_CONSTANTS.fixedDt &&
         steps < SIM_CONSTANTS.maxSubStepsPerFrame
       ) {
+        if (stepInput === null) {
+          stepInput = this.applyAndClearOneShots(polledInput);
+        } else {
+          stepInput = stripOneShotPresses(stepInput);
+        }
         this.prevState = snapshotPrevState(this.state);
         stepSim(this.state, { ...stepInput, tick: this.state.tick + 1 }, this.hooks);
         this.drainEvents();
@@ -500,15 +593,16 @@ export class GameApp {
 
         this.simAccumulator -= SIM_CONSTANTS.fixedDt;
         steps += 1;
-        stepInput = stripOneShotPresses(stepInput);
 
         if (!this.isGameplaySimRunning()) {
           this.simAccumulator = 0;
+          this.clearPendingOneShots();
           break;
         }
       }
     } else {
       this.simAccumulator = 0;
+      this.clearPendingOneShots();
       this.syncScreenFromState();
     }
 
@@ -533,14 +627,29 @@ export class GameApp {
     if (shouldRender || hasAnyMenuNav(uiMenuNav)) {
       const renderStats = this.renderer.getStats();
       const hash = this.ui.isDebugDrawerOpen() ? hashSimState(this.state) : '';
-      this.ui.update(
-        this.state,
-        this.screen,
-        this.input.getActiveSource(),
-        renderStats,
-        uiMenuNav,
-        hash
-      );
+      let uiState = this.state;
+      if (this.pendingUiEvents.length > 0 && this.state.tick !== this.lastUiToastTick) {
+        uiState = { ...this.state, events: this.pendingUiEvents };
+        this.lastUiToastTick = this.state.tick;
+        this.ui.update(
+          uiState,
+          this.screen,
+          this.input.getActiveSource(),
+          renderStats,
+          uiMenuNav,
+          hash
+        );
+        this.pendingUiEvents = [];
+      } else {
+        this.ui.update(
+          uiState,
+          this.screen,
+          this.input.getActiveSource(),
+          renderStats,
+          uiMenuNav,
+          hash
+        );
+      }
     }
   }
 }
