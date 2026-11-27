@@ -1,0 +1,27 @@
+{
+  "name": "krunked-wannabehades",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "extract": "tsx tools/extract-assets.ts",
+    "oracle": "tsx tools/oracle-dump.ts",
+    "dev": "vite",
+    "play": "vite --host 127.0.0.1 --port 5173",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "verify:assets": "tsx scripts/verify/verify-assets.ts",
+    "verify:sim": "tsx scripts/verify/verify-sim.ts",
+    "verify": "npm run typecheck && npm run test && npm run verify:assets && npm run verify:sim",
+    "build": "vite build",
+    "export:dna": "tsx export-dna.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "playwright-core": "^1.51.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.8"
+  }
+}
