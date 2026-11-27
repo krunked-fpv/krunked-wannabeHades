@@ -297,19 +297,34 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
     ctx.lineWidth = 4 * cam.zoom;
     ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
 
-    // Chasm pits
+    // Chasm pits (beveled octagonal isometric stone chasms!)
     for (let i = 0; i < state.room.obstacles.length; i++) {
       const obs = state.room.obstacles[i];
       if (obs.kind !== 'pit') continue;
-      const px0 = this.wxToSx(obs.pos.x - obs.halfW, cam);
-      const px1 = this.wxToSx(obs.pos.x + obs.halfW, cam);
-      const py0 = this.wyToSy(obs.pos.y - obs.halfH, 0, cam);
-      const py1 = this.wyToSy(obs.pos.y + obs.halfH, 0, cam);
-      ctx.fillStyle = '#070e10';
-      ctx.fillRect(px0, py0, px1 - px0, py1 - py0);
-      ctx.strokeStyle = BIOME_CONSTANTS[state.room.biome].accentHex;
-      ctx.lineWidth = 3 * cam.zoom;
-      ctx.strokeRect(px0, py0, px1 - px0, py1 - py0);
+      const cx = this.wxToSx(obs.pos.x, cam);
+      const cy = this.wyToSy(obs.pos.y, 0, cam);
+      const hw = obs.halfW * cam.zoom;
+      const hh = obs.halfH * cam.isoScaleY * cam.zoom;
+      const cxOff = hw * 0.36;
+      const cyOff = hh * 0.42;
+      ctx.beginPath();
+      ctx.moveTo(cx - hw + cxOff, cy - hh);
+      ctx.lineTo(cx + hw - cxOff, cy - hh);
+      ctx.lineTo(cx + hw, cy - hh + cyOff);
+      ctx.lineTo(cx + hw, cy + hh - cyOff);
+      ctx.lineTo(cx + hw - cxOff, cy + hh);
+      ctx.lineTo(cx - hw + cxOff, cy + hh);
+      ctx.lineTo(cx - hw, cy + hh - cyOff);
+      ctx.lineTo(cx - hw, cy - hh + cyOff);
+      ctx.closePath();
+      ctx.fillStyle = '#060c0e';
+      ctx.fill();
+      ctx.strokeStyle = '#08060e';
+      ctx.lineWidth = 5 * cam.zoom;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(130, 175, 145, 0.55)';
+      ctx.lineWidth = 2 * cam.zoom;
+      ctx.stroke();
     }
 
     // Floor hazards
@@ -607,16 +622,25 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
     const flip = Math.cos(p.facingAngle) < -0.12 ? -1 : 1;
     this.drawSprite(ctx, this.selectHeroPose(p.facingAngle), sx, sy - runBob, 0.82 * cam.zoom * flip, 0.82 * cam.zoom);
 
-    // Weapon
-    const swingOff = p.attackTimer > 0 ? (p.attackComboStep % 2 === 1 ? -1.1 : 1.1) : 0;
-    const wepAngle = p.facingAngle + swingOff;
+    // Weapon (heroic side poise when idle, dynamic aim swing when attacking!)
+    const isSwinging = p.attackTimer > 0;
+    const facingLeft = Math.cos(p.facingAngle) < -0.12;
+    const wepAngle = isSwinging
+      ? p.facingAngle + (p.attackComboStep % 2 === 1 ? -1.1 : 1.1)
+      : facingLeft
+        ? Math.PI - 0.38
+        : 0.38;
+    const handX = isSwinging ? sx + Math.cos(p.facingAngle) * 20 * cam.zoom : sx + (facingLeft ? -22 : 22) * cam.zoom;
+    const handY = isSwinging
+      ? sy - 44 * cam.zoom - runBob + Math.sin(p.facingAngle) * 10 * cam.zoom
+      : sy - 36 * cam.zoom - runBob;
     this.drawSprite(
       ctx,
       getWeaponSpriteId(p.weaponId),
-      sx + Math.cos(p.facingAngle) * 20 * cam.zoom,
-      sy - 44 * cam.zoom - runBob + Math.sin(p.facingAngle) * 10 * cam.zoom,
-      0.74 * cam.zoom,
-      0.74 * cam.zoom * (Math.cos(wepAngle) < 0 ? -1 : 1),
+      handX,
+      handY,
+      0.72 * cam.zoom,
+      0.72 * cam.zoom * (Math.cos(wepAngle) < 0 ? -1 : 1),
       wepAngle
     );
   }
