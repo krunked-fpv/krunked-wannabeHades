@@ -1,10 +1,11 @@
 /**
  * Krunked WannabeHades — Browser Debug & Automation Bridge
  *
- * Mounts `window.__KRUNKED_DEBUG__` conforming strictly to `DebugBridge` in `src/contracts/index.ts`.
- * Used by both the F9 Playtest Drawer and automated Playwright verification suites.
+ * Mounts `window.__KRUNKED_DEBUG__` conforming strictly to `DebugBridge` in `src/contracts/index.ts`,
+ * plus Wave 2 inspection helpers for RenderStats, dual-mode AssetRegistry, and Hub Meta screens.
  */
 
+import type { PackManifestSummary } from '../assets/AssetRegistry.js';
 import {
   EMPTY_INPUT_FRAME,
   PLAYER_CONSTANTS,
@@ -26,16 +27,26 @@ import {
   type Vec2,
   type WeaponId,
 } from '../contracts/index.js';
+import type { RenderStats } from '../render/GameRenderer.js';
 import { grantBoonDirect, grantHammerDirect } from '../sim/boons.js';
 import { spawnEnemy } from '../sim/enemies.js';
 import { hashSimState } from '../sim/hash.js';
 import { applyMetaToPlayer, computeHeat, selectWeaponAndAspect } from '../sim/meta.js';
-import { warpToBiome, warpToBoss } from '../sim/rooms.js';
+import { borrowFerrymanGoldBag, warpToBiome, warpToBoss } from '../sim/rooms.js';
 import { getCombatContext, stepSim, type SimGameplayHooks } from '../sim/step.js';
+
+export interface ExtendedDebugBridge extends DebugBridge {
+  getRenderStats(): RenderStats;
+  getPackSummary(): PackManifestSummary;
+  openScreen(screen: ScreenId): void;
+  borrowGoldBag(): boolean;
+}
 
 export interface DebugBridgeHost {
   getState(): SimState;
   getHooks(): SimGameplayHooks;
+  getRenderStats(): RenderStats;
+  getPackSummary(): PackManifestSummary;
   setScreen(screen: ScreenId): void;
   clearPrevState(): void;
   drainEvents(): void;
@@ -92,7 +103,7 @@ function allocateVowsForHeat(targetHeat: number): Partial<Record<ShrineVowId, nu
   return vows;
 }
 
-export function createDebugBridge(host: DebugBridgeHost): DebugBridge {
+export function createDebugBridge(host: DebugBridgeHost): ExtendedDebugBridge {
   return {
     warpBiome(biome: BiomeId, depth = 1): void {
       const state = host.getState();
@@ -105,7 +116,10 @@ export function createDebugBridge(host: DebugBridgeHost): DebugBridge {
 
     warpBoss(bossId: BossId): void {
       const state = host.getState();
-      warpToBoss(state, bossId);
+      // Ensure warping to either Verdant Colosseum Champion spawns BOTH Dual Champions!
+      const effectiveBoss: BossId =
+        bossId === 'colosseum_bull' ? 'colosseum_spearlord' : bossId;
+      warpToBoss(state, effectiveBoss, getCombatContext());
       host.clearPrevState();
       host.setScreen('playing');
       host.drainEvents();
@@ -127,8 +141,16 @@ export function createDebugBridge(host: DebugBridgeHost): DebugBridge {
 
     setWeapon(weaponId: WeaponId, aspectId?: AspectId): void {
       const state = host.getState();
+      const prevMaxHp = state.player.maxHp;
       selectWeaponAndAspect(state.meta, weaponId, aspectId);
-      applyMetaToPlayer(state, { resetVitals: false });
+      const inHub = state.room.biome === 'sanctum_hub';
+      applyMetaToPlayer(state, { resetVitals: inHub });
+      // Immediately refill clip and adjust HP upward if new Aspect grants extra Max HP (e.g., Paladin)
+      state.player.ammo = state.player.maxAmmo;
+      state.player.reloadTimer = 0;
+      if (!inHub && state.player.maxHp > prevMaxHp) {
+        state.player.hp = Math.min(state.player.maxHp, state.player.hp + (state.player.maxHp - prevMaxHp));
+      }
       host.drainEvents();
       host.persistSave();
     },
@@ -300,6 +322,30 @@ export function createDebugBridge(host: DebugBridgeHost): DebugBridge {
         life: 0,
         maxLife: 0.9,
       });
+    },
+
+    getRenderStats(): RenderStats {
+      return host.getRenderStats();
+    },
+
+    getPackSummary(): PackManifestSummary {
+      return host.getPackSummary();
+    },
+
+    openScreen(screen: ScreenId): void {
+      host.setScreen(screen);
+    },
+
+    borrowGoldBag(): boolean {
+      const state = host.getState();
+      const ok = borrowFerrymanGoldBag(state, getCombatContext());
+      if (ok) {
+        host.clearPrevState();
+        host.setScreen('playing');
+        host.drainEvents();
+        host.persistSave();
+      }
+      return ok;
     },
   };
 }

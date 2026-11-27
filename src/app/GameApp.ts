@@ -2,14 +2,17 @@
  * Krunked WannabeHades — Application Composition Root
  *
  * Orchestrates:
- * - Fixed 60Hz deterministic SimState + SimGameplayHooks
+ * - Fixed 60Hz deterministic SimState + SimGameplayHooks (all 6 Arms, 5 Biomes, 8 Bosses, 10 Patrons)
  * - 6-Pass WebGL2 / Canvas2D Ink-Cel GameRenderer with smooth `interpAlpha` & 30/60/120 FPS pacing
+ * - Dual-Mode `AssetRegistry` + `CustomPackLoader` (`BUILTIN` default + optional local `CUSTOM_PACK`)
  * - Omnidevice InputManager (Keyboard+Mouse, Xbox Gamepad + Dual-Rumble, Auto-Translucent Touch)
  * - Autoplay-safe Greek-Metal AudioEngine + Combat SFX
- * - Mythic UiManager (Title, HUD, Boon Select, Pause/Options, Victory/Death, F9 Debug Drawer)
+ * - Mythic UiManager (Title, HUD, Boon Select, Weapons/Mirror/Shrine/Keepsakes/Shop/Codex, Pause/Options, F9 Drawer)
  * - Schema-validated SaveManager & `window.__KRUNKED_DEBUG__` DebugBridge
  */
 
+import { AssetRegistry } from '../assets/AssetRegistry.js';
+import { autoLoadCustomPack, promptLoadCustomPackFolder } from '../assets/CustomPackLoader.js';
 import { AudioEngine } from '../audio/AudioEngine.js';
 import {
   SIM_CONSTANTS,
@@ -24,8 +27,19 @@ import { InputManager, type MenuNavInput } from '../input/InputManager.js';
 import { GameRenderer } from '../render/GameRenderer.js';
 import { applySelectedBoon, rerollBoonOffer } from '../sim/boons.js';
 import { hashSimState } from '../sim/hash.js';
-import { applyMetaToPlayer } from '../sim/meta.js';
 import {
+  applyMetaToPlayer,
+  purchaseMirrorUpgrade,
+  refundMirrorUpgrades,
+  selectKeepsake,
+  selectWeaponAndAspect,
+  setShrineVowRank,
+  toggleMirrorSide,
+  upgradeWeaponAspect,
+} from '../sim/meta.js';
+import {
+  borrowFerrymanGoldBag,
+  buyShopPickup,
   createGameplayHooks,
   enterTrainingCourtyard,
   findNearestInteractable,
@@ -38,7 +52,7 @@ import {
   type SimGameplayHooks,
 } from '../sim/step.js';
 import { UiManager } from '../ui/UiManager.js';
-import { createDebugBridge } from './DebugBridge.js';
+import { createDebugBridge, type ExtendedDebugBridge } from './DebugBridge.js';
 import { loadSave, resetSave as resetPersistedSave, writeSave } from './SaveManager.js';
 
 declare global {
@@ -53,6 +67,21 @@ export interface GameAppElements {
   touchRoot: HTMLElement;
 }
 
+const MODAL_PAUSING_SCREENS = new Set<ScreenId>([
+  'pause',
+  'options',
+  'weapon_menu',
+  'mirror_menu',
+  'shrine_menu',
+  'keepsake_menu',
+  'shop_menu',
+  'codex_menu',
+]);
+
+function isModalOverlayScreen(screen: ScreenId): boolean {
+  return screen === 'title' || MODAL_PAUSING_SCREENS.has(screen);
+}
+
 function hasAnyMenuNav(nav: MenuNavInput): boolean {
   return (
     nav.up ||
@@ -62,7 +91,10 @@ function hasAnyMenuNav(nav: MenuNavInput): boolean {
     nav.confirm ||
     nav.back ||
     nav.pause ||
-    nav.toggleDebug
+    nav.toggleDebug ||
+    Boolean(nav.codex) ||
+    Boolean(nav.tabPrev) ||
+    Boolean(nav.tabNext)
   );
 }
 
@@ -111,11 +143,12 @@ export class GameApp {
   private readonly canvas: HTMLCanvasElement;
   private readonly state: SimState;
   private readonly hooks: SimGameplayHooks;
+  private readonly assetRegistry: AssetRegistry;
   private readonly renderer: GameRenderer;
   private readonly input: InputManager;
   private readonly audio: AudioEngine;
   private readonly ui: UiManager;
-  private readonly debugBridge: DebugBridge;
+  private readonly debugBridge: ExtendedDebugBridge;
 
   private screen: ScreenId = 'title';
   private returnScreenBeforeOptions: ScreenId = 'title';
@@ -171,9 +204,15 @@ export class GameApp {
     enterTrainingCourtyard(this.state);
     this.state.events.length = 0;
 
-    // 2. Initialize 6-pass WebGL2 / Canvas2D Ink-Cel Renderer
+    // 2. Initialize Dual-Mode Asset Registry + 6-Pass WebGL2 / Canvas2D Ink-Cel Renderer
+    this.assetRegistry = new AssetRegistry();
+    this.assetRegistry.setPackMode(this.state.meta.settings.packMode);
     this.renderer = new GameRenderer();
     this.renderer.init(this.canvas);
+    this.renderer.attachCustomPack(this.assetRegistry);
+
+    // Non-blocking background check for cached IndexedDB pack or local dev `/.wannabehades-assets/`
+    void this.initCustomPackAutoDetect();
 
     // 3. Initialize Omnidevice Input (Keyboard+Mouse, Xbox Gamepad, Auto-Translucent Touch)
     this.input = new InputManager(this.canvas, touchRoot, (clientX, clientY) =>
@@ -189,11 +228,9 @@ export class GameApp {
     this.debugBridge = createDebugBridge({
       getState: () => this.state,
       getHooks: () => this.hooks,
-      setScreen: (screen) => {
-        this.screen = screen;
-        this.state.run.paused = screen === 'pause' || screen === 'options';
-        this.audio.updateMusic(this.state, this.screen);
-      },
+      getRenderStats: () => this.renderer.getStats(),
+      getPackSummary: () => this.assetRegistry.getManifestSummary(),
+      setScreen: (screen) => this.applyScreenTransition(screen),
       clearPrevState: () => {
         this.prevState = null;
       },
@@ -208,7 +245,7 @@ export class GameApp {
     });
     window.__KRUNKED_DEBUG__ = this.debugBridge;
 
-    // 6. Initialize Mythic UI Manager
+    // 6. Initialize Mythic UI Manager (Wave 1 + all Wave 2 Hub Meta, Shop & Codex modals)
     this.ui = new UiManager(uiRoot, {
       onEnterCourtyard: () => {
         this.audio.unlock();
@@ -262,25 +299,25 @@ export class GameApp {
         if (this.screen !== 'options') {
           this.returnScreenBeforeOptions = this.screen;
         }
-        this.screen = 'options';
-        this.state.run.paused = true;
+        this.applyScreenTransition('options');
+      },
+      onOpenScreen: (screen) => {
+        this.audio.unlock();
+        this.audio.playUiSound('click');
+        if (screen === 'options' && this.screen !== 'options') {
+          this.returnScreenBeforeOptions = this.screen;
+        }
+        this.applyScreenTransition(screen);
       },
       onCloseModal: () => {
         this.audio.unlock();
         this.audio.playUiSound('back');
         if (this.screen === 'options') {
-          this.screen = this.returnScreenBeforeOptions;
-          this.state.run.paused = this.screen === 'pause';
-        } else if (
-          this.screen === 'weapon_menu' ||
-          this.screen === 'mirror_menu' ||
-          this.screen === 'shrine_menu' ||
-          this.screen === 'keepsake_menu' ||
-          this.screen === 'shop_menu' ||
-          this.screen === 'codex_menu'
-        ) {
-          this.screen = this.state.room.biome === 'sanctum_hub' ? 'hub' : 'playing';
-          this.state.run.paused = false;
+          this.applyScreenTransition(this.returnScreenBeforeOptions);
+        } else if (MODAL_PAUSING_SCREENS.has(this.screen)) {
+          this.applyScreenTransition(
+            this.state.room.biome === 'sanctum_hub' ? 'hub' : 'playing'
+          );
         }
       },
       onUpdateSettings: (partial) => {
@@ -293,10 +330,113 @@ export class GameApp {
         this.state.run.godModeEnabled = Boolean(enabled);
         this.persistSave();
       },
+      onLoadCustomPackFolder: () => {
+        this.audio.unlock();
+        this.audio.playUiSound('click');
+        void this.handleLoadCustomPackFolder();
+      },
       onResetSave: () => {
         this.audio.unlock();
         this.audio.playUiSound('back');
         this.handleResetSave();
+      },
+      onSelectWeapon: (weaponId, aspectId) => {
+        this.audio.unlock();
+        this.audio.playUiSound('confirm');
+        const prevMaxHp = this.state.player.maxHp;
+        selectWeaponAndAspect(this.state.meta, weaponId, aspectId);
+        const inHub = this.state.room.biome === 'sanctum_hub';
+        applyMetaToPlayer(this.state, { resetVitals: inHub });
+        this.state.player.ammo = this.state.player.maxAmmo;
+        this.state.player.reloadTimer = 0;
+        if (!inHub && this.state.player.maxHp > prevMaxHp) {
+          this.state.player.hp = Math.min(
+            this.state.player.maxHp,
+            this.state.player.hp + (this.state.player.maxHp - prevMaxHp)
+          );
+        }
+        this.persistSave();
+      },
+      onUpgradeAspect: (aspectId) => {
+        this.audio.unlock();
+        if (upgradeWeaponAspect(this.state.meta, aspectId)) {
+          this.audio.playUiSound('confirm');
+          applyMetaToPlayer(this.state, { resetVitals: this.state.room.biome === 'sanctum_hub' });
+          this.persistSave();
+        } else {
+          this.audio.playUiSound('back');
+        }
+      },
+      onUpgradeMirror: (id) => {
+        this.audio.unlock();
+        if (purchaseMirrorUpgrade(this.state.meta, id)) {
+          this.audio.playUiSound('confirm');
+          applyMetaToPlayer(this.state, { resetVitals: this.state.room.biome === 'sanctum_hub' });
+          this.persistSave();
+        } else {
+          this.audio.playUiSound('back');
+        }
+      },
+      onToggleMirrorSide: (id) => {
+        this.audio.unlock();
+        this.audio.playUiSound('click');
+        toggleMirrorSide(this.state.meta, id);
+        applyMetaToPlayer(this.state, { resetVitals: this.state.room.biome === 'sanctum_hub' });
+        this.persistSave();
+      },
+      onRefundMirror: () => {
+        this.audio.unlock();
+        const refunded = refundMirrorUpgrades(this.state.meta);
+        if (refunded > 0) {
+          this.audio.playUiSound('confirm');
+          applyMetaToPlayer(this.state, { resetVitals: this.state.room.biome === 'sanctum_hub' });
+          this.pushLocalToast(`Mirror Refunded: +${refunded} Darkness`, '#c084fc');
+          this.persistSave();
+        } else {
+          this.audio.playUiSound('back');
+        }
+      },
+      onSetShrineVow: (id, rank) => {
+        this.audio.unlock();
+        this.audio.playUiSound('click');
+        const totalHeat = setShrineVowRank(this.state.meta, id, rank);
+        this.state.run.vows = { ...this.state.meta.shrineVows };
+        this.state.run.heat = totalHeat;
+        applyMetaToPlayer(this.state, { resetVitals: this.state.room.biome === 'sanctum_hub' });
+        this.persistSave();
+      },
+      onSelectKeepsake: (id) => {
+        this.audio.unlock();
+        this.audio.playUiSound('confirm');
+        selectKeepsake(this.state.meta, id);
+        applyMetaToPlayer(this.state, { resetVitals: this.state.room.biome === 'sanctum_hub' });
+        this.persistSave();
+      },
+      onBuyShopItem: (pickupId) => {
+        this.audio.unlock();
+        if (buyShopPickup(this.state, pickupId, getCombatContext())) {
+          this.audio.playUiSound('confirm');
+          this.drainEvents();
+          if (this.state.run.pendingOffer !== null) {
+            this.screen = 'boon_select';
+            this.state.run.paused = false;
+          }
+          this.persistSave();
+        } else {
+          this.audio.playUiSound('back');
+        }
+      },
+      onBorrowGoldBag: () => {
+        this.audio.unlock();
+        if (borrowFerrymanGoldBag(this.state, getCombatContext())) {
+          this.audio.playUiSound('confirm');
+          this.prevState = null;
+          this.simAccumulator = 0;
+          this.clearPendingOneShots();
+          this.applyScreenTransition('playing');
+          this.drainEvents();
+          this.persistSave();
+        }
       },
       getPortraitUrl: (patronId) => this.renderer.getPatronPortraitDataUrl(patronId),
       getDebugBridge: () => this.debugBridge,
@@ -343,6 +483,65 @@ export class GameApp {
     this.input.dispose();
     this.audio.dispose();
     this.renderer.dispose();
+    this.assetRegistry.dispose();
+  }
+
+  private async initCustomPackAutoDetect(): Promise<void> {
+    try {
+      const pack = await autoLoadCustomPack();
+      if (!this.disposed && pack) {
+        this.assetRegistry.attachCustomPack(pack);
+        this.assetRegistry.setPackMode(this.state.meta.settings.packMode);
+        this.renderer.attachCustomPack(this.assetRegistry);
+      }
+    } catch {
+      // Quietly remain in BUILTIN mode when no local pack is present
+    }
+  }
+
+  private async handleLoadCustomPackFolder(): Promise<void> {
+    try {
+      const res = await promptLoadCustomPackFolder();
+      if (this.disposed) return;
+
+      if (res.ok && res.pack) {
+        this.assetRegistry.attachCustomPack(res.pack);
+        this.state.meta.settings = {
+          ...this.state.meta.settings,
+          packMode: 'CUSTOM_PACK',
+        };
+        this.assetRegistry.setPackMode('CUSTOM_PACK');
+        this.renderer.attachCustomPack(this.assetRegistry);
+        this.persistSave();
+        this.pushLocalToast(
+          `Custom Pack Loaded (${res.spriteCount} sprites / ${res.sheetCount} sheets)`,
+          '#7cf5be'
+        );
+      } else if (res.error) {
+        this.pushLocalToast(res.error, '#ff8066');
+      }
+    } catch {
+      if (!this.disposed) {
+        this.pushLocalToast('Custom Pack selection cancelled or unavailable.', '#f5cb70');
+      }
+    }
+  }
+
+  private pushLocalToast(text: string, colorHex?: string): void {
+    this.pendingUiEvents.push({ type: 'ui_toast', text, colorHex });
+    if (this.pendingUiEvents.length > 32) {
+      this.pendingUiEvents.splice(0, this.pendingUiEvents.length - 32);
+    }
+  }
+
+  private applyScreenTransition(screen: ScreenId): void {
+    this.screen = screen;
+    this.state.run.paused = MODAL_PAUSING_SCREENS.has(screen);
+    this.simAccumulator = 0;
+    if (isModalOverlayScreen(screen)) {
+      this.clearPendingOneShots();
+    }
+    this.audio.updateMusic(this.state, this.screen);
   }
 
   private handleResize(): void {
@@ -381,12 +580,25 @@ export class GameApp {
   }
 
   private handleUpdateSettings(partial: Partial<RenderSettings>): void {
+    const prevPackMode = this.state.meta.settings.packMode;
     this.state.meta.settings = {
       ...this.state.meta.settings,
       ...partial,
     };
     this.audio.applySettings(this.state.meta.settings);
     this.input.setTouchMode(this.state.meta.settings.showTouchControls);
+
+    if (partial.packMode && partial.packMode !== prevPackMode) {
+      this.assetRegistry.setPackMode(this.state.meta.settings.packMode);
+      this.renderer.attachCustomPack(this.assetRegistry);
+      if (this.state.meta.settings.packMode === 'CUSTOM_PACK' && !this.assetRegistry.hasCustomPack()) {
+        this.pushLocalToast(
+          'No Custom Pack loaded — using Built-In Ink-Cel (load folder or run npm run extract)',
+          '#f5cb70'
+        );
+      }
+    }
+
     this.persistSave();
   }
 
@@ -399,6 +611,8 @@ export class GameApp {
     applyMetaToPlayer(this.state, { resetVitals: true });
     this.audio.applySettings(fresh.settings);
     this.input.setTouchMode(fresh.settings.showTouchControls);
+    this.assetRegistry.setPackMode(fresh.settings.packMode);
+    this.renderer.attachCustomPack(this.assetRegistry);
   }
 
   private persistSave(): void {
@@ -416,7 +630,7 @@ export class GameApp {
   }
 
   private syncScreenFromState(): void {
-    if (this.screen === 'title' || this.screen === 'pause' || this.screen === 'options') {
+    if (isModalOverlayScreen(this.screen)) {
       return;
     }
     if (this.state.run.victory) {
@@ -561,6 +775,7 @@ export class GameApp {
       this.screen = 'pause';
       this.state.run.paused = true;
       this.simAccumulator = 0;
+      this.clearPendingOneShots();
       this.audio.playUiSound('click');
       // Prevent PauseAndOptionsModal from immediately resuming on the exact same frame
       uiMenuNav = { ...menuNav, pause: false, back: false };
