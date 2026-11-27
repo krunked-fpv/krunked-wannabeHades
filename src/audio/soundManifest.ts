@@ -1,13 +1,14 @@
 /**
- * Krunked WannabeHades — Canonical Audio Manifest
+ * Krunked WannabeHades — Canonical Audio Manifest (Wave 2 Full Soundtrack & 6-Weapon Arsenal)
  *
  * 100% pure / DOM-free module: safe to import in pure Node scripts (e.g. Gate A `verify:assets`).
- * Defines every procedural SFX ID, Music Track ID, polyphony cap, and Patron harmonic signature.
+ * Defines every procedural SFX ID, Music Track ID, modal scale, polyphony cap, and Patron harmonic signature.
  */
 
 import type { BiomeId, PatronId } from '../contracts/index';
 
 export const SFX_IDS = [
+  // Wave 1 Core Combat, Blade, Cast, Dash, Impact, Boss, Patron, UI
   'sword_swing_1',
   'sword_swing_2',
   'sword_swing_3',
@@ -40,19 +41,48 @@ export const SFX_IDS = [
   'pickup_collect',
   'status_proc',
   'enemy_spawn',
+  // Wave 2 Bespoke Infernal Arms (Spear, Shield, Bow, Fists, Rail)
+  'spear_thrust',
+  'spear_spin',
+  'spear_recall',
+  'shield_bash',
+  'shield_clang',
+  'shield_boomerang',
+  'bow_draw',
+  'bow_power_shot',
+  'bow_volley',
+  'fists_flurry',
+  'fists_uppercut',
+  'rail_shot',
+  'rail_reload',
+  'rail_mortar',
+  // Wave 2 Biome Hazards, Special Enemies, Statuses & Chaos
+  'lava_sizzle',
+  'poison_hiss',
+  'curing_pool_chime',
+  'soul_eye_shatter',
+  'doom_gong',
+  'hangover_fizz',
+  'chill_crackle',
+  'chaos_void_hum',
 ] as const;
 
 export type SfxId = (typeof SFX_IDS)[number];
 
 export const MUSIC_TRACK_IDS = [
   'hub_sanctum',
+  'boatman_shop',
   'obsidian_pit',
   'boss_warden',
   'cinder_mire',
+  'boss_leviathan',
   'verdant_colosseum',
+  'boss_champions',
   'crypt_of_bile',
+  'boss_ferryman',
   'frozen_summit',
   'boss_sovereign',
+  'boss_sovereign_p2',
   'victory_fanfare',
   'death_stinger',
 ] as const;
@@ -63,7 +93,17 @@ export type AudioId = SfxId | MusicTrackId;
 
 export type MusicIntensity = 'hub' | 'explore' | 'combat' | 'boss';
 
-export type SfxCategory = 'weapon' | 'movement' | 'impact' | 'combat_event' | 'patron' | 'world' | 'ui';
+export type MusicalModeId = 'phrygian_dominant' | 'aeolian' | 'dorian' | 'harmonic_minor';
+
+export type SfxCategory =
+  | 'weapon'
+  | 'movement'
+  | 'impact'
+  | 'combat_event'
+  | 'patron'
+  | 'hazard'
+  | 'world'
+  | 'ui';
 
 export interface SfxSpec {
   readonly id: SfxId;
@@ -75,7 +115,7 @@ export interface SfxSpec {
   readonly pitchJitter: number;
   /** Minimum milliseconds between retriggers of the same ID to prevent wall-of-sound clipping. */
   readonly minIntervalMs: number;
-  /** Whether this sound routes a wet send to the cavern reverb bus. */
+  /** Wet send amount to the cavern reverb bus (0..1). */
   readonly reverbSend: number;
 }
 
@@ -368,124 +408,447 @@ export const SFX_MANIFEST: Readonly<Record<SfxId, SfxSpec>> = {
     minIntervalMs: 65,
     reverbSend: 0.24,
   },
+  // Wave 2 — Eternal Spear
+  spear_thrust: {
+    id: 'spear_thrust',
+    category: 'weapon',
+    defaultGain: 0.48,
+    maxPolyphony: 3,
+    pitchJitter: 0.08,
+    minIntervalMs: 35,
+    reverbSend: 0.12,
+  },
+  spear_spin: {
+    id: 'spear_spin',
+    category: 'weapon',
+    defaultGain: 0.62,
+    maxPolyphony: 2,
+    pitchJitter: 0.06,
+    minIntervalMs: 80,
+    reverbSend: 0.28,
+  },
+  spear_recall: {
+    id: 'spear_recall',
+    category: 'weapon',
+    defaultGain: 0.54,
+    maxPolyphony: 2,
+    pitchJitter: 0.06,
+    minIntervalMs: 60,
+    reverbSend: 0.22,
+  },
+  // Wave 2 — Shield of Chaos
+  shield_bash: {
+    id: 'shield_bash',
+    category: 'weapon',
+    defaultGain: 0.58,
+    maxPolyphony: 3,
+    pitchJitter: 0.07,
+    minIntervalMs: 45,
+    reverbSend: 0.18,
+  },
+  shield_clang: {
+    id: 'shield_clang',
+    category: 'weapon',
+    defaultGain: 0.64,
+    maxPolyphony: 3,
+    pitchJitter: 0.06,
+    minIntervalMs: 45,
+    reverbSend: 0.34,
+  },
+  shield_boomerang: {
+    id: 'shield_boomerang',
+    category: 'weapon',
+    defaultGain: 0.54,
+    maxPolyphony: 2,
+    pitchJitter: 0.06,
+    minIntervalMs: 60,
+    reverbSend: 0.24,
+  },
+  // Wave 2 — Heart-Seeking Bow
+  bow_draw: {
+    id: 'bow_draw',
+    category: 'weapon',
+    defaultGain: 0.36,
+    maxPolyphony: 2,
+    pitchJitter: 0.06,
+    minIntervalMs: 80,
+    reverbSend: 0.08,
+  },
+  bow_power_shot: {
+    id: 'bow_power_shot',
+    category: 'weapon',
+    defaultGain: 0.64,
+    maxPolyphony: 3,
+    pitchJitter: 0.05,
+    minIntervalMs: 45,
+    reverbSend: 0.28,
+  },
+  bow_volley: {
+    id: 'bow_volley',
+    category: 'weapon',
+    defaultGain: 0.58,
+    maxPolyphony: 2,
+    pitchJitter: 0.07,
+    minIntervalMs: 65,
+    reverbSend: 0.22,
+  },
+  // Wave 2 — Twin Fists
+  fists_flurry: {
+    id: 'fists_flurry',
+    category: 'weapon',
+    defaultGain: 0.44,
+    maxPolyphony: 4,
+    pitchJitter: 0.08,
+    minIntervalMs: 28,
+    reverbSend: 0.08,
+  },
+  fists_uppercut: {
+    id: 'fists_uppercut',
+    category: 'weapon',
+    defaultGain: 0.64,
+    maxPolyphony: 2,
+    pitchJitter: 0.06,
+    minIntervalMs: 60,
+    reverbSend: 0.24,
+  },
+  // Wave 2 — Adamant Rail
+  rail_shot: {
+    id: 'rail_shot',
+    category: 'weapon',
+    defaultGain: 0.46,
+    maxPolyphony: 4,
+    pitchJitter: 0.08,
+    minIntervalMs: 32,
+    reverbSend: 0.1,
+  },
+  rail_reload: {
+    id: 'rail_reload',
+    category: 'weapon',
+    defaultGain: 0.52,
+    maxPolyphony: 2,
+    pitchJitter: 0.05,
+    minIntervalMs: 120,
+    reverbSend: 0.12,
+  },
+  rail_mortar: {
+    id: 'rail_mortar',
+    category: 'weapon',
+    defaultGain: 0.72,
+    maxPolyphony: 2,
+    pitchJitter: 0.06,
+    minIntervalMs: 85,
+    reverbSend: 0.34,
+  },
+  // Wave 2 — Biome Hazards, Soul-Eye, Statuses, Chaos
+  lava_sizzle: {
+    id: 'lava_sizzle',
+    category: 'hazard',
+    defaultGain: 0.48,
+    maxPolyphony: 2,
+    pitchJitter: 0.08,
+    minIntervalMs: 160,
+    reverbSend: 0.14,
+  },
+  poison_hiss: {
+    id: 'poison_hiss',
+    category: 'hazard',
+    defaultGain: 0.46,
+    maxPolyphony: 2,
+    pitchJitter: 0.08,
+    minIntervalMs: 160,
+    reverbSend: 0.16,
+  },
+  curing_pool_chime: {
+    id: 'curing_pool_chime',
+    category: 'world',
+    defaultGain: 0.58,
+    maxPolyphony: 2,
+    pitchJitter: 0.04,
+    minIntervalMs: 140,
+    reverbSend: 0.4,
+  },
+  soul_eye_shatter: {
+    id: 'soul_eye_shatter',
+    category: 'combat_event',
+    defaultGain: 0.62,
+    maxPolyphony: 3,
+    pitchJitter: 0.06,
+    minIntervalMs: 55,
+    reverbSend: 0.36,
+  },
+  doom_gong: {
+    id: 'doom_gong',
+    category: 'combat_event',
+    defaultGain: 0.7,
+    maxPolyphony: 3,
+    pitchJitter: 0.05,
+    minIntervalMs: 65,
+    reverbSend: 0.42,
+  },
+  hangover_fizz: {
+    id: 'hangover_fizz',
+    category: 'combat_event',
+    defaultGain: 0.44,
+    maxPolyphony: 3,
+    pitchJitter: 0.08,
+    minIntervalMs: 70,
+    reverbSend: 0.16,
+  },
+  chill_crackle: {
+    id: 'chill_crackle',
+    category: 'combat_event',
+    defaultGain: 0.46,
+    maxPolyphony: 3,
+    pitchJitter: 0.08,
+    minIntervalMs: 65,
+    reverbSend: 0.24,
+  },
+  chaos_void_hum: {
+    id: 'chaos_void_hum',
+    category: 'world',
+    defaultGain: 0.64,
+    maxPolyphony: 1,
+    pitchJitter: 0.03,
+    minIntervalMs: 280,
+    reverbSend: 0.5,
+  },
 };
+
+/**
+ * Phrygian Dominant (Hijaz / Freygish) semitone intervals from root:
+ * D (0), Eb (1), F# (4), G (5), A (7), Bb (8), C (10).
+ */
+export const PHRYGIAN_DOMINANT_INTERVALS = [0, 1, 4, 5, 7, 8, 10] as const;
+
+export const SCALE_INTERVALS: Readonly<Record<MusicalModeId, readonly number[]>> = {
+  phrygian_dominant: PHRYGIAN_DOMINANT_INTERVALS,
+  aeolian: [0, 2, 3, 5, 7, 8, 10],
+  dorian: [0, 2, 3, 5, 7, 9, 10],
+  harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
+};
+
+export type DrumStyleId =
+  | 'none'
+  | 'shop'
+  | 'tartarus_rock'
+  | 'mire_syncopated'
+  | 'colosseum_march'
+  | 'crypt_sludge'
+  | 'summit_gothic'
+  | 'warden_thrash'
+  | 'leviathan_tribal'
+  | 'champions_gallop'
+  | 'ferryman_heavy'
+  | 'sovereign_orchestral'
+  | 'sovereign_shred';
 
 export interface MusicTrackSpec {
   readonly id: MusicTrackId;
   readonly displayName: string;
   readonly bpm: number;
-  /** Semitone offset relative to D Phrygian Dominant (0 = D). */
+  /** Semitone offset relative to D (0 = D, 2 = E, -1 = C#, -2 = C, 4 = F#, -5 = A). */
   readonly transposeSemitones: number;
+  readonly mode: MusicalModeId;
   readonly defaultIntensity: MusicIntensity;
   readonly biome?: BiomeId;
   readonly isOneShot: boolean;
-  readonly riffVariant: 0 | 1 | 2 | 3;
+  readonly riffVariant: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  readonly drumStyle: DrumStyleId;
+  /** Weight of the orchestral brass/strings stem (0..1). */
+  readonly orchestralWeight: number;
 }
-
-/**
- * Phrygian Dominant (Hijaz / Freygish) semitone intervals from D:
- * D (0), Eb (1), F# (4), G (5), A (7), Bb (8), C (10).
- */
-export const PHRYGIAN_DOMINANT_INTERVALS = [0, 1, 4, 5, 7, 8, 10] as const;
 
 export const MUSIC_TRACK_MANIFEST: Readonly<Record<MusicTrackId, MusicTrackSpec>> = {
   hub_sanctum: {
     id: 'hub_sanctum',
     displayName: 'Sanctum of Ash (Lyre)',
     bpm: 92,
-    transposeSemitones: 0,
+    transposeSemitones: 0, // D Phrygian Dominant
+    mode: 'phrygian_dominant',
     defaultIntensity: 'hub',
     biome: 'sanctum_hub',
     isOneShot: false,
     riffVariant: 0,
+    drumStyle: 'none',
+    orchestralWeight: 0.12,
+  },
+  boatman_shop: {
+    id: 'boatman_shop',
+    displayName: 'Ferryman Crossing (Shop)',
+    bpm: 98,
+    transposeSemitones: -5, // A Dorian
+    mode: 'dorian',
+    defaultIntensity: 'explore',
+    isOneShot: false,
+    riffVariant: 4,
+    drumStyle: 'shop',
+    orchestralWeight: 0.22,
   },
   obsidian_pit: {
     id: 'obsidian_pit',
     displayName: 'Out of the Obsidian Pit',
     bpm: 128,
-    transposeSemitones: 0,
+    transposeSemitones: 0, // D Phrygian Dominant
+    mode: 'phrygian_dominant',
     defaultIntensity: 'combat',
     biome: 'obsidian_pit',
     isOneShot: false,
     riffVariant: 0,
+    drumStyle: 'tartarus_rock',
+    orchestralWeight: 0.14,
   },
   boss_warden: {
     id: 'boss_warden',
     displayName: 'Scourge of the Wardens',
     bpm: 148,
-    transposeSemitones: 0,
+    transposeSemitones: 0, // D Phrygian Dominant
+    mode: 'phrygian_dominant',
     defaultIntensity: 'boss',
     biome: 'obsidian_pit',
     isOneShot: false,
     riffVariant: 1,
+    drumStyle: 'warden_thrash',
+    orchestralWeight: 0.34,
   },
   cinder_mire: {
     id: 'cinder_mire',
-    displayName: 'Ashes of the Mire',
-    bpm: 134,
-    transposeSemitones: 2, // E Phrygian Dominant
+    displayName: 'Ashes of the Cinder Mire',
+    bpm: 136,
+    transposeSemitones: 2, // E Harmonic Minor
+    mode: 'harmonic_minor',
     defaultIntensity: 'combat',
     biome: 'cinder_mire',
     isOneShot: false,
     riffVariant: 2,
+    drumStyle: 'mire_syncopated',
+    orchestralWeight: 0.18,
+  },
+  boss_leviathan: {
+    id: 'boss_leviathan',
+    displayName: 'Serpent of the Molten Pit',
+    bpm: 142,
+    transposeSemitones: 2, // E Phrygian Dominant
+    mode: 'phrygian_dominant',
+    defaultIntensity: 'boss',
+    biome: 'cinder_mire',
+    isOneShot: false,
+    riffVariant: 5,
+    drumStyle: 'leviathan_tribal',
+    orchestralWeight: 0.42,
   },
   verdant_colosseum: {
     id: 'verdant_colosseum',
     displayName: 'Crown of the Colosseum',
     bpm: 132,
-    transposeSemitones: -1, // C# Phrygian Dominant
+    transposeSemitones: -1, // C# Aeolian
+    mode: 'aeolian',
     defaultIntensity: 'combat',
     biome: 'verdant_colosseum',
     isOneShot: false,
-    riffVariant: 1,
+    riffVariant: 6,
+    drumStyle: 'colosseum_march',
+    orchestralWeight: 0.56,
+  },
+  boss_champions: {
+    id: 'boss_champions',
+    displayName: 'Champions of the Arena',
+    bpm: 146,
+    transposeSemitones: -1, // C# Aeolian heroic anthem
+    mode: 'aeolian',
+    defaultIntensity: 'boss',
+    biome: 'verdant_colosseum',
+    isOneShot: false,
+    riffVariant: 6,
+    drumStyle: 'champions_gallop',
+    orchestralWeight: 0.72,
   },
   crypt_of_bile: {
     id: 'crypt_of_bile',
     displayName: 'Gates of the Crypt',
-    bpm: 124,
-    transposeSemitones: -2, // C Phrygian Dominant
+    bpm: 122,
+    transposeSemitones: -2, // C Phrygian Dominant sludge
+    mode: 'phrygian_dominant',
     defaultIntensity: 'combat',
     biome: 'crypt_of_bile',
     isOneShot: false,
     riffVariant: 3,
+    drumStyle: 'crypt_sludge',
+    orchestralWeight: 0.24,
+  },
+  boss_ferryman: {
+    id: 'boss_ferryman',
+    displayName: 'Toll of the Oar',
+    bpm: 136,
+    transposeSemitones: -5, // A Dorian heavy groove
+    mode: 'dorian',
+    defaultIntensity: 'boss',
+    isOneShot: false,
+    riffVariant: 4,
+    drumStyle: 'ferryman_heavy',
+    orchestralWeight: 0.52,
   },
   frozen_summit: {
     id: 'frozen_summit',
     displayName: 'Frost of the Summit',
     bpm: 138,
-    transposeSemitones: 4, // F# Phrygian Dominant
+    transposeSemitones: 4, // F# Dorian gothic
+    mode: 'dorian',
     defaultIntensity: 'combat',
     biome: 'frozen_summit',
     isOneShot: false,
     riffVariant: 2,
+    drumStyle: 'summit_gothic',
+    orchestralWeight: 0.58,
   },
   boss_sovereign: {
     id: 'boss_sovereign',
-    displayName: 'God of the Deep',
-    bpm: 154,
-    transposeSemitones: 0,
+    displayName: 'Sovereign of the Deep (Phase I)',
+    bpm: 134,
+    transposeSemitones: 0, // D Aeolian orchestral-metal
+    mode: 'aeolian',
     defaultIntensity: 'boss',
     biome: 'frozen_summit',
     isOneShot: false,
-    riffVariant: 3,
+    riffVariant: 7,
+    drumStyle: 'sovereign_orchestral',
+    orchestralWeight: 0.92,
+  },
+  boss_sovereign_p2: {
+    id: 'boss_sovereign_p2',
+    displayName: 'Sovereign Unbound (Phase II Shred)',
+    bpm: 162,
+    transposeSemitones: 0, // D Harmonic Minor double-kick shred
+    mode: 'harmonic_minor',
+    defaultIntensity: 'boss',
+    biome: 'frozen_summit',
+    isOneShot: false,
+    riffVariant: 7,
+    drumStyle: 'sovereign_shred',
+    orchestralWeight: 0.78,
   },
   victory_fanfare: {
     id: 'victory_fanfare',
     displayName: 'Escape Triumphant',
     bpm: 120,
     transposeSemitones: 0,
+    mode: 'dorian',
     defaultIntensity: 'hub',
     isOneShot: true,
     riffVariant: 0,
+    drumStyle: 'none',
+    orchestralWeight: 0.8,
   },
   death_stinger: {
     id: 'death_stinger',
     displayName: 'Return to Ash',
     bpm: 84,
     transposeSemitones: 0,
+    mode: 'phrygian_dominant',
     defaultIntensity: 'hub',
     isOneShot: true,
     riffVariant: 0,
+    drumStyle: 'none',
+    orchestralWeight: 0.7,
   },
 };
 

@@ -1,16 +1,18 @@
 /**
- * Krunked WannabeHades — Unified AudioEngine Facade
+ * Krunked WannabeHades — Unified AudioEngine Facade (Wave 2 Full 5-Biome / 5-Boss / 6-Arm Suite)
  *
  * Orchestrates ProceduralSfx and MusicSynthesizer behind a strict, autoplay-safe API:
  * - Lazy AudioContext creation on user gesture (`unlock()`) -> zero browser autoplay warnings
  * - Safe no-op when AudioContext is absent (Node/headless) or suspended -> zero unhandled rejections
  * - Master DynamicsCompressorNode preventing clipping across simultaneous SFX + Greek-metal stems
- * - Automatic SimEvent -> Hades combat foley dispatch & adaptive biome/combat/boss music tracking
+ * - Bespoke SimEvent + PlayerState foley routing for all 6 Infernal Arms, hazards, statuses, and Chaos
+ * - Adaptive 5-Biome + Hub + Boatman Shop + 5-Boss soundtrack (incl. Sovereign Lord P1->P2 shred ramp!)
  */
 
 import {
   DEFAULT_RENDER_SETTINGS,
   type BiomeId,
+  type BossId,
   type RenderSettings,
   type ScreenId,
   type SimEvent,
@@ -54,12 +56,23 @@ export class AudioEngine {
   private settings: RenderSettings = { ...DEFAULT_RENDER_SETTINGS };
   private desiredTrack: MusicTrackId = 'hub_sanctum';
   private desiredIntensity: MusicIntensity = 'hub';
+  private desiredBossPhase = 1;
   private desiredMuffled = false;
 
+  // Edge-detection trackers for seamless PlayerState-driven foley
   private seenZeroBasedCombo = false;
   private prevTick = -1;
   private prevRoomIndex = -1;
   private prevCastAmmo = -1;
+  private prevSpearOut = false;
+  private prevReloadTimer = 0;
+  private prevAttackChargeTimer = 0;
+  private prevIsBlocking = false;
+  private prevInLava = false;
+  private prevInPoison = false;
+  private prevHasPoisonStatus = false;
+  private lastLavaSizzleTick = -999;
+  private lastPoisonHissTick = -999;
   private disposed = false;
 
   /**
@@ -89,6 +102,7 @@ export class AudioEngine {
           promise
             .then(() => {
               if (!this.disposed && this.music && this.ctx?.state === 'running') {
+                this.music.setBossPhase(this.desiredBossPhase);
                 this.music.setState(this.desiredTrack, this.desiredIntensity);
                 this.music.setMenuMuffled(this.desiredMuffled);
               }
@@ -119,22 +133,13 @@ export class AudioEngine {
           if (ev.comboStep === 0) {
             this.seenZeroBasedCombo = true;
           }
-          const normalizedStep = this.seenZeroBasedCombo ? ev.comboStep + 1 : ev.comboStep;
-          const swingId: SfxId =
-            normalizedStep <= 1
-              ? 'sword_swing_1'
-              : normalizedStep === 2
-                ? 'sword_swing_2'
-                : 'sword_swing_3';
-          this.sfx.play(swingId, {
-            weaponId: ev.weaponId,
-            isDashStrike: ev.isDashStrike,
-          });
+          const step = this.seenZeroBasedCombo ? ev.comboStep + 1 : Math.max(1, ev.comboStep);
+          this.dispatchWeaponAttackSfx(ev.weaponId, step, ev.isDashStrike);
           break;
         }
 
         case 'special_cast': {
-          this.sfx.play('sword_nova', { weaponId: ev.weaponId });
+          this.dispatchWeaponSpecialSfx(ev.weaponId);
           break;
         }
 
@@ -184,7 +189,9 @@ export class AudioEngine {
         }
 
         case 'enemy_death': {
-          if (ev.finalInRoom || ev.isBoss) {
+          if (ev.archetype === 'soul_orb') {
+            this.sfx.play('soul_eye_shatter');
+          } else if (ev.finalInRoom || ev.isBoss) {
             this.sfx.play('final_kill_boom');
             this.music?.duck(0.32, 0.85);
           } else {
@@ -196,17 +203,51 @@ export class AudioEngine {
         case 'boss_phase': {
           this.sfx.play('boss_phase');
           this.music?.duck(0.55, 0.55);
+          if (ev.bossId === 'sovereign_lord' && ev.phase >= 2) {
+            this.desiredTrack = 'boss_sovereign_p2';
+            this.desiredIntensity = 'boss';
+            this.desiredBossPhase = ev.phase;
+            this.music?.setBossPhase(ev.phase);
+            this.music?.setState('boss_sovereign_p2', 'boss');
+          }
+          break;
+        }
+
+        case 'status_applied': {
+          if (ev.statusId === 'chill') {
+            this.sfx.play('chill_crackle', { volume: 0.65 });
+          } else if (ev.statusId === 'hangover') {
+            this.sfx.play('hangover_fizz', { volume: 0.65 });
+          } else if (ev.statusId === 'poison') {
+            this.sfx.play('poison_hiss', { volume: 0.65 });
+          } else if (ev.statusId === 'doom') {
+            this.sfx.play('doom_gong', { volume: 0.42, pitchScale: 1.45 });
+          }
           break;
         }
 
         case 'status_triggered': {
-          this.sfx.play('status_proc', { statusId: ev.statusId });
+          if (ev.statusId === 'doom') {
+            this.sfx.play('doom_gong');
+          } else if (ev.statusId === 'hangover') {
+            this.sfx.play('hangover_fizz');
+          } else if (ev.statusId === 'chill') {
+            this.sfx.play('chill_crackle');
+          } else if (ev.statusId === 'poison') {
+            this.sfx.play('poison_hiss');
+          } else {
+            this.sfx.play('status_proc', { statusId: ev.statusId });
+          }
           break;
         }
 
         case 'pickup_collected': {
           const lower = ev.label.toLowerCase();
-          if (lower.includes('bloodstone') || lower.includes('cast')) {
+          if (ev.kind === 'chaos_gate') {
+            this.sfx.play('chaos_void_hum');
+          } else if (ev.kind === 'fountain') {
+            this.sfx.play('curing_pool_chime');
+          } else if (lower.includes('bloodstone') || lower.includes('cast')) {
             this.sfx.play('cast_pickup');
           } else {
             this.sfx.play('pickup_collect', { patronId: ev.patronId });
@@ -250,7 +291,11 @@ export class AudioEngine {
         }
 
         case 'room_entered': {
-          this.sfx.play('room_enter');
+          if (ev.encounterKind === 'chaos') {
+            this.sfx.play('chaos_void_hum');
+          } else {
+            this.sfx.play('room_enter');
+          }
           break;
         }
 
@@ -261,7 +306,6 @@ export class AudioEngine {
           break;
         }
 
-        case 'status_applied':
         case 'hitstop':
         case 'camera_shake':
         case 'rumble':
@@ -272,35 +316,91 @@ export class AudioEngine {
   }
 
   /**
-   * Synchronize adaptive soundtrack (hub / explore / combat / boss + biome track)
-   * and detect Bloodstone ammo pickups cleanly from simulation state.
+   * Synchronize adaptive 5-biome / 5-boss / shop soundtrack AND state-driven foley
+   * (cast pickup, lava sizzle, poison hiss, curing pool cleanse, bow draw, rail reload, spear recall).
    */
   updateMusic(state: SimState, screen: ScreenId): void {
     if (this.disposed) return;
 
-    // Detect Bloodstone pickup cleanly without requiring a custom SimEvent
-    if (
+    const sameRoomAdvance =
       this.prevTick >= 0 &&
       state.tick > this.prevTick &&
       state.room.roomIndex === this.prevRoomIndex &&
-      this.prevCastAmmo >= 0 &&
-      state.player.castAmmo > this.prevCastAmmo &&
-      screen === 'playing'
-    ) {
-      if (this.sfx && this.ctx && this.ctx.state === 'running' && !this.settings.muted) {
+      screen === 'playing';
+
+    const hasPoisonStatus = state.player.statuses.some((s) => s.id === 'poison' && s.remaining > 0);
+    const canPlaySfx =
+      this.sfx !== null &&
+      this.ctx !== null &&
+      this.ctx.state === 'running' &&
+      !this.settings.muted &&
+      this.settings.masterVolume > 0.001 &&
+      this.settings.sfxVolume > 0.001;
+
+    if (sameRoomAdvance && canPlaySfx && this.sfx) {
+      // 1. Bloodstone pickup
+      if (this.prevCastAmmo >= 0 && state.player.castAmmo > this.prevCastAmmo) {
         this.sfx.play('cast_pickup');
       }
+      // 2. Eternal Spear recall transition (spearOut true -> false)
+      if (state.player.weaponId === 'eternal_spear' && this.prevSpearOut && !state.player.spearOut) {
+        this.sfx.play('spear_recall');
+      }
+      // 3. Adamant Rail reload clack transition (reloadTimer <= 0 -> > 0)
+      if (
+        state.player.weaponId === 'adamant_rail' &&
+        this.prevReloadTimer <= 0 &&
+        state.player.reloadTimer > 0
+      ) {
+        this.sfx.play('rail_reload');
+      }
+      // 4. Heart-Seeking Bow draw creak + golden Power Shot glint
+      if (state.player.weaponId === 'heart_seeking_bow') {
+        if (this.prevAttackChargeTimer <= 0 && state.player.attackChargeTimer > 0) {
+          this.sfx.play('bow_draw');
+        } else if (this.prevAttackChargeTimer < 0.42 && state.player.attackChargeTimer >= 0.42) {
+          this.sfx.play('bow_power_shot', { volume: 0.35, pitchScale: 1.25 });
+        }
+      }
+      // 5. Shield of Chaos block/Bull Rush clang
+      if (state.player.weaponId === 'shield_of_chaos' && !this.prevIsBlocking && state.player.isBlocking) {
+        this.sfx.play('shield_clang', { volume: 0.45 });
+      }
+      // 6. Cinder Mire lava sizzle
+      if (state.player.inLava && (!this.prevInLava || state.tick - this.lastLavaSizzleTick >= 26)) {
+        this.sfx.play('lava_sizzle');
+        this.lastLavaSizzleTick = state.tick;
+      }
+      // 7. Crypt of Bile poison hiss
+      if (state.player.inPoison && (!this.prevInPoison || state.tick - this.lastPoisonHissTick >= 30)) {
+        this.sfx.play('poison_hiss');
+        this.lastPoisonHissTick = state.tick;
+      }
+      // 8. Crypt of Bile curing pool cleanse chime
+      if (this.prevHasPoisonStatus && !hasPoisonStatus) {
+        this.sfx.play('curing_pool_chime');
+      }
     }
+
     this.prevTick = state.tick;
     this.prevRoomIndex = state.room.roomIndex;
     this.prevCastAmmo = state.player.castAmmo;
+    this.prevSpearOut = state.player.spearOut;
+    this.prevReloadTimer = state.player.reloadTimer;
+    this.prevAttackChargeTimer = state.player.attackChargeTimer;
+    this.prevIsBlocking = state.player.isBlocking;
+    this.prevInLava = state.player.inLava;
+    this.prevInPoison = state.player.inPoison;
+    this.prevHasPoisonStatus = hasPoisonStatus;
 
-    const { track, intensity, muffled } = this.resolveMusicTarget(state, screen);
+    const { track, intensity, bossPhase, muffled } = this.resolveMusicTarget(state, screen);
     this.desiredTrack = track;
     this.desiredIntensity = intensity;
+    this.desiredBossPhase = bossPhase;
     this.desiredMuffled = muffled;
 
     if (this.music && this.ctx && this.ctx.state === 'running') {
+      this.music.setBossPhase(bossPhase);
       this.music.setState(track, intensity);
       this.music.setMenuMuffled(muffled);
     }
@@ -396,7 +496,88 @@ export class AudioEngine {
   }
 
   // ============================================================================
-  // Internals
+  // Bespoke 6-Weapon Foley Dispatch
+  // ============================================================================
+
+  private dispatchWeaponAttackSfx(weaponId: SimState['player']['weaponId'], step: number, isDashStrike: boolean): void {
+    if (!this.sfx) return;
+    switch (weaponId) {
+      case 'stygian_blade': {
+        const swingId: SfxId =
+          step <= 1 ? 'sword_swing_1' : step === 2 ? 'sword_swing_2' : 'sword_swing_3';
+        this.sfx.play(swingId, { weaponId, isDashStrike });
+        break;
+      }
+      case 'eternal_spear': {
+        if (step >= 4) {
+          this.sfx.play('spear_spin', { weaponId, isDashStrike });
+        } else {
+          const pitchScale = step <= 1 ? 1.0 : step === 2 ? 1.14 : 1.3;
+          this.sfx.play('spear_thrust', { weaponId, isDashStrike, pitchScale });
+        }
+        break;
+      }
+      case 'shield_of_chaos': {
+        this.sfx.play(isDashStrike ? 'shield_clang' : 'shield_bash', { weaponId, isDashStrike });
+        break;
+      }
+      case 'heart_seeking_bow': {
+        // Power Shot chime on full/empowered shots (or comboStep >= 2 / dash-strike); crisp twang on quick taps
+        const pitchScale = isDashStrike ? 1.08 : step >= 2 ? 1.04 : 0.94;
+        this.sfx.play('bow_power_shot', {
+          weaponId,
+          isDashStrike,
+          pitchScale,
+          volume: step >= 2 || isDashStrike ? 1.0 : 0.72,
+        });
+        break;
+      }
+      case 'twin_fists': {
+        const fistLadder = [0.94, 1.02, 1.1, 1.18, 1.32];
+        const idx = Math.max(0, Math.min(fistLadder.length - 1, step - 1));
+        this.sfx.play('fists_flurry', {
+          weaponId,
+          isDashStrike,
+          pitchScale: fistLadder[idx],
+        });
+        break;
+      }
+      case 'adamant_rail': {
+        this.sfx.play('rail_shot', { weaponId, isDashStrike });
+        break;
+      }
+    }
+  }
+
+  private dispatchWeaponSpecialSfx(weaponId: SimState['player']['weaponId']): void {
+    if (!this.sfx) return;
+    switch (weaponId) {
+      case 'stygian_blade':
+        this.sfx.play('sword_nova', { weaponId });
+        break;
+      case 'eternal_spear':
+        this.sfx.play(this.prevSpearOut ? 'spear_recall' : 'spear_thrust', {
+          weaponId,
+          pitchScale: this.prevSpearOut ? 1.0 : 0.9,
+        });
+        break;
+      case 'shield_of_chaos':
+        this.sfx.play('shield_boomerang', { weaponId });
+        break;
+      case 'heart_seeking_bow':
+        this.sfx.play('bow_volley', { weaponId });
+        break;
+      case 'twin_fists':
+        this.sfx.play('fists_uppercut', { weaponId });
+        break;
+      case 'adamant_rail':
+        this.sfx.play('rail_mortar', { weaponId });
+        break;
+    }
+  }
+
+  // ============================================================================
+  // Internals & Adaptive 5-Biome / 5-Boss Track Selection
   // ============================================================================
 
   private initGraph(ctx: AudioContext): void {
@@ -425,6 +606,7 @@ export class AudioEngine {
     this.music = new MusicSynthesizer(ctx, musicGain);
 
     this.applySettings(this.settings);
+    this.music.setBossPhase(this.desiredBossPhase);
     this.music.setState(this.desiredTrack, this.desiredIntensity);
     this.music.setMenuMuffled(this.desiredMuffled);
     this.music.start();
@@ -433,7 +615,7 @@ export class AudioEngine {
   private resolveMusicTarget(
     state: SimState,
     screen: ScreenId
-  ): { track: MusicTrackId; intensity: MusicIntensity; muffled: boolean } {
+  ): { track: MusicTrackId; intensity: MusicIntensity; bossPhase: number; muffled: boolean } {
     const muffled =
       state.run.paused ||
       screen === 'pause' ||
@@ -443,14 +625,13 @@ export class AudioEngine {
       screen === 'mirror_menu' ||
       screen === 'shrine_menu' ||
       screen === 'keepsake_menu' ||
-      screen === 'shop_menu' ||
       screen === 'codex_menu';
 
     if (screen === 'victory' || state.run.victory) {
-      return { track: 'victory_fanfare', intensity: 'hub', muffled: false };
+      return { track: 'victory_fanfare', intensity: 'hub', bossPhase: 1, muffled: false };
     }
     if (screen === 'death' || state.run.defeat) {
-      return { track: 'death_stinger', intensity: 'hub', muffled: false };
+      return { track: 'death_stinger', intensity: 'hub', bossPhase: 1, muffled: false };
     }
     if (
       screen === 'title' ||
@@ -458,21 +639,22 @@ export class AudioEngine {
       state.run.inHub ||
       state.room.biome === 'sanctum_hub'
     ) {
-      return { track: 'hub_sanctum', intensity: 'hub', muffled };
+      return { track: 'hub_sanctum', intensity: 'hub', bossPhase: 1, muffled };
     }
 
-    let hasLiveBoss = false;
-    let hasSovereign = false;
+    let liveBossId: BossId | null = null;
+    let liveBossPhase = 1;
     let hasLiveHostile = false;
+
     for (let i = 0; i < state.enemies.length; i++) {
       const e = state.enemies[i];
       if (e.hp <= 0 || e.aiState === 'dead') continue;
       if (e.archetype === 'rattlebones_dummy') continue;
       hasLiveHostile = true;
       if (e.isBoss) {
-        hasLiveBoss = true;
-        if (e.bossId === 'sovereign_lord') {
-          hasSovereign = true;
+        if (liveBossId === null || e.bossId === 'sovereign_lord') {
+          liveBossId = e.bossId ?? null;
+          liveBossPhase = Math.max(1, e.phase);
         }
       }
     }
@@ -480,21 +662,55 @@ export class AudioEngine {
     const isBossRoom =
       state.room.encounterKind === 'boss' ||
       state.room.encounterKind === 'surface_boss' ||
-      hasLiveBoss;
+      liveBossId !== null;
 
+    // 1. All 5 Boss Tiers (runs BEFORE shop check so borrowing Gold Bag -> Ferryman instantly triggers boss_ferryman!)
     if (isBossRoom && hasLiveHostile && !state.room.cleared) {
-      const bossTrack: MusicTrackId =
-        hasSovereign || state.room.biome === 'frozen_summit' ? 'boss_sovereign' : 'boss_warden';
-      return { track: bossTrack, intensity: 'boss', muffled };
+      const bossTrack = this.bossToTrack(liveBossId, state.room.biome, liveBossPhase);
+      return { track: bossTrack, intensity: 'boss', bossPhase: liveBossPhase, muffled };
     }
 
+    // 2. Boatman Shop / Styx Hub calm mysterious Dorian theme
+    if (
+      screen === 'shop_menu' ||
+      state.room.encounterKind === 'shop' ||
+      state.room.encounterKind === 'styx_hub'
+    ) {
+      return { track: 'boatman_shop', intensity: 'explore', bossPhase: 1, muffled };
+    }
+
+    // 3. Chaos Realm brooding sparse atmosphere
+    if (state.room.encounterKind === 'chaos') {
+      return { track: 'hub_sanctum', intensity: 'hub', bossPhase: 1, muffled };
+    }
+
+    // 4. All 5 Biomes (combat shred vs. explore tension)
     const biomeTrack = this.biomeToTrack(state.room.biome);
     if (hasLiveHostile && !state.room.cleared && state.room.combatStarted) {
-      return { track: biomeTrack, intensity: 'combat', muffled };
+      return { track: biomeTrack, intensity: 'combat', bossPhase: 1, muffled };
     }
 
-    // Cleared chamber, shop, fountain, story, or pre-combat suspense
-    return { track: biomeTrack, intensity: 'explore', muffled };
+    return { track: biomeTrack, intensity: 'explore', bossPhase: 1, muffled };
+  }
+
+  private bossToTrack(bossId: BossId | null, biome: BiomeId, phase: number): MusicTrackId {
+    if (bossId === 'sovereign_lord' || (bossId === null && biome === 'frozen_summit')) {
+      return phase >= 2 ? 'boss_sovereign_p2' : 'boss_sovereign';
+    }
+    if (bossId === 'the_ferryman') {
+      return 'boss_ferryman';
+    }
+    if (
+      bossId === 'colosseum_bull' ||
+      bossId === 'colosseum_spearlord' ||
+      (bossId === null && biome === 'verdant_colosseum')
+    ) {
+      return 'boss_champions';
+    }
+    if (bossId === 'bone_leviathan' || (bossId === null && biome === 'cinder_mire')) {
+      return 'boss_leviathan';
+    }
+    return 'boss_warden';
   }
 
   private biomeToTrack(biome: BiomeId): MusicTrackId {
@@ -515,5 +731,17 @@ export class AudioEngine {
   }
 }
 
-export { getBuiltinAudioIds, MUSIC_TRACK_IDS, SFX_IDS } from './soundManifest';
-export type { AudioId, MusicIntensity, MusicTrackId, SfxId } from './soundManifest';
+export {
+  getBuiltinAudioIds,
+  MUSIC_TRACK_IDS,
+  SCALE_INTERVALS,
+  SFX_IDS,
+} from './soundManifest';
+export type {
+  AudioId,
+  DrumStyleId,
+  MusicalModeId,
+  MusicIntensity,
+  MusicTrackId,
+  SfxId,
+} from './soundManifest';
