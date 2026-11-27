@@ -1,5 +1,6 @@
 import type { InputSource, MetaSaveState, RenderSettings } from '../contracts/index.js';
 import type { MenuNavInput } from '../input/InputManager.js';
+import { svgDividerFinial, svgTitleCrest } from './svgArt.js';
 
 export interface TitleScreenCallbacks {
   onEnterCourtyard(): void;
@@ -7,6 +8,7 @@ export interface TitleScreenCallbacks {
   onOpenOptions(): void;
   onUpdateSettings(partial: Partial<RenderSettings>): void;
   onLoadCustomPackFolder?(): void;
+  readonly onUiHover?: () => void;
 }
 
 const INPUT_SOURCE_LABELS: Record<InputSource, { badge: string; hint: string }> = {
@@ -52,17 +54,44 @@ export class TitleScreen {
     const content = document.createElement('div');
     content.className = 'kh-title-content';
 
+    // Editorial Left Pillar framing the wordmark & menu while the live Courtyard breathes on the right
+    const pillar = document.createElement('div');
+    pillar.className = 'kh-title-pillar';
+
+    const crestArt = document.createElement('div');
+    crestArt.className = 'kh-title-crest-art';
+    crestArt.innerHTML = svgTitleCrest();
+
+    const eyebrowRule = document.createElement('div');
+    eyebrowRule.className = 'kh-title-eyebrow-rule';
+    const ruleLeft = document.createElement('span');
+    ruleLeft.className = 'kh-title-rule-line';
     const crest = document.createElement('div');
     crest.className = 'kh-title-crest';
-    crest.textContent = '◆ UNDERWORLD ACTION ROGUELITE ◆';
+    crest.textContent = 'UNDERWORLD ACTION ROGUELITE';
+    const ruleRight = document.createElement('span');
+    ruleRight.className = 'kh-title-rule-line';
+    eyebrowRule.append(ruleLeft, crest, ruleRight);
 
     const heading = document.createElement('h1');
     heading.className = 'kh-title-heading';
-    heading.textContent = 'KRUNKED WANNABEHADES';
+    const topWord = document.createElement('span');
+    topWord.className = 'kh-title-word-top';
+    topWord.textContent = 'KRUNKED ';
+    const mainWord = document.createElement('span');
+    mainWord.className = 'kh-title-word-main';
+    mainWord.textContent = 'WANNABEHADES';
+    heading.append(topWord, mainWord);
 
+    const taglineWrap = document.createElement('div');
+    taglineWrap.className = 'kh-title-tagline-wrap';
     const sub = document.createElement('p');
     sub.className = 'kh-title-sub';
     sub.textContent = 'Escape the Sanctum of Ash';
+    const divider = document.createElement('div');
+    divider.className = 'kh-title-divider';
+    divider.innerHTML = `<span class="kh-title-rule-line"></span>${svgDividerFinial()}<span class="kh-title-rule-line"></span>`;
+    taglineWrap.append(sub, divider);
 
     const menu = document.createElement('div');
     menu.className = 'kh-title-menu';
@@ -76,14 +105,14 @@ export class TitleScreen {
 
     const btnPackMode = document.createElement('button');
     btnPackMode.type = 'button';
-    btnPackMode.className = 'kh-btn';
+    btnPackMode.className = 'kh-btn kh-btn-notched';
     this.packModeTextEl = document.createElement('span');
     this.packModeTextEl.textContent = 'ART PACK: BUILT-IN';
     btnPackMode.appendChild(this.packModeTextEl);
 
     const btnLoadPack = document.createElement('button');
     btnLoadPack.type = 'button';
-    btnLoadPack.className = 'kh-btn';
+    btnLoadPack.className = 'kh-btn kh-btn-notched';
     btnLoadPack.textContent = 'LOAD CUSTOM PACK';
 
     packRow.append(btnPackMode, btnLoadPack);
@@ -99,30 +128,37 @@ export class TitleScreen {
 
     this.buttons.forEach((btn, idx) => {
       btn.addEventListener('pointerenter', () => {
-        this.focusedIndex = idx;
-        this.applyFocusStyles();
+        if (this.focusedIndex !== idx) {
+          this.focusedIndex = idx;
+          this.applyFocusStyles();
+          this.callbacks.onUiHover?.();
+        }
+      });
+      btn.addEventListener('focus', () => {
+        if (this.focusedIndex !== idx) {
+          this.focusedIndex = idx;
+          this.applyFocusStyles();
+          this.callbacks.onUiHover?.();
+        }
       });
     });
 
-    content.append(crest, heading, sub, menu);
+    pillar.append(crestArt, eyebrowRule, heading, taglineWrap, menu);
+    content.appendChild(pillar);
 
     // Footer with live input mode badge + meta run counters
     const footer = document.createElement('div');
     footer.className = 'kh-title-footer';
 
     const leftFooter = document.createElement('div');
-    leftFooter.style.display = 'flex';
-    leftFooter.style.alignItems = 'center';
-    leftFooter.style.gap = '12px';
-    leftFooter.style.flexWrap = 'wrap';
+    leftFooter.className = 'kh-title-footer-left';
 
     this.inputBadgeEl = document.createElement('div');
     this.inputBadgeEl.className = 'kh-input-badge';
     this.inputBadgeEl.setAttribute('data-input-badge', 'keyboard');
 
     this.navHintEl = document.createElement('span');
-    this.navHintEl.style.fontSize = '11px';
-    this.navHintEl.style.color = '#b8aea2';
+    this.navHintEl.className = 'kh-title-nav-hint';
 
     leftFooter.append(this.inputBadgeEl, this.navHintEl);
 
@@ -178,33 +214,52 @@ export class TitleScreen {
       this.lastMetaKey = metaKey;
       this.metaStatsEl.innerHTML = '';
       if (meta.totalRuns > 0 || meta.darkness > 0) {
-        const items = [
-          `RUNS: ${meta.totalRuns}`,
-          `ESCAPES: ${meta.totalClears}`,
-          `BEST HEAT: ${meta.highestHeatCleared}`,
-          `DARKNESS: ${meta.darkness}`,
+        const items: readonly [string, number][] = [
+          ['RUNS', meta.totalRuns],
+          ['ESCAPES', meta.totalClears],
+          ['BEST HEAT', meta.highestHeatCleared],
+          ['DARKNESS', Math.floor(meta.darkness)],
         ];
-        for (const text of items) {
-          const span = document.createElement('span');
-          span.textContent = text;
-          this.metaStatsEl.appendChild(span);
+        for (const [label, val] of items) {
+          const item = document.createElement('span');
+          item.className = 'kh-title-meta-item';
+          const lbl = document.createElement('span');
+          lbl.className = 'kh-title-meta-label';
+          lbl.textContent = label;
+          const num = document.createElement('span');
+          num.className = 'kh-title-meta-num';
+          num.textContent = String(val);
+          item.append(lbl, num);
+          this.metaStatsEl.appendChild(item);
         }
+      } else {
+        const badge = document.createElement('span');
+        badge.className = 'kh-title-meta-item';
+        const lbl = document.createElement('span');
+        lbl.className = 'kh-title-meta-label';
+        lbl.textContent = 'SANCTUM';
+        const num = document.createElement('span');
+        num.className = 'kh-title-meta-num';
+        num.textContent = '60HZ · 5 BIOMES';
+        badge.append(lbl, num);
+        this.metaStatsEl.appendChild(badge);
       }
     }
 
     // Keyboard & Xbox D-Pad / A navigation
+    const prevIdx = this.focusedIndex;
     if (menuNav.up) {
       this.focusedIndex = (this.focusedIndex - 1 + this.buttons.length) % this.buttons.length;
-      this.applyFocusStyles();
     } else if (menuNav.down) {
       this.focusedIndex = (this.focusedIndex + 1) % this.buttons.length;
-      this.applyFocusStyles();
     } else if (menuNav.left && this.focusedIndex === 4) {
       this.focusedIndex = 3;
-      this.applyFocusStyles();
     } else if (menuNav.right && this.focusedIndex === 3) {
       this.focusedIndex = 4;
+    }
+    if (this.focusedIndex !== prevIdx) {
       this.applyFocusStyles();
+      this.callbacks.onUiHover?.();
     }
 
     if (menuNav.confirm) {
@@ -253,15 +308,22 @@ export class TitleScreen {
   private createMenuButton(label: string, tag: string, primary: boolean): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = primary ? 'kh-btn kh-btn-primary' : 'kh-btn';
-    const left = document.createElement('span');
-    left.textContent = label;
+    btn.className = primary ? 'kh-btn kh-btn-primary kh-btn-notched' : 'kh-btn kh-btn-notched';
+
+    const leftWrap = document.createElement('span');
+    leftWrap.className = 'kh-title-btn-left';
+    const diamond = document.createElement('span');
+    diamond.className = 'kh-title-btn-diamond';
+    diamond.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.textContent = label;
+    leftWrap.append(diamond, text);
+
     const right = document.createElement('span');
-    right.style.fontSize = '10px';
-    right.style.opacity = '0.72';
-    right.style.letterSpacing = '0.14em';
+    right.className = 'kh-title-btn-tag';
     right.textContent = tag;
-    btn.append(left, right);
+
+    btn.append(leftWrap, right);
     return btn;
   }
 }

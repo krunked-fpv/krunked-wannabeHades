@@ -5,10 +5,12 @@ import {
   type SimState,
 } from '../contracts/index.js';
 import type { MenuNavInput } from '../input/InputManager.js';
+import { attachCornerFiligrees, svgHeatFlame } from './svgArt.js';
 
 export interface ShrineModalCallbacks {
   onSetShrineVow?(id: ShrineVowId, rank: number): void;
   onCloseModal(): void;
+  readonly onUiHover?: () => void;
 }
 
 const SHRINE_ORDER: readonly ShrineVowId[] = [
@@ -80,7 +82,8 @@ export class ShrineModal {
     this.backdrop.setAttribute('data-screen', 'shrine_menu');
 
     const shell = document.createElement('div');
-    shell.className = 'kh-meta-shell';
+    shell.className = 'kh-meta-shell kh-ornate-frame kh-theme-shrine';
+    attachCornerFiligrees(shell);
 
     // Header
     const header = document.createElement('div');
@@ -93,7 +96,7 @@ export class ShrineModal {
     title.textContent = 'SHRINE OF TORMENT';
     const sub = document.createElement('div');
     sub.className = 'kh-meta-sub';
-    sub.textContent = '16 Heat Vows · Raise Torment for Greater Bounties';
+    sub.textContent = 'Sixteen Heat Vows · Raise Torment for Greater Bounties';
     titleGroup.append(title, sub);
 
     const badges = document.createElement('div');
@@ -101,7 +104,7 @@ export class ShrineModal {
     this.bestHeatBadge = document.createElement('div');
     this.bestHeatBadge.className = 'kh-meta-pill';
     this.totalHeatBadge = document.createElement('div');
-    this.totalHeatBadge.className = 'kh-meta-pill kh-meta-pill-heat';
+    this.totalHeatBadge.className = 'kh-meta-pill kh-meta-pill-heat kh-heat-crest';
     badges.append(this.bestHeatBadge, this.totalHeatBadge);
     header.append(titleGroup, badges);
 
@@ -126,12 +129,11 @@ export class ShrineModal {
     this.hintEl.className = 'kh-meta-hint';
 
     const footerBtns = document.createElement('div');
-    footerBtns.style.display = 'flex';
-    footerBtns.style.gap = '8px';
+    footerBtns.className = 'kh-footer-btn-group';
 
     const clearBtn = document.createElement('button');
     clearBtn.type = 'button';
-    clearBtn.className = 'kh-btn';
+    clearBtn.className = 'kh-btn kh-btn-notched';
     clearBtn.textContent = 'CLEAR ALL VOWS';
     clearBtn.addEventListener('click', () => {
       for (const id of SHRINE_ORDER) {
@@ -140,12 +142,14 @@ export class ShrineModal {
         }
       }
     });
+    clearBtn.addEventListener('pointerenter', () => this.callbacks.onUiHover?.());
 
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
-    closeBtn.className = 'kh-btn kh-btn-primary';
+    closeBtn.className = 'kh-btn kh-btn-primary kh-btn-notched';
     closeBtn.textContent = 'SEAL SHRINE';
     closeBtn.addEventListener('click', () => this.callbacks.onCloseModal());
+    closeBtn.addEventListener('pointerenter', () => this.callbacks.onUiHover?.());
 
     footerBtns.append(clearBtn, closeBtn);
     footer.append(this.hintEl, footerBtns);
@@ -190,12 +194,15 @@ export class ShrineModal {
     }
 
     const len = SHRINE_ORDER.length;
+    const prevIdx = this.focusedIndex;
     if (menuNav.up) {
       this.focusedIndex = (this.focusedIndex - 1 + len) % len;
-      this.applyFocusStyles();
     } else if (menuNav.down) {
       this.focusedIndex = (this.focusedIndex + 1) % len;
+    }
+    if (this.focusedIndex !== prevIdx) {
       this.applyFocusStyles();
+      this.callbacks.onUiHover?.();
     }
 
     const vowId = SHRINE_ORDER[this.focusedIndex];
@@ -227,10 +234,9 @@ export class ShrineModal {
     const vows = state.meta.shrineVows;
     const totalHeat = computeTotalHeat(vows);
 
-    this.totalHeatBadge.textContent = `🔥 TOTAL HEAT: ${totalHeat}`;
+    this.totalHeatBadge.innerHTML = `${svgHeatFlame()}<span>TOTAL HEAT: <strong class="kh-heat-num">${totalHeat}</strong></span>`;
     this.bestHeatBadge.textContent = `HIGHEST CLEARED: ${state.meta.highestHeatCleared}`;
 
-    // Special callouts for Tight Deadline, Extreme Measures (EM1-4), and Routine Inspection
     this.calloutsEl.innerHTML = '';
     const deadlineRank = Math.max(0, Math.min(3, Math.floor(vows.tight_deadline ?? 0)));
     const emRank = Math.max(0, Math.min(4, Math.floor(vows.extreme_measures ?? 0)));
@@ -270,40 +276,29 @@ export class ShrineModal {
       row.dataset.vowId = id;
 
       const info = document.createElement('div');
-      info.style.display = 'flex';
-      info.style.flexDirection = 'column';
-      info.style.gap = '2px';
-      info.style.minWidth = '0';
+      info.className = 'kh-shrine-info';
 
       const top = document.createElement('div');
-      top.style.display = 'flex';
-      top.style.alignItems = 'center';
-      top.style.gap = '6px';
-      top.style.flexWrap = 'wrap';
+      top.className = 'kh-shrine-top';
 
       const nameEl = document.createElement('span');
-      nameEl.style.fontFamily = 'var(--kh-font-display)';
-      nameEl.style.fontSize = '12.5px';
-      nameEl.style.fontWeight = '700';
-      nameEl.style.color = rank > 0 ? '#ffd59c' : '#f4ece0';
+      nameEl.className = 'kh-shrine-name';
       nameEl.textContent = def.displayName;
 
       const heatPill = document.createElement('span');
-      heatPill.className = 'kh-boon-slot-tag';
-      heatPill.style.color = rank > 0 ? '#ff9d66' : '#b8aea2';
+      heatPill.className = rank > 0 ? 'kh-boon-slot-tag kh-tag-heat-on' : 'kh-boon-slot-tag';
       heatPill.textContent =
         rank > 0 ? `+${heatAdded} HEAT` : `+${def.heatPerRank.join('/')} HEAT`;
 
       top.append(nameEl, heatPill);
 
       const desc = document.createElement('div');
-      desc.style.fontSize = '11px';
-      desc.style.color = '#cfc5b8';
+      desc.className = 'kh-shrine-desc';
       desc.textContent = def.description;
 
       info.append(top, desc);
 
-      // − / + Stepper (>= 48px touch targets)
+      // − / + Sculpted Bronze Stepper Seals (>= 48px touch targets)
       const stepper = document.createElement('div');
       stepper.className = 'kh-stepper';
 
@@ -316,6 +311,9 @@ export class ShrineModal {
       decBtn.addEventListener('click', () => {
         this.focusedIndex = idx;
         this.callbacks.onSetShrineVow?.(id, Math.max(0, rank - 1));
+      });
+      decBtn.addEventListener('pointerenter', () => {
+        if (!decBtn.disabled) this.callbacks.onUiHover?.();
       });
 
       const rankText = document.createElement('span');
@@ -332,12 +330,18 @@ export class ShrineModal {
         this.focusedIndex = idx;
         this.callbacks.onSetShrineVow?.(id, Math.min(def.maxRank, rank + 1));
       });
+      incBtn.addEventListener('pointerenter', () => {
+        if (!incBtn.disabled) this.callbacks.onUiHover?.();
+      });
 
       stepper.append(decBtn, rankText, incBtn);
       row.append(info, stepper);
       row.addEventListener('pointerenter', () => {
-        this.focusedIndex = idx;
-        this.applyFocusStyles();
+        if (this.focusedIndex !== idx) {
+          this.focusedIndex = idx;
+          this.applyFocusStyles();
+          this.callbacks.onUiHover?.();
+        }
       });
 
       this.gridEl.appendChild(row);

@@ -10,6 +10,7 @@ import {
   type SimState,
 } from '../contracts/index.js';
 import type { MenuNavInput } from '../input/InputManager.js';
+import { attachCornerFiligrees, svgPatronSigil, svgTitleCrest } from './svgArt.js';
 
 export interface PauseAndOptionsCallbacks {
   onResume(): void;
@@ -22,6 +23,7 @@ export interface PauseAndOptionsCallbacks {
   onToggleGodMode(enabled: boolean): void;
   onLoadCustomPackFolder?(): void;
   onResetSave(): void;
+  readonly onUiHover?: () => void;
 }
 
 const FPS_CHOICES: readonly (30 | 60 | 120)[] = [30, 60, 120];
@@ -87,6 +89,7 @@ export class PauseAndOptionsModal {
 
   // Victory / Death Summary elements
   private readonly summaryPanel: HTMLDivElement;
+  private readonly summaryBannerEl: HTMLDivElement;
   private readonly summaryTitleEl: HTMLHeadingElement;
   private readonly summarySubEl: HTMLDivElement;
   private readonly summaryStatsEl: HTMLDivElement;
@@ -94,7 +97,7 @@ export class PauseAndOptionsModal {
   private readonly summaryButtons: HTMLButtonElement[];
   private lastSummaryKey = '';
 
-  // Lightweight fallback panel for hub submenus (weapon/mirror/shrine/keepsake/shop/codex)
+  // Lightweight fallback panel for hub submenus
   private readonly submenuPanel: HTMLDivElement;
   private readonly submenuTitleEl: HTMLHeadingElement;
   private readonly submenuBodyEl: HTMLDivElement;
@@ -110,8 +113,9 @@ export class PauseAndOptionsModal {
 
     // ==================== 1. PAUSE MENU ====================
     this.pausePanel = document.createElement('div');
-    this.pausePanel.className = 'kh-modal-panel kh-modal-panel-narrow kh-hidden';
+    this.pausePanel.className = 'kh-modal-panel kh-modal-panel-narrow kh-ornate-frame kh-hidden';
     this.pausePanel.setAttribute('data-screen', 'pause');
+    attachCornerFiligrees(this.pausePanel);
 
     const pauseTitle = document.createElement('h2');
     pauseTitle.className = 'kh-modal-title';
@@ -139,9 +143,10 @@ export class PauseAndOptionsModal {
     this.pauseButtons = [btnResume, btnOptions, btnCourtyard, btnTitle];
     this.pauseButtons.forEach((b, idx) => {
       b.addEventListener('pointerenter', () => {
-        if (this.activeMode === 'pause') {
+        if (this.activeMode === 'pause' && this.focusedIndex !== idx) {
           this.focusedIndex = idx;
           this.applyFocus();
+          this.callbacks.onUiHover?.();
         }
       });
     });
@@ -151,8 +156,9 @@ export class PauseAndOptionsModal {
 
     // ==================== 2. OPTIONS PANEL ====================
     this.optionsPanel = document.createElement('div');
-    this.optionsPanel.className = 'kh-modal-panel kh-modal-panel-wide kh-hidden';
+    this.optionsPanel.className = 'kh-modal-panel kh-modal-panel-wide kh-ornate-frame kh-hidden';
     this.optionsPanel.setAttribute('data-screen', 'options');
+    attachCornerFiligrees(this.optionsPanel);
 
     const optTitle = document.createElement('h2');
     optTitle.className = 'kh-modal-title';
@@ -239,7 +245,7 @@ export class PauseAndOptionsModal {
       }
     );
 
-    // Volume Sliders: Master, Music, SFX
+    // Custom Gilded Bronze Volume Sliders
     const masterCtrl = this.createSliderRow('Master Volume', 'masterVolume');
     this.masterSlider = masterCtrl.slider;
     this.masterValEl = masterCtrl.valEl;
@@ -329,23 +335,32 @@ export class PauseAndOptionsModal {
 
     this.optionRows.forEach((ctrl, idx) => {
       ctrl.rowEl.addEventListener('pointerenter', () => {
-        if (this.activeMode === 'options') {
+        if (this.activeMode === 'options' && this.focusedIndex !== idx) {
           this.focusedIndex = idx;
           this.applyFocus();
+          this.callbacks.onUiHover?.();
         }
       });
     });
 
     this.optionsPanel.append(optTitle, optMeander, optGrid, optFooter);
 
-    // ==================== 3. VICTORY & DEATH SUMMARY ====================
+    // ==================== 3. MONUMENTAL VICTORY & DEATH SUMMARY ====================
     this.summaryPanel = document.createElement('div');
-    this.summaryPanel.className = 'kh-modal-panel kh-hidden';
+    this.summaryPanel.className = 'kh-modal-panel kh-summary-panel kh-ornate-frame kh-hidden';
+    attachCornerFiligrees(this.summaryPanel);
 
+    this.summaryBannerEl = document.createElement('div');
+    this.summaryBannerEl.className = 'kh-summary-banner';
+    const bannerCrest = document.createElement('div');
+    bannerCrest.className = 'kh-summary-crest';
+    bannerCrest.innerHTML = svgTitleCrest();
     this.summaryTitleEl = document.createElement('h2');
-    this.summaryTitleEl.className = 'kh-modal-title';
+    this.summaryTitleEl.className = 'kh-modal-title kh-summary-title';
     this.summarySubEl = document.createElement('div');
-    this.summarySubEl.className = 'kh-modal-subtitle';
+    this.summarySubEl.className = 'kh-modal-subtitle kh-summary-sub';
+    this.summaryBannerEl.append(bannerCrest, this.summaryTitleEl, this.summarySubEl);
+
     const sumMeander = document.createElement('div');
     sumMeander.className = 'kh-meander-strip';
 
@@ -353,8 +368,7 @@ export class PauseAndOptionsModal {
     this.summaryStatsEl.className = 'kh-stats-grid';
 
     this.summaryBoonsEl = document.createElement('div');
-    this.summaryBoonsEl.className = 'kh-boon-strip';
-    this.summaryBoonsEl.style.justifyContent = 'center';
+    this.summaryBoonsEl.className = 'kh-summary-boons';
 
     const sumActions = document.createElement('div');
     sumActions.className = 'kh-modal-actions-row';
@@ -369,17 +383,17 @@ export class PauseAndOptionsModal {
     this.summaryButtons = [btnSumCourtyard, btnSumRetry, btnSumTitle];
     this.summaryButtons.forEach((b, idx) => {
       b.addEventListener('pointerenter', () => {
-        if (this.activeMode === 'victory' || this.activeMode === 'death') {
+        if ((this.activeMode === 'victory' || this.activeMode === 'death') && this.focusedIndex !== idx) {
           this.focusedIndex = idx;
           this.applyFocus();
+          this.callbacks.onUiHover?.();
         }
       });
     });
 
     sumActions.append(...this.summaryButtons);
     this.summaryPanel.append(
-      this.summaryTitleEl,
-      this.summarySubEl,
+      this.summaryBannerEl,
       sumMeander,
       this.summaryStatsEl,
       this.summaryBoonsEl,
@@ -388,16 +402,14 @@ export class PauseAndOptionsModal {
 
     // ==================== 4. FALLBACK HUB SUBMENU ====================
     this.submenuPanel = document.createElement('div');
-    this.submenuPanel.className = 'kh-modal-panel kh-modal-panel-narrow kh-hidden';
+    this.submenuPanel.className = 'kh-modal-panel kh-modal-panel-narrow kh-ornate-frame kh-hidden';
+    attachCornerFiligrees(this.submenuPanel);
     this.submenuTitleEl = document.createElement('h2');
     this.submenuTitleEl.className = 'kh-modal-title';
     const subMeander = document.createElement('div');
     subMeander.className = 'kh-meander-strip';
     this.submenuBodyEl = document.createElement('div');
-    this.submenuBodyEl.style.fontSize = '13px';
-    this.submenuBodyEl.style.lineHeight = '1.5';
-    this.submenuBodyEl.style.color = '#dfd5c8';
-    this.submenuBodyEl.style.textAlign = 'center';
+    this.submenuBodyEl.className = 'kh-submenu-body';
     this.submenuCloseBtn = this.makeBtn('CLOSE', true);
     this.submenuCloseBtn.addEventListener('click', () => this.callbacks.onCloseModal());
     this.submenuPanel.append(this.submenuTitleEl, subMeander, this.submenuBodyEl, this.submenuCloseBtn);
@@ -481,12 +493,15 @@ export class PauseAndOptionsModal {
       return;
     }
     const len = this.pauseButtons.length;
+    const prevIdx = this.focusedIndex;
     if (menuNav.up) {
       this.focusedIndex = (this.focusedIndex - 1 + len) % len;
-      this.applyFocus();
     } else if (menuNav.down) {
       this.focusedIndex = (this.focusedIndex + 1) % len;
+    }
+    if (this.focusedIndex !== prevIdx) {
       this.applyFocus();
+      this.callbacks.onUiHover?.();
     }
     if (menuNav.confirm) {
       this.pauseButtons[this.focusedIndex]?.click();
@@ -500,16 +515,19 @@ export class PauseAndOptionsModal {
       return;
     }
     const len = this.optionRows.length;
+    const prevIdx = this.focusedIndex;
     if (menuNav.up) {
       this.focusedIndex = (this.focusedIndex - 1 + len) % len;
-      this.applyFocus();
     } else if (menuNav.down) {
       this.focusedIndex = (this.focusedIndex + 1) % len;
-      this.applyFocus();
     } else if (menuNav.left) {
       this.optionRows[this.focusedIndex]?.adjust(-1);
     } else if (menuNav.right) {
       this.optionRows[this.focusedIndex]?.adjust(1);
+    }
+    if (this.focusedIndex !== prevIdx) {
+      this.applyFocus();
+      this.callbacks.onUiHover?.();
     }
     if (menuNav.confirm) {
       this.optionRows[this.focusedIndex]?.activate();
@@ -518,12 +536,15 @@ export class PauseAndOptionsModal {
 
   private handleSummaryNav(menuNav: MenuNavInput): void {
     const len = this.summaryButtons.length;
+    const prevIdx = this.focusedIndex;
     if (menuNav.left || menuNav.up) {
       this.focusedIndex = (this.focusedIndex - 1 + len) % len;
-      this.applyFocus();
     } else if (menuNav.right || menuNav.down) {
       this.focusedIndex = (this.focusedIndex + 1) % len;
+    }
+    if (this.focusedIndex !== prevIdx) {
       this.applyFocus();
+      this.callbacks.onUiHover?.();
     }
     if (menuNav.confirm) {
       this.summaryButtons[this.focusedIndex]?.click();
@@ -559,18 +580,21 @@ export class PauseAndOptionsModal {
     if (document.activeElement !== this.masterSlider) {
       this.masterSlider.value = String(masterPct);
     }
+    this.masterSlider.style.setProperty('--kh-slider-pct', `${masterPct}%`);
     this.masterValEl.textContent = `${masterPct}%`;
 
     const musicPct = Math.round(s.musicVolume * 100);
     if (document.activeElement !== this.musicSlider) {
       this.musicSlider.value = String(musicPct);
     }
+    this.musicSlider.style.setProperty('--kh-slider-pct', `${musicPct}%`);
     this.musicValEl.textContent = `${musicPct}%`;
 
     const sfxPct = Math.round(s.sfxVolume * 100);
     if (document.activeElement !== this.sfxSlider) {
       this.sfxSlider.value = String(sfxPct);
     }
+    this.sfxSlider.style.setProperty('--kh-slider-pct', `${sfxPct}%`);
     this.sfxValEl.textContent = `${sfxPct}%`;
 
     PACK_CHOICES.forEach((mode, i) => {
@@ -591,17 +615,20 @@ export class PauseAndOptionsModal {
     this.lastSummaryKey = key;
 
     this.summaryPanel.setAttribute('data-screen', isVictory ? 'victory' : 'death');
+    this.summaryBannerEl.className = isVictory
+      ? 'kh-summary-banner kh-banner-victory'
+      : 'kh-summary-banner kh-banner-death';
     this.summaryTitleEl.className = isVictory
-      ? 'kh-modal-title kh-victory-title'
-      : 'kh-modal-title kh-death-title';
-    this.summaryTitleEl.textContent = isVictory ? 'ESCAPE COMPLETE' : 'THERE IS NO ESCAPE';
+      ? 'kh-modal-title kh-summary-title kh-victory-title'
+      : 'kh-modal-title kh-summary-title kh-death-title';
+    this.summaryTitleEl.textContent = isVictory ? 'ESCAPED' : 'THERE IS NO ESCAPE';
 
     const biome = BIOME_CONSTANTS[state.room.biome].displayName;
     const weapon = WEAPON_CONSTANTS[state.player.weaponId].displayName;
     const aspect = ASPECT_DEFS[state.player.aspectId].displayName;
     this.summarySubEl.textContent = isVictory
-      ? `THE FROZEN SUMMIT CONQUERED · ${weapon.toUpperCase()} (${aspect.toUpperCase()})`
-      : `FALLEN IN ${biome.toUpperCase()} (CHAMBER ${state.room.depth}) · ${weapon.toUpperCase()}`;
+      ? `The Frozen Summit Conquered · ${weapon} (${aspect})`
+      : `Fallen in ${biome} (Chamber ${state.room.depth}) · ${weapon}`;
 
     this.summaryStatsEl.innerHTML = '';
     const stats: [string, string][] = [
@@ -633,14 +660,16 @@ export class PauseAndOptionsModal {
 
     this.summaryBoonsEl.innerHTML = '';
     for (const boon of state.player.boons.slice(0, 10)) {
+      const patron = PATRON_CONSTANTS[boon.patronId];
       const chip = document.createElement('div');
-      chip.className = 'kh-boon-chip';
-      const dot = document.createElement('span');
-      dot.className = 'kh-boon-dot';
-      dot.style.background = PATRON_CONSTANTS[boon.patronId].colorHex;
+      chip.className = 'kh-stat-badge kh-summary-boon-pill';
+      chip.style.borderColor = `${patron.colorHex}88`;
+      const sig = document.createElement('span');
+      sig.style.color = patron.colorHex;
+      sig.innerHTML = svgPatronSigil(boon.patronId, 15);
       const text = document.createElement('span');
       text.textContent = `${boon.name}${boon.level > 1 ? ` Lv.${boon.level}` : ''}`;
-      chip.append(dot, text);
+      chip.append(sig, text);
       this.summaryBoonsEl.appendChild(chip);
     }
 
@@ -651,10 +680,10 @@ export class PauseAndOptionsModal {
   private syncSubmenuView(state: SimState, screen: ScreenId): void {
     const titles: Partial<Record<ScreenId, string>> = {
       weapon_menu: 'INFERNAL ARMORY',
-      mirror_menu: 'MIRROR OF ASH',
-      shrine_menu: 'SHRINE OF VOWS',
+      mirror_menu: 'MIRROR OF DUSK',
+      shrine_menu: 'SHRINE OF TORMENT',
       keepsake_menu: 'KEEPSAKE CABINET',
-      shop_menu: 'FERRYMAN WARES',
+      shop_menu: "BOATMAN'S WARES",
       codex_menu: 'SANCTUM CODEX',
     };
     this.submenuTitleEl.textContent = titles[screen] ?? 'SANCTUM ARCHIVE';
@@ -692,7 +721,7 @@ export class PauseAndOptionsModal {
   private makeBtn(label: string, primary: boolean): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = primary ? 'kh-btn kh-btn-primary' : 'kh-btn';
+    btn.className = primary ? 'kh-btn kh-btn-primary kh-btn-notched' : 'kh-btn kh-btn-notched';
     btn.textContent = label;
     return btn;
   }
@@ -818,6 +847,7 @@ export class PauseAndOptionsModal {
     slider.max = '100';
     slider.step = '5';
     slider.className = 'kh-slider';
+    slider.style.setProperty('--kh-slider-pct', '80%');
     slider.setAttribute('aria-label', label);
 
     const valEl = document.createElement('span');
@@ -826,6 +856,7 @@ export class PauseAndOptionsModal {
 
     slider.addEventListener('input', () => {
       const pct = Math.max(0, Math.min(100, Number(slider.value) || 0));
+      slider.style.setProperty('--kh-slider-pct', `${pct}%`);
       valEl.textContent = `${pct}%`;
       this.callbacks.onUpdateSettings({ [settingKey]: pct / 100 });
     });

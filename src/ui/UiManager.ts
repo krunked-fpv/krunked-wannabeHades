@@ -41,6 +41,7 @@ export interface UiCallbacks {
   onResetSave(): void;
   getPortraitUrl(patronId: PatronId): string;
   getDebugBridge(): DebugBridge | null;
+  readonly onUiHover?: () => void;
 
   // Wave 2 Hub Meta, Shop & Codex Callbacks (optional for backwards compatibility)
   onOpenScreen?(screen: ScreenId): void;
@@ -75,7 +76,7 @@ export class UiManager {
     this.callbacks = callbacks;
     this.uiRoot.innerHTML = '';
 
-    this.hud = new HudOverlay(uiRoot, callbacks.onOpenScreen);
+    this.hud = new HudOverlay(uiRoot, callbacks.onOpenScreen, callbacks.onUiHover);
     this.titleScreen = new TitleScreen(uiRoot, callbacks);
     this.boonModal = new BoonSelectModal(uiRoot, callbacks);
     this.pauseAndOptions = new PauseAndOptionsModal(uiRoot, callbacks);

@@ -7,11 +7,13 @@ import {
   type WeaponId,
 } from '../contracts/index.js';
 import type { MenuNavInput } from '../input/InputManager.js';
+import { attachCornerFiligrees, svgWeaponSilhouette } from './svgArt.js';
 
 export interface WeaponRackCallbacks {
   onSelectWeapon?(weaponId: WeaponId, aspectId: AspectId): void;
   onUpgradeAspect?(aspectId: AspectId): void;
   onCloseModal(): void;
+  readonly onUiHover?: () => void;
 }
 
 const WEAPON_LIST: readonly WeaponId[] = [
@@ -61,7 +63,8 @@ export class WeaponRackModal {
     this.backdrop.setAttribute('data-screen', 'weapon_menu');
 
     const shell = document.createElement('div');
-    shell.className = 'kh-meta-shell';
+    shell.className = 'kh-meta-shell kh-ornate-frame kh-theme-armory';
+    attachCornerFiligrees(shell);
 
     // Header
     const header = document.createElement('div');
@@ -74,7 +77,7 @@ export class WeaponRackModal {
     title.textContent = 'INFERNAL ARMORY';
     const sub = document.createElement('div');
     sub.className = 'kh-meta-sub';
-    sub.textContent = '6 Infernal Arms · 24 Aspects · Titan Blood Awakening';
+    sub.textContent = 'Six Infernal Arms · Twenty-Four Aspects · Titan Blood Awakening';
     titleGroup.append(title, sub);
 
     const badges = document.createElement('div');
@@ -89,7 +92,7 @@ export class WeaponRackModal {
     const meander = document.createElement('div');
     meander.className = 'kh-meander-strip';
 
-    // 6-Weapon Tab Strip
+    // 6-Weapon Tab Strip with SVG Weapon Silhouettes
     this.tabStrip = document.createElement('div');
     this.tabStrip.className = 'kh-tab-strip';
     WEAPON_LIST.forEach((weaponId, idx) => {
@@ -98,7 +101,7 @@ export class WeaponRackModal {
       btn.type = 'button';
       btn.className = 'kh-tab-btn';
       btn.dataset.weaponId = weaponId;
-      btn.textContent = def.displayName;
+      btn.innerHTML = `<span class="kh-tab-icon">${svgWeaponSilhouette(weaponId, 18)}</span><span class="kh-tab-label">${def.displayName}</span>`;
       btn.addEventListener('click', () => {
         this.selectedWeaponIndex = idx;
         this.focusedAspectIndex = 0;
@@ -107,16 +110,14 @@ export class WeaponRackModal {
           this.renderBody(this.latestState);
         }
       });
+      btn.addEventListener('pointerenter', () => this.callbacks.onUiHover?.());
       this.tabButtons.push(btn);
       this.tabStrip.appendChild(btn);
     });
 
     // Scrollable Content
     const scroll = document.createElement('div');
-    scroll.className = 'kh-meta-scroll';
-    scroll.style.display = 'flex';
-    scroll.style.flexDirection = 'column';
-    scroll.style.gap = '10px';
+    scroll.className = 'kh-meta-scroll kh-armory-scroll';
 
     this.weaponSummaryEl = document.createElement('div');
     this.weaponSummaryEl.className = 'kh-weapon-summary';
@@ -133,9 +134,10 @@ export class WeaponRackModal {
     this.hintEl.className = 'kh-meta-hint';
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
-    closeBtn.className = 'kh-btn kh-btn-primary';
+    closeBtn.className = 'kh-btn kh-btn-primary kh-btn-notched';
     closeBtn.textContent = 'CLOSE ARMORY';
     closeBtn.addEventListener('click', () => this.callbacks.onCloseModal());
+    closeBtn.addEventListener('pointerenter', () => this.callbacks.onUiHover?.());
     footer.append(this.hintEl, closeBtn);
 
     shell.append(header, meander, this.tabStrip, scroll, footer);
@@ -182,31 +184,32 @@ export class WeaponRackModal {
       return;
     }
 
-    // Switch Weapon Arm via LB/RB or [/]
     if (menuNav.tabPrev) {
       this.selectedWeaponIndex =
         (this.selectedWeaponIndex - 1 + WEAPON_LIST.length) % WEAPON_LIST.length;
       this.focusedAspectIndex = 0;
       this.lastRenderKey = '';
+      this.callbacks.onUiHover?.();
     } else if (menuNav.tabNext) {
       this.selectedWeaponIndex = (this.selectedWeaponIndex + 1) % WEAPON_LIST.length;
       this.focusedAspectIndex = 0;
       this.lastRenderKey = '';
+      this.callbacks.onUiHover?.();
     }
 
-    // Navigate 2x2 Aspect Grid
+    const prevAspect = this.focusedAspectIndex;
     if (menuNav.left) {
       this.focusedAspectIndex = (this.focusedAspectIndex + 3) % 4;
-      this.applyFocusStyles();
     } else if (menuNav.right) {
       this.focusedAspectIndex = (this.focusedAspectIndex + 1) % 4;
-      this.applyFocusStyles();
     } else if (menuNav.up) {
       this.focusedAspectIndex = (this.focusedAspectIndex + 2) % 4;
-      this.applyFocusStyles();
     } else if (menuNav.down) {
       this.focusedAspectIndex = (this.focusedAspectIndex + 2) % 4;
+    }
+    if (this.focusedAspectIndex !== prevAspect) {
       this.applyFocusStyles();
+      this.callbacks.onUiHover?.();
     }
 
     const activeWeaponId = WEAPON_LIST[this.selectedWeaponIndex];
@@ -243,42 +246,58 @@ export class WeaponRackModal {
       const id = WEAPON_LIST[idx];
       btn.classList.toggle('kh-active', idx === this.selectedWeaponIndex);
       const isEquippedArm = state.meta.selectedWeapon === id;
-      btn.textContent = isEquippedArm
-        ? `★ ${WEAPON_CONSTANTS[id].displayName}`
-        : WEAPON_CONSTANTS[id].displayName;
+      const labelEl = btn.querySelector('.kh-tab-label');
+      if (labelEl) {
+        labelEl.textContent = isEquippedArm
+          ? `★ ${WEAPON_CONSTANTS[id].displayName}`
+          : WEAPON_CONSTANTS[id].displayName;
+      }
     });
 
-    // Weapon Base Summary Bar
+    // Weapon Hero Banner with Large SVG Silhouette & Sculpted Stat Badges
     this.weaponSummaryEl.innerHTML = '';
     const leftInfo = document.createElement('div');
+    leftInfo.className = 'kh-weapon-banner-head';
+
+    const emblem = document.createElement('div');
+    emblem.className = 'kh-weapon-emblem-medallion';
+    emblem.innerHTML = svgWeaponSilhouette(weaponId, 34);
+
+    const textWrap = document.createElement('div');
+    textWrap.className = 'kh-weapon-banner-text';
     const wName = document.createElement('div');
-    wName.style.fontFamily = 'var(--kh-font-display)';
-    wName.style.fontSize = '15px';
-    wName.style.fontWeight = '700';
-    wName.style.color = '#ffe8b8';
-    wName.textContent = `${weaponDef.displayName} — ${weaponDef.subtitle}`;
-    leftInfo.appendChild(wName);
+    wName.className = 'kh-weapon-banner-name';
+    wName.textContent = weaponDef.displayName;
+    const wSub = document.createElement('div');
+    wSub.className = 'kh-weapon-banner-sub';
+    wSub.textContent = weaponDef.subtitle;
+    textWrap.append(wName, wSub);
+
+    leftInfo.append(emblem, textWrap);
 
     const chips = document.createElement('div');
     chips.className = 'kh-weapon-stat-chips';
-    const statItems = [
-      `ATK: ${weaponDef.attackComboDamage.join('/')}`,
-      `DASH-STRIKE: ${weaponDef.dashStrikeDamage}`,
-      `RANGE: ${weaponDef.attackRange}`,
-      `SPC (${weaponDef.specialName}): ${weaponDef.specialDamage}${weaponDef.specialHits > 1 ? `×${weaponDef.specialHits}` : ''}`,
+    const statItems: [string, string][] = [
+      ['ATK', weaponDef.attackComboDamage.join('/')],
+      ['DASH-STRIKE', String(weaponDef.dashStrikeDamage)],
+      ['RANGE', String(weaponDef.attackRange)],
+      [
+        `SPC (${weaponDef.specialName})`,
+        `${weaponDef.specialDamage}${weaponDef.specialHits > 1 ? `×${weaponDef.specialHits}` : ''}`,
+      ],
     ];
     if (weaponDef.clipSize) {
-      statItems.push(`CLIP: ${weaponDef.clipSize}`);
+      statItems.push(['CLIP', String(weaponDef.clipSize)]);
     }
-    for (const st of statItems) {
+    for (const [k, v] of statItems) {
       const chip = document.createElement('span');
-      chip.className = 'kh-boon-chip';
-      chip.textContent = st;
+      chip.className = 'kh-stat-badge';
+      chip.innerHTML = `<span class="kh-stat-badge-key">${k}</span><span class="kh-stat-badge-num">${v}</span>`;
       chips.appendChild(chip);
     }
     this.weaponSummaryEl.append(leftInfo, chips);
 
-    // 4 Aspects Grid
+    // 4 Aspects Grid with Rank Pips
     this.aspectGrid.innerHTML = '';
     this.aspectCards = [];
     this.currentAspects = weaponDef.aspects;
@@ -296,38 +315,38 @@ export class WeaponRackModal {
       card.dataset.aspectId = aspectId;
 
       const topRow = document.createElement('div');
-      topRow.style.display = 'flex';
-      topRow.style.alignItems = 'center';
-      topRow.style.justifyContent = 'space-between';
-      topRow.style.gap = '8px';
+      topRow.className = 'kh-aspect-top-row';
 
       const nameEl = document.createElement('div');
-      nameEl.style.fontFamily = 'var(--kh-font-display)';
-      nameEl.style.fontSize = '14px';
-      nameEl.style.fontWeight = '700';
-      nameEl.style.color = def.isHiddenAspect ? '#ff96a2' : '#fff5df';
+      nameEl.className = def.isHiddenAspect ? 'kh-aspect-name kh-aspect-hidden' : 'kh-aspect-name';
       nameEl.textContent = def.displayName;
 
       const badgeRow = document.createElement('div');
-      badgeRow.style.display = 'flex';
-      badgeRow.style.gap = '5px';
+      badgeRow.className = 'kh-aspect-badges';
 
       if (def.isHiddenAspect) {
         const hiddenTag = document.createElement('span');
-        hiddenTag.className = 'kh-boon-slot-tag';
-        hiddenTag.style.color = '#ff9ea8';
-        hiddenTag.style.border = '1px solid rgba(255, 110, 126, 0.55)';
+        hiddenTag.className = 'kh-boon-slot-tag kh-tag-hidden';
         hiddenTag.textContent = 'HIDDEN';
         badgeRow.appendChild(hiddenTag);
       }
 
       const rankTag = document.createElement('span');
-      rankTag.className = 'kh-boon-slot-tag';
-      rankTag.style.color = '#f5cb70';
+      rankTag.className = 'kh-boon-slot-tag kh-tag-rank';
       rankTag.textContent = `RANK ${rank}/${def.maxRank}`;
       badgeRow.appendChild(rankTag);
 
       topRow.append(nameEl, badgeRow);
+
+      // Rank Pip Track (1/5 -> 5/5)
+      const pipTrack = document.createElement('div');
+      pipTrack.className = 'kh-rank-pip-track';
+      pipTrack.setAttribute('aria-hidden', 'true');
+      for (let r = 1; r <= def.maxRank; r++) {
+        const pip = document.createElement('span');
+        pip.className = r <= rank ? 'kh-rank-pip kh-filled' : 'kh-rank-pip';
+        pipTrack.appendChild(pip);
+      }
 
       const desc = document.createElement('p');
       desc.className = 'kh-boon-desc';
@@ -338,16 +357,17 @@ export class WeaponRackModal {
 
       const equipBtn = document.createElement('button');
       equipBtn.type = 'button';
-      equipBtn.className = isEquipped ? 'kh-btn kh-btn-primary' : 'kh-btn';
+      equipBtn.className = isEquipped ? 'kh-btn kh-btn-primary kh-btn-notched' : 'kh-btn kh-btn-notched';
       equipBtn.textContent = isEquipped ? '✓ EQUIPPED' : 'EQUIP ASPECT';
       equipBtn.addEventListener('click', () => {
         this.focusedAspectIndex = idx;
         this.callbacks.onSelectWeapon?.(weaponId, aspectId);
       });
+      equipBtn.addEventListener('pointerenter', () => this.callbacks.onUiHover?.());
 
       const upgradeBtn = document.createElement('button');
       upgradeBtn.type = 'button';
-      upgradeBtn.className = 'kh-btn';
+      upgradeBtn.className = 'kh-btn kh-btn-notched';
       upgradeBtn.disabled = !canUpgrade;
       upgradeBtn.textContent =
         rank >= def.maxRank ? 'MAX RANK' : `RANK UP (${upgradeCost} BLOOD)`;
@@ -356,19 +376,24 @@ export class WeaponRackModal {
         if (this.callbacks.onUpgradeAspect) {
           this.callbacks.onUpgradeAspect(aspectId);
         } else if (canUpgrade) {
-          // Graceful local fallback before App wires dedicated onUpgradeAspect
           state.meta.titanBlood -= upgradeCost;
           state.meta.aspectRanks[aspectId] = rank + 1;
           this.callbacks.onSelectWeapon?.(weaponId, aspectId);
           this.lastRenderKey = '';
         }
       });
+      upgradeBtn.addEventListener('pointerenter', () => {
+        if (!upgradeBtn.disabled) this.callbacks.onUiHover?.();
+      });
 
       actions.append(equipBtn, upgradeBtn);
-      card.append(topRow, desc, actions);
+      card.append(topRow, pipTrack, desc, actions);
       card.addEventListener('pointerenter', () => {
-        this.focusedAspectIndex = idx;
-        this.applyFocusStyles();
+        if (this.focusedAspectIndex !== idx) {
+          this.focusedAspectIndex = idx;
+          this.applyFocusStyles();
+          this.callbacks.onUiHover?.();
+        }
       });
 
       this.aspectGrid.appendChild(card);

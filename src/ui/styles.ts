@@ -1,38 +1,60 @@
 const UI_STYLE_ID = 'kh-mythic-ui-styles';
 
-// Inline Greek Meander SVG data URI (burnished gold on transparent)
+// Inline Greco-Roman Meander SVG data URI (burnished hammered gold on transparent)
 const MEANDER_SVG = encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="10" viewBox="0 0 24 10" fill="none"><path d="M0 9H24M1 1H11V7H5V4H8M13 1H23V7H17V4H20" stroke="#d99f4c" stroke-opacity="0.58" stroke-width="1.2"/></svg>`
+  `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="10" viewBox="0 0 24 10" fill="none"><path d="M0 9H24M1 1H11V7H5V4H8M13 1H23V7H17V4H20" stroke="#e5b952" stroke-opacity="0.68" stroke-width="1.2"/></svg>`
 );
 
 export const MYTHIC_UI_CSS = `
 :root {
-  --kh-bg-obsidian: rgba(11, 9, 18, 0.92);
-  --kh-bg-panel: rgba(17, 13, 27, 0.94);
-  --kh-bg-card: rgba(24, 18, 36, 0.92);
-  --kh-ink: #06050a;
-  --kh-gold: #d99f4c;
-  --kh-gold-bright: #f5cb70;
-  --kh-gold-dim: rgba(217, 159, 76, 0.36);
-  --kh-crimson: #d82f3c;
-  --kh-crimson-bright: #ff4f5c;
-  --kh-ivory: #f5ede0;
-  --kh-ash: #b8aea2;
-  --kh-font-display: 'Cinzel', 'Trajan Pro', 'Palatino Linotype', 'Book Antiqua', Georgia, 'Times New Roman', serif;
-  --kh-font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Canonical Offline OFL Font Stack — ZERO system fallback fonts */
+  --kh-font-display: 'Cinzel', serif;
+  --kh-font-deco: 'Cinzel Decorative', 'Cinzel', serif;
+  --kh-font-ui: 'Alegreya Sans', sans-serif;
+  --kh-font-num: 'Barlow Condensed', 'Cinzel', sans-serif;
+  --kh-font-lore: 'Cormorant Garamond', 'Cinzel', serif;
+  --kh-font-sans: var(--kh-font-ui);
 
-  /* Rarity Palette */
-  --kh-rarity-common: #b69d81;
-  --kh-rarity-rare: #3b96ff;
-  --kh-rarity-epic: #ae5cff;
-  --kh-rarity-heroic: #eb4754;
-  --kh-rarity-duo: #3ee491;
-  --kh-rarity-legendary: #ffb133;
+  /* Master Ink / Obsidian Surfaces */
+  --kh-ink: #09060E;
+  --kh-panel-deep: #110B18;
+  --kh-panel-mid: #1B1226;
+  --kh-panel-raised: #271B36;
+  --kh-bg-obsidian: rgba(17, 11, 24, 0.94);
+  --kh-bg-panel: rgba(27, 18, 38, 0.95);
+  --kh-bg-card: rgba(39, 27, 54, 0.92);
+
+  /* Burnished Greco-Roman Metals */
+  --kh-bronze-dark: #5C3D18;
+  --kh-bronze: #9E6E2E;
+  --kh-gold: #E5B952;
+  --kh-gold-bright: #FFF0B8;
+  --kh-gold-dim: rgba(229, 185, 82, 0.36);
+
+  /* Underworld Crimson */
+  --kh-crimson-deep: #5A0B1A;
+  --kh-crimson: #B81932;
+  --kh-crimson-bright: #F02E46;
+
+  /* Parchment / Marble Typography */
+  --kh-text-primary: #F7EEDB;
+  --kh-text-secondary: #CBBCA0;
+  --kh-text-muted: #8E7F69;
+  --kh-ivory: var(--kh-text-primary);
+  --kh-ash: var(--kh-text-secondary);
+
+  /* Boon Rarity Metallic Accents */
+  --kh-rarity-common: #B8ADA0;
+  --kh-rarity-rare: #3EA4FF;
+  --kh-rarity-epic: #B25CFF;
+  --kh-rarity-heroic: #FF465A;
+  --kh-rarity-duo: #C9F238;
+  --kh-rarity-legendary: #FFAE24;
 }
 
 #ui-root {
-  font-family: var(--kh-font-sans);
-  color: var(--kh-ivory);
+  font-family: var(--kh-font-ui);
+  color: var(--kh-text-primary);
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
@@ -48,11 +70,45 @@ export const MYTHIC_UI_CSS = `
   background-image: url("data:image/svg+xml,${MEANDER_SVG}");
   background-repeat: repeat-x;
   background-position: center;
-  opacity: 0.85;
+  opacity: 0.9;
   pointer-events: none;
+  flex-shrink: 0;
 }
 
-/* Shared Mythic Buttons & Focus Outlines */
+/* ============================================================================
+   SCULPTED ORNATE FRAMES & SVG CORNER FILIGREE
+   ============================================================================ */
+
+.kh-ornate-frame {
+  position: relative;
+  border: 2px solid var(--kh-gold);
+  box-shadow:
+    0 0 0 1px var(--kh-ink),
+    inset 0 0 0 4px rgba(9, 6, 14, 0.72),
+    inset 0 0 0 5px rgba(158, 110, 46, 0.36),
+    0 24px 68px rgba(0, 0, 0, 0.88),
+    0 0 42px rgba(229, 185, 82, 0.14);
+}
+
+.kh-corner-ornament {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  z-index: 4;
+  pointer-events: none;
+  display: flex;
+  filter: drop-shadow(0 1px 3px rgba(9, 6, 14, 0.95));
+}
+
+.kh-corner-tl { top: 4px; left: 4px; }
+.kh-corner-tr { top: 4px; right: 4px; }
+.kh-corner-bl { bottom: 4px; left: 4px; }
+.kh-corner-br { bottom: 4px; right: 4px; }
+
+/* ============================================================================
+   SHARED NOTCHED BRONZE-OBSIDIAN MYTHIC BUTTONS
+   ============================================================================ */
+
 .kh-btn {
   position: relative;
   display: inline-flex;
@@ -61,22 +117,49 @@ export const MYTHIC_UI_CSS = `
   gap: 10px;
   min-height: 48px;
   padding: 10px 22px;
-  border: 1.5px solid rgba(217, 159, 76, 0.62);
-  border-radius: 3px;
-  background: linear-gradient(180deg, rgba(35, 25, 48, 0.94) 0%, rgba(16, 12, 24, 0.96) 100%);
-  color: var(--kh-ivory);
+  border: 1.5px solid var(--kh-bronze);
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(39, 27, 54, 0.95) 0%, rgba(17, 11, 24, 0.98) 100%);
+  color: var(--kh-text-primary);
   font-family: var(--kh-font-display);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   letter-spacing: 0.11em;
   text-transform: uppercase;
   cursor: pointer;
   pointer-events: auto;
   box-shadow:
-    inset 0 1px 0 rgba(255, 232, 180, 0.16),
-    0 4px 16px rgba(0, 0, 0, 0.55);
-  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.14s ease, background 0.14s ease;
+    inset 0 1px 0 rgba(255, 240, 184, 0.18),
+    inset 0 -2px 0 rgba(9, 6, 14, 0.65),
+    0 5px 18px rgba(0, 0, 0, 0.6);
+  transition: transform 0.12s ease, border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
   -webkit-tap-highlight-color: transparent;
+}
+
+.kh-btn-notched {
+  clip-path: polygon(
+    9px 0%,
+    calc(100% - 9px) 0%,
+    100% 9px,
+    100% calc(100% - 9px),
+    calc(100% - 9px) 100%,
+    9px 100%,
+    0% calc(100% - 9px),
+    0% 9px
+  );
+}
+
+.kh-btn::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  background: linear-gradient(180deg, var(--kh-gold-bright), var(--kh-crimson-bright));
+  opacity: 0;
+  transition: opacity 0.14s ease, top 0.14s ease, bottom 0.14s ease;
+  pointer-events: none;
 }
 
 .kh-btn:hover:not(:disabled),
@@ -85,12 +168,20 @@ export const MYTHIC_UI_CSS = `
   outline: 2px solid var(--kh-gold-bright);
   outline-offset: 2px;
   border-color: var(--kh-gold-bright);
-  background: linear-gradient(180deg, rgba(64, 34, 46, 0.96) 0%, rgba(28, 16, 30, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(90, 22, 38, 0.96) 0%, rgba(34, 15, 28, 0.98) 100%);
   box-shadow:
-    0 0 0 4px rgba(245, 203, 112, 0.22),
-    0 0 24px rgba(245, 203, 112, 0.36),
-    inset 0 1px 0 rgba(255, 240, 200, 0.3);
+    0 0 0 3px rgba(229, 185, 82, 0.24),
+    0 0 26px rgba(229, 185, 82, 0.36),
+    inset 0 1px 0 rgba(255, 240, 184, 0.34);
   transform: translateY(-1px);
+}
+
+.kh-btn:hover:not(:disabled)::before,
+.kh-btn.kh-focused:not(:disabled)::before,
+.kh-btn:focus-visible:not(:disabled)::before {
+  opacity: 1;
+  top: 8%;
+  bottom: 8%;
 }
 
 .kh-btn:active:not(:disabled) {
@@ -100,24 +191,29 @@ export const MYTHIC_UI_CSS = `
 .kh-btn:disabled {
   opacity: 0.42;
   cursor: not-allowed;
-  filter: grayscale(0.4);
+  filter: grayscale(0.45);
 }
 
 .kh-btn-primary {
-  border-color: var(--kh-gold-bright);
-  background: linear-gradient(180deg, rgba(132, 30, 42, 0.96) 0%, rgba(74, 15, 26, 0.98) 100%);
-  color: #fff6e3;
+  border-color: var(--kh-gold);
+  background: linear-gradient(180deg, rgba(162, 24, 46, 0.96) 0%, rgba(86, 11, 24, 0.98) 100%);
+  color: #fff7e6;
 }
 
 .kh-btn-primary:hover:not(:disabled),
 .kh-btn-primary.kh-focused:not(:disabled),
 .kh-btn-primary:focus-visible:not(:disabled) {
-  background: linear-gradient(180deg, rgba(168, 38, 52, 0.98) 0%, rgba(98, 20, 32, 0.98) 100%);
+  border-color: var(--kh-gold-bright);
+  background: linear-gradient(180deg, rgba(208, 34, 58, 0.98) 0%, rgba(114, 16, 32, 0.98) 100%);
+  box-shadow:
+    0 0 0 3px rgba(240, 46, 70, 0.25),
+    0 0 28px rgba(229, 185, 82, 0.44),
+    inset 0 1px 0 rgba(255, 240, 184, 0.42);
 }
 
 .kh-btn-danger {
-  border-color: rgba(235, 71, 84, 0.72);
-  color: #ffd5d8;
+  border-color: rgba(240, 46, 70, 0.78);
+  color: #ffd5da;
 }
 
 .kh-btn-sm {
@@ -127,8 +223,14 @@ export const MYTHIC_UI_CSS = `
   letter-spacing: 0.08em;
 }
 
+.kh-footer-btn-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* ============================================================================
-   HUD OVERLAY
+   HUD OVERLAY — DESKTOP 1440x900 & 1280x720 BASELINE GEOMETRY
    ============================================================================ */
 
 .kh-hud {
@@ -137,18 +239,19 @@ export const MYTHIC_UI_CSS = `
   pointer-events: none;
   z-index: 12;
   padding:
-    max(14px, env(safe-area-inset-top, 0px))
+    max(12px, env(safe-area-inset-top, 0px))
     max(16px, env(safe-area-inset-right, 0px))
     max(14px, env(safe-area-inset-bottom, 0px))
     max(16px, env(safe-area-inset-left, 0px));
 }
 
-/* Top-Center Unified Stack (Boss Health Bars + Event Toasts — mathematically prevents overlap) */
+/* Top-Center Unified Stack (Sculpted Boss Bars + Zero-Truncation Underworld Toasts) */
 .kh-top-center-stack {
   position: fixed;
-  top: max(14px, calc(env(safe-area-inset-top, 0px) + 10px));
+  top: max(12px, calc(env(safe-area-inset-top, 0px) + 8px));
   left: 50%;
   transform: translateX(-50%);
+  width: min(580px, calc(100vw - 600px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -158,126 +261,190 @@ export const MYTHIC_UI_CSS = `
 }
 
 .kh-hud.kh-is-hub:not(.kh-touch-active) .kh-top-center-stack {
-  top: max(76px, calc(env(safe-area-inset-top, 0px) + 72px));
+  top: max(78px, calc(env(safe-area-inset-top, 0px) + 74px));
 }
 
-/* Top-Center Boss Health Bar */
+/* Sculpted Boss Health Bars */
 .kh-boss-stack {
-  width: min(560px, 68vw);
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   pointer-events: none;
 }
 
 .kh-boss-bar-card {
-  background: linear-gradient(180deg, rgba(16, 10, 22, 0.88) 0%, rgba(10, 7, 14, 0.82) 100%);
-  border: 1.5px solid rgba(217, 159, 76, 0.72);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+  background: linear-gradient(180deg, rgba(24, 14, 34, 0.94) 0%, rgba(11, 7, 16, 0.94) 100%);
+  border: 1.5px solid var(--kh-gold);
   border-radius: 3px;
-  padding: 8px 14px 10px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.68), inset 0 1px 0 rgba(255, 228, 174, 0.16);
+  padding: 7px 10px 8px;
+  box-shadow:
+    0 0 0 1px var(--kh-ink),
+    0 10px 30px rgba(0, 0, 0, 0.76),
+    inset 0 1px 0 rgba(255, 240, 184, 0.22);
+}
+
+.kh-boss-bar-card.kh-boss-invulnerable {
+  border-color: var(--kh-gold-bright);
+  box-shadow:
+    0 0 0 1px var(--kh-ink),
+    0 0 22px rgba(255, 240, 184, 0.36),
+    0 10px 30px rgba(0, 0, 0, 0.76);
+}
+
+.kh-boss-crown {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  filter: drop-shadow(0 2px 4px rgba(9, 6, 14, 0.92));
+}
+
+.kh-boss-crown-left { margin-right: 6px; margin-left: -4px; }
+.kh-boss-crown-right { margin-left: 6px; margin-right: -4px; }
+
+.kh-boss-card-inner {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .kh-boss-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 6px;
+  gap: 8px;
+  margin-bottom: 5px;
 }
 
 .kh-boss-title-group {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  flex-wrap: wrap;
+  column-gap: 8px;
+  row-gap: 1px;
   min-width: 0;
 }
 
 .kh-boss-name {
   font-family: var(--kh-font-display);
-  font-size: 16px;
+  font-size: 15.5px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: #ffe8b8;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
-  white-space: nowrap;
+  color: var(--kh-gold-bright);
+  text-shadow: 0 2px 6px rgba(9, 6, 14, 0.95);
+  line-height: 1.15;
 }
 
+/* ZERO ellipsis truncation on boss subtitles */
 .kh-boss-subtitle {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--kh-ash);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-family: var(--kh-font-lore);
+  font-style: italic;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--kh-text-secondary);
+  white-space: normal;
+  line-height: 1.18;
 }
 
 .kh-boss-phase-badge {
-  font-family: var(--kh-font-display);
-  font-size: 11px;
-  font-weight: 700;
+  font-family: var(--kh-font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 800;
   color: var(--kh-gold-bright);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .kh-boss-armor-track {
   position: relative;
   height: 6px;
   border-radius: 2px;
-  background: rgba(255, 210, 96, 0.14);
-  border: 1px solid rgba(245, 203, 112, 0.55);
+  background: rgba(255, 224, 120, 0.14);
+  border: 1px solid rgba(229, 185, 82, 0.65);
   margin-bottom: 4px;
   overflow: hidden;
 }
 
 .kh-boss-armor-fill {
   height: 100%;
-  background: linear-gradient(90deg, #e09c2b 0%, #ffe078 65%, #fff5c2 100%);
+  background: linear-gradient(90deg, #b87a1c 0%, #e5b952 55%, #fff0b8 100%);
   transition: width 0.1s linear;
 }
 
 .kh-boss-hp-track {
   position: relative;
-  height: 16px;
+  height: 17px;
   border-radius: 2px;
-  background: rgba(24, 9, 14, 0.92);
-  border: 1.5px solid rgba(217, 159, 76, 0.7);
+  background: rgba(18, 6, 12, 0.96);
+  border: 1.5px solid var(--kh-bronze);
   overflow: hidden;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.78);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.85);
+}
+
+.kh-boss-hp-ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #e5b952 0%, #fff0b8 100%);
+  opacity: 0.88;
+  z-index: 1;
 }
 
 .kh-boss-hp-fill {
+  position: relative;
+  z-index: 2;
   height: 100%;
-  background: linear-gradient(90deg, #8b1322 0%, #d82b3a 60%, #ff5a5f 100%);
-  transition: width 0.09s linear;
+  background: linear-gradient(180deg, #f02e46 0%, #b81932 58%, #6e0b1c 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 198, 206, 0.42);
+  transition: width 0.08s linear;
+}
+
+.kh-boss-invuln-shimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: linear-gradient(
+    112deg,
+    rgba(255, 240, 184, 0.16) 0%,
+    rgba(255, 240, 184, 0.68) 45%,
+    rgba(229, 185, 82, 0.24) 60%,
+    rgba(255, 240, 184, 0.16) 100%
+  );
+  background-size: 220% 100%;
+  animation: kh-invuln-shimmer 1.15s linear infinite;
+  pointer-events: none;
 }
 
 .kh-boss-notch {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 2px;
-  z-index: 1;
-  background: rgba(255, 232, 168, 0.85);
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.95);
+  width: 2.5px;
+  z-index: 4;
+  background: linear-gradient(180deg, #fff0b8 0%, #e5b952 50%, #5c3d18 100%);
+  box-shadow: 0 0 4px rgba(9, 6, 14, 0.98);
   pointer-events: none;
 }
 
 .kh-boss-hp-text {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: #fff6ea;
-  text-shadow: 0 1px 3px #000;
   pointer-events: none;
 }
 
@@ -287,71 +454,87 @@ export const MYTHIC_UI_CSS = `
   padding: 0 8px;
   height: 14px;
   border-radius: 2px;
-  background: rgba(11, 8, 18, 0.9);
-  border: 1px solid rgba(217, 159, 76, 0.45);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.78);
+  background: rgba(9, 6, 14, 0.88);
+  border: 1px solid rgba(229, 185, 82, 0.55);
+  font-family: var(--kh-font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--kh-text-primary);
+  text-shadow: 0 1px 2px #000;
   line-height: 1;
 }
 
-/* Top-Right Chamber / Biome / Currencies / FPS Readout */
+/* Top-Right Biome Ribbon & Currency Pills */
 .kh-hud-topright {
   position: fixed;
   top: max(12px, calc(env(safe-area-inset-top, 0px) + 8px));
-  right: max(14px, calc(env(safe-area-inset-right, 0px) + 10px));
+  right: max(16px, calc(env(safe-area-inset-right, 0px) + 12px));
+  max-width: 320px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
 }
 
-.kh-hud-topright.kh-touch-offset,
-.kh-hud.kh-touch-active .kh-hud-topright {
-  right: max(92px, calc(env(safe-area-inset-right, 0px) + 88px));
-}
-
 .kh-chamber-pill {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 14px;
-  background: linear-gradient(90deg, rgba(15, 11, 24, 0.78) 0%, rgba(12, 9, 19, 0.92) 100%);
-  border: 1px solid rgba(217, 159, 76, 0.52);
-  border-right: 3px solid var(--kh-gold);
-  border-radius: 3px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.52);
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  gap: 8px;
+  padding: 6px 12px;
+  background: linear-gradient(95deg, rgba(17, 11, 24, 0.84) 0%, rgba(27, 18, 38, 0.96) 100%);
+  border: 1px solid rgba(229, 185, 82, 0.54);
+  border-right: 4px solid var(--kh-gold);
+  border-radius: 2px;
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 240, 184, 0.14);
 }
 
 .kh-biome-name {
   font-family: var(--kh-font-display);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  text-shadow: 0 1px 4px rgba(9, 6, 14, 0.9);
 }
 
 .kh-chamber-depth {
-  font-size: 11px;
-  font-weight: 700;
+  font-family: var(--kh-font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 800;
   letter-spacing: 0.08em;
   color: var(--kh-gold-bright);
   padding-left: 8px;
-  border-left: 1px solid rgba(217, 159, 76, 0.35);
+  border-left: 1px solid rgba(229, 185, 82, 0.42);
 }
 
 .kh-heat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 2px 7px;
   border-radius: 2px;
-  background: rgba(185, 42, 42, 0.34);
-  border: 1px solid rgba(255, 108, 72, 0.65);
-  color: #ffb899;
-  font-size: 11px;
-  font-weight: 700;
+  background: rgba(140, 28, 22, 0.56);
+  border: 1px solid rgba(255, 134, 62, 0.78);
+  color: #ffd39e;
+  font-family: var(--kh-font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
 }
 
 .kh-currency-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .kh-currency-chip {
@@ -359,70 +542,128 @@ export const MYTHIC_UI_CSS = `
   align-items: center;
   gap: 5px;
   padding: 4px 10px;
-  border-radius: 3px;
-  background: rgba(12, 9, 20, 0.84);
-  border: 1px solid rgba(217, 159, 76, 0.38);
-  font-size: 12px;
-  font-weight: 700;
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(22, 15, 32, 0.92) 0%, rgba(11, 7, 17, 0.95) 100%);
+  border: 1px solid rgba(229, 185, 82, 0.46);
+  font-family: var(--kh-font-num);
+  font-size: 14px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  letter-spacing: 0.04em;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.56), inset 0 1px 0 rgba(255, 240, 184, 0.12);
 }
 
-.kh-currency-gold {
-  color: #ffd866;
-}
-.kh-currency-darkness {
-  color: #c88cff;
-}
+.kh-currency-gold { color: #ffd966; }
+.kh-currency-darkness { color: #cfa2ff; }
 .kh-currency-fps {
   color: #8ceec9;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
+  font-size: 12px;
 }
 
-/* Bottom-Left Ornate Hero HUD (moves cleanly to Top-Left when touch controls are active) */
+/* Bottom-Left Sculpted Hero Frame + Patron Boon Medallion Rail */
 .kh-hud-bottomleft {
   position: fixed;
-  left: max(16px, calc(env(safe-area-inset-left, 0px) + 12px));
+  left: max(18px, calc(env(safe-area-inset-left, 0px) + 14px));
   bottom: max(16px, calc(env(safe-area-inset-bottom, 0px) + 12px));
+  width: 380px;
+  max-width: calc(100vw - 36px);
   display: flex;
   flex-direction: column;
   gap: 7px;
-  width: min(350px, 46vw);
 }
 
-.kh-hud.kh-touch-active .kh-hud-bottomleft {
-  top: max(12px, calc(env(safe-area-inset-top, 0px) + 8px));
-  bottom: auto;
-  left: max(14px, calc(env(safe-area-inset-left, 0px) + 10px));
-  flex-direction: column-reverse;
-  width: min(320px, 38vw);
-}
-
-.kh-hud.kh-touch-active .kh-boss-stack {
-  width: min(440px, 40vw);
-}
-
+/* Circular / Hexagonal Patron Boon Medallion Rail */
 .kh-boon-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 6px;
   align-items: center;
+  pointer-events: auto;
 }
 
+.kh-boon-medallion {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 42% 35%, rgba(39, 27, 54, 0.96) 0%, rgba(12, 8, 19, 0.98) 100%);
+  border: 2px solid var(--kh-medallion-ring, var(--kh-gold));
+  box-shadow:
+    0 0 0 1.5px var(--kh-ink),
+    0 3px 10px rgba(0, 0, 0, 0.65),
+    inset 0 0 10px rgba(255, 240, 184, 0.14);
+  color: var(--kh-patron-color, var(--kh-gold-bright));
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.kh-boon-medallion-sigil {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -3px;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.kh-boon-medallion-slot {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 4px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--kh-ink);
+  border: 1px solid var(--kh-medallion-ring, var(--kh-gold));
+  font-family: var(--kh-font-num);
+  font-size: 8.5px;
+  font-weight: 800;
+  line-height: 10px;
+  letter-spacing: 0.06em;
+  color: var(--kh-text-primary);
+}
+
+.kh-boon-medallion-lvl {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 50%;
+  background: var(--kh-crimson);
+  border: 1px solid var(--kh-gold-bright);
+  font-family: var(--kh-font-num);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 12px;
+  text-align: center;
+  color: #fff7e6;
+}
+
+.kh-boon-medallion-more {
+  font-family: var(--kh-font-num);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--kh-gold-bright);
+}
+
+/* Legacy chip class preserved for compact badges */
 .kh-boon-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  border-radius: 3px;
-  background: rgba(14, 11, 22, 0.88);
-  border: 1.5px solid var(--kh-gold-dim);
-  font-size: 10px;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 2px;
+  background: rgba(17, 11, 24, 0.92);
+  border: 1px solid var(--kh-bronze);
+  font-family: var(--kh-font-ui);
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--kh-ivory);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  color: var(--kh-text-primary);
 }
 
 .kh-boon-dot {
@@ -434,186 +675,255 @@ export const MYTHIC_UI_CSS = `
 }
 
 .kh-hero-frame {
-  background: linear-gradient(135deg, rgba(19, 13, 28, 0.92) 0%, rgba(10, 8, 16, 0.88) 100%);
-  border: 1.5px solid rgba(217, 159, 76, 0.65);
+  position: relative;
+  background: linear-gradient(140deg, rgba(27, 18, 38, 0.95) 0%, rgba(13, 9, 20, 0.95) 100%);
+  border: 1.5px solid var(--kh-gold);
   border-left: 4px solid var(--kh-gold);
-  border-radius: 4px;
-  padding: 10px 12px;
+  border-radius: 3px;
+  padding: 9px 11px;
   box-shadow:
-    0 8px 26px rgba(0, 0, 0, 0.65),
-    inset 0 1px 0 rgba(255, 228, 174, 0.16);
+    0 0 0 1px var(--kh-ink),
+    0 10px 28px rgba(0, 0, 0, 0.72),
+    inset 0 1px 0 rgba(255, 240, 184, 0.2);
 }
 
 .kh-hero-top-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 6px;
 }
 
+.kh-hero-weapon-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.kh-weapon-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 2px;
+  background: rgba(9, 6, 14, 0.78);
+  border: 1px solid rgba(229, 185, 82, 0.55);
+  flex-shrink: 0;
+}
+
+/* NEVER truncate weapon name with ellipsis */
 .kh-weapon-tag {
   font-family: var(--kh-font-display);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--kh-gold-bright);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.15;
+  white-space: normal;
+}
+
+.kh-hero-right-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
 }
 
 .kh-dd-row {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
 
 .kh-dd-skull {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  filter: drop-shadow(0 0 5px rgba(255, 92, 92, 0.55));
+  filter: drop-shadow(0 0 5px rgba(240, 46, 70, 0.6));
 }
 
 .kh-dd-skull.kh-spent {
-  opacity: 0.28;
-  filter: grayscale(1);
+  opacity: 0.34;
+  filter: grayscale(0.8);
 }
 
 .kh-godmode-badge {
-  font-size: 10px;
-  font-weight: 700;
+  font-family: var(--kh-font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
   padding: 1px 6px;
   border-radius: 2px;
-  background: rgba(245, 203, 112, 0.18);
-  border: 1px solid rgba(245, 203, 112, 0.6);
-  color: #ffe8a3;
+  background: rgba(229, 185, 82, 0.2);
+  border: 1px solid rgba(229, 185, 82, 0.7);
+  color: var(--kh-gold-bright);
+  white-space: nowrap;
 }
 
-/* HP Bar */
+/* Winged Bronze-Filigree Hero HP Bar */
+.kh-hp-winged-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.kh-hp-wing {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 3px rgba(9, 6, 14, 0.92));
+}
+.kh-hp-wing-left { margin-right: -2px; }
+.kh-hp-wing-right { margin-left: -2px; }
+
 .kh-hp-track {
   position: relative;
-  height: 20px;
-  border-radius: 3px;
-  background: rgba(28, 9, 14, 0.94);
-  border: 1.5px solid rgba(217, 159, 76, 0.72);
+  flex: 1;
+  height: 21px;
+  border-radius: 2px;
+  background: rgba(20, 6, 12, 0.96);
+  border: 1.5px solid var(--kh-gold);
   overflow: hidden;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.76);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.85);
+}
+
+.kh-hp-ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #e5b952 0%, #fff0b8 100%);
+  opacity: 0.9;
+  z-index: 1;
 }
 
 .kh-hp-fill {
+  position: relative;
+  z-index: 2;
   height: 100%;
-  background: linear-gradient(90deg, #8b1624 0%, #cf2638 55%, #f04854 100%);
-  transition: width 0.12s ease-out;
+  background: linear-gradient(180deg, #f02e46 0%, #b81932 55%, #720c1e 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 200, 208, 0.44);
+  transition: width 0.09s ease-out;
 }
 
 .kh-hp-track.kh-hp-low .kh-hp-fill {
-  animation: kh-low-hp-pulse 0.9s ease-in-out infinite;
+  animation: kh-low-hp-pulse 0.85s ease-in-out infinite;
 }
 
 .kh-hp-text {
   position: absolute;
   inset: 0;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 9px;
-  font-size: 12px;
+  font-family: var(--kh-font-num);
+  font-size: 14px;
   font-weight: 800;
+  letter-spacing: 0.05em;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+  color: var(--kh-text-primary);
+  text-shadow: 0 1px 3px rgba(9, 6, 14, 0.98);
 }
 
-/* Sub-row: Bloodstones, Dash Pips, Rail Ammo */
+.kh-hp-armor-val {
+  color: var(--kh-gold-bright);
+}
+
+/* Sub-row: Jeweled Bloodstone Sockets & Swept Dash Wings */
 .kh-resources-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   margin-top: 7px;
 }
 
 .kh-pip-group {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
 
 .kh-pip-label {
+  font-family: var(--kh-font-display);
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--kh-ash);
+  color: var(--kh-text-secondary);
   margin-right: 2px;
 }
 
-.kh-bloodstone-pip {
-  width: 11px;
-  height: 14px;
-  background: linear-gradient(180deg, #ff5d78 0%, #c81938 100%);
-  clip-path: polygon(50% 0%, 100% 42%, 50% 100%, 0% 42%);
-  box-shadow: 0 0 8px rgba(255, 76, 108, 0.75);
-  transition: opacity 0.12s ease, transform 0.12s ease;
+.kh-bloodstone-socket {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.kh-bloodstone-pip.kh-empty {
-  background: rgba(140, 82, 96, 0.25);
-  box-shadow: none;
-  opacity: 0.35;
+.kh-bloodstone-socket.kh-bs-ready {
+  filter: drop-shadow(0 0 6px rgba(240, 46, 70, 0.75));
 }
 
-.kh-dash-pip {
-  width: 14px;
-  height: 7px;
-  border-radius: 2px;
-  transform: skewX(-18deg);
-  background: linear-gradient(90deg, #43d6f5 0%, #9df3ff 100%);
-  box-shadow: 0 0 8px rgba(84, 224, 248, 0.6);
-  transition: opacity 0.1s ease;
+.kh-dash-wing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.kh-dash-pip.kh-empty {
-  background: rgba(96, 140, 152, 0.24);
-  box-shadow: none;
-  opacity: 0.35;
+.kh-dash-wing.kh-ready {
+  filter: drop-shadow(0 0 5px rgba(70, 224, 255, 0.65));
 }
 
 .kh-rail-ammo {
-  font-size: 11px;
-  font-weight: 700;
+  font-family: var(--kh-font-num);
+  font-size: 12px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  color: #d6c4ff;
+  color: #e4d4ff;
   padding: 1px 6px;
   border-radius: 2px;
-  background: rgba(92, 68, 164, 0.28);
-  border: 1px solid rgba(176, 154, 255, 0.5);
+  background: rgba(92, 68, 164, 0.34);
+  border: 1px solid rgba(178, 92, 255, 0.62);
 }
 
-/* 4-Segment God Gauge */
+/* 4-Segment Gilded Patron Call Gauge */
 .kh-god-gauge-wrap {
-  margin-top: 7px;
+  margin-top: 6px;
 }
 
 .kh-god-gauge-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-family: var(--kh-font-display);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--kh-ash);
+  color: var(--kh-text-secondary);
   margin-bottom: 3px;
+}
+
+.kh-god-gauge-status {
+  font-family: var(--kh-font-num);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
 }
 
 .kh-god-gauge-status.kh-ready {
   color: var(--kh-gold-bright);
-  text-shadow: 0 0 8px rgba(245, 203, 112, 0.65);
+  text-shadow: 0 0 9px rgba(229, 185, 82, 0.72);
 }
 
 .kh-god-gauge-segments {
@@ -625,21 +935,25 @@ export const MYTHIC_UI_CSS = `
 .kh-god-seg {
   height: 7px;
   border-radius: 2px;
-  background: rgba(24, 19, 34, 0.92);
-  border: 1px solid rgba(217, 159, 76, 0.44);
+  background: rgba(17, 11, 24, 0.96);
+  border: 1px solid rgba(229, 185, 82, 0.48);
   overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .kh-god-seg-fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, #d99f4c 0%, #ffe680 100%);
   transition: width 0.1s linear;
 }
 
+.kh-god-gauge-wrap.kh-call-ready .kh-god-seg {
+  border-color: var(--kh-gold);
+}
+
 .kh-god-gauge-wrap.kh-call-max .kh-god-seg {
-  border-color: #fff0a8;
-  box-shadow: 0 0 10px rgba(255, 214, 96, 0.55);
+  border-color: var(--kh-gold-bright);
+  box-shadow: 0 0 12px rgba(255, 224, 118, 0.65);
 }
 
 /* Bottom-Right Dynamic Control Prompts */
@@ -651,7 +965,7 @@ export const MYTHIC_UI_CSS = `
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
-  max-width: 54vw;
+  max-width: 50vw;
 }
 
 .kh-prompt-chip {
@@ -659,18 +973,20 @@ export const MYTHIC_UI_CSS = `
   align-items: center;
   gap: 5px;
   padding: 4px 8px;
-  border-radius: 3px;
-  background: rgba(12, 9, 20, 0.82);
-  border: 1px solid rgba(217, 159, 76, 0.36);
-  font-size: 11px;
-  color: #ded5c8;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.48);
+  border-radius: 2px;
+  background: rgba(17, 11, 24, 0.88);
+  border: 1px solid rgba(158, 110, 46, 0.48);
+  font-family: var(--kh-font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--kh-text-secondary);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.52);
 }
 
 .kh-prompt-chip.kh-highlight {
   border-color: var(--kh-gold-bright);
-  color: #fff6d9;
-  box-shadow: 0 0 14px rgba(245, 203, 112, 0.34);
+  color: var(--kh-gold-bright);
+  box-shadow: 0 0 14px rgba(229, 185, 82, 0.36);
 }
 
 .kh-keycap {
@@ -680,13 +996,14 @@ export const MYTHIC_UI_CSS = `
   min-width: 22px;
   height: 20px;
   padding: 0 5px;
-  border-radius: 3px;
-  background: linear-gradient(180deg, #2b2238 0%, #161121 100%);
-  border: 1px solid rgba(245, 203, 112, 0.56);
-  color: #fff4da;
-  font-size: 10px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #2d2040 0%, #150e20 100%);
+  border: 1px solid rgba(229, 185, 82, 0.64);
+  color: var(--kh-gold-bright);
+  font-family: var(--kh-font-num);
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 .kh-xbox-btn {
@@ -697,9 +1014,10 @@ export const MYTHIC_UI_CSS = `
   height: 21px;
   padding: 0 5px;
   border-radius: 50%;
-  font-size: 10px;
+  font-family: var(--kh-font-num);
+  font-size: 11px;
   font-weight: 800;
-  color: #0b0812;
+  color: var(--kh-ink);
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45);
 }
 .kh-xbox-a { background: #4cd964; }
@@ -707,26 +1025,26 @@ export const MYTHIC_UI_CSS = `
 .kh-xbox-x { background: #3aa0ff; color: #fff; }
 .kh-xbox-y { background: #ffcc33; }
 .kh-xbox-bumper {
-  border-radius: 5px;
-  background: #2e2840;
-  color: #f4e6c9;
-  border: 1px solid rgba(245, 203, 112, 0.65);
+  border-radius: 4px;
+  background: #271b36;
+  color: var(--kh-gold-bright);
+  border: 1px solid rgba(229, 185, 82, 0.68);
 }
 
 /* Contextual World Interact Banner */
 .kh-interact-banner {
   position: fixed;
   left: 50%;
-  bottom: max(96px, 16vh);
+  bottom: max(96px, 15vh);
   transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 8px 18px;
-  border-radius: 4px;
-  background: linear-gradient(180deg, rgba(22, 16, 34, 0.94) 0%, rgba(11, 8, 18, 0.96) 100%);
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(27, 18, 38, 0.96) 0%, rgba(13, 9, 20, 0.98) 100%);
   border: 1.5px solid var(--kh-gold-bright);
-  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.72), 0 0 18px rgba(245, 203, 112, 0.25);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.78), 0 0 20px rgba(229, 185, 82, 0.28);
   font-family: var(--kh-font-display);
   font-size: 13px;
   font-weight: 700;
@@ -735,8 +1053,13 @@ export const MYTHIC_UI_CSS = `
   white-space: nowrap;
 }
 
-/* Event Toast Banner — flows cleanly below Boss Health Bars inside .kh-top-center-stack */
+/* ============================================================================
+   ZERO-TRUNCATION UNDERWORLD PROCLAMATION TOASTS
+   STRICT RULE: NEVER nowrap / ellipsis / overflow:hidden!
+   ============================================================================ */
+
 .kh-toast-container {
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -745,37 +1068,68 @@ export const MYTHIC_UI_CSS = `
 }
 
 .kh-toast {
-  padding: 6px 16px;
-  border-radius: 3px;
-  background: rgba(10, 8, 18, 0.92);
-  border: 1px solid rgba(245, 203, 112, 0.62);
-  border-left: 3px solid currentColor;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.78);
+  position: relative;
+  max-width: 100%;
+  padding: 6px 24px;
+  background: linear-gradient(
+    90deg,
+    rgba(9, 6, 14, 0.68) 0%,
+    rgba(22, 13, 30, 0.95) 14%,
+    rgba(22, 13, 30, 0.95) 86%,
+    rgba(9, 6, 14, 0.68) 100%
+  );
+  border-top: 1.5px solid var(--kh-gold);
+  border-bottom: 1.5px solid var(--kh-crimson);
+  border-left: 2px solid var(--kh-toast-accent, var(--kh-gold));
+  border-right: 2px solid var(--kh-toast-accent, var(--kh-gold));
+  border-radius: 2px;
+  box-shadow:
+    0 5px 20px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 240, 184, 0.22);
   font-family: var(--kh-font-display);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  text-shadow: 0 1px 4px #000;
-  white-space: nowrap;
-  max-width: min(460px, 60vw);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  animation: kh-toast-in 0.14s ease-out;
+  text-shadow: 0 1px 5px rgba(9, 6, 14, 0.98);
+  white-space: normal;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+  text-align: center;
+  line-height: 1.28;
+  animation: kh-toast-in 0.16s ease-out;
 }
+
+.kh-toast::before,
+.kh-toast::after {
+  content: '◆';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 8px;
+  color: var(--kh-gold-bright);
+  opacity: 0.88;
+}
+.kh-toast::before { left: 8px; }
+.kh-toast::after { right: 8px; }
 
 @keyframes kh-low-hp-pulse {
   0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.45); }
+  50% { filter: brightness(1.48); }
 }
 
 @keyframes kh-toast-in {
-  from { opacity: 0.94; transform: translateY(-4px); }
+  from { opacity: 0.92; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes kh-invuln-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
 /* ============================================================================
-   TITLE SCREEN OVERLAY
+   TITLE SCREEN REDESIGN — CINEMATIC EDITORIAL LEFT PILLAR
    ============================================================================ */
 
 .kh-title-overlay {
@@ -786,94 +1140,185 @@ export const MYTHIC_UI_CSS = `
   flex-direction: column;
   justify-content: space-between;
   padding:
-    max(22px, calc(env(safe-area-inset-top, 0px) + 18px))
+    max(18px, calc(env(safe-area-inset-top, 0px) + 14px))
     max(28px, calc(env(safe-area-inset-right, 0px) + 22px))
-    max(18px, calc(env(safe-area-inset-bottom, 0px) + 14px))
+    max(16px, calc(env(safe-area-inset-bottom, 0px) + 12px))
     max(28px, calc(env(safe-area-inset-left, 0px) + 22px));
-  background: radial-gradient(
-    ellipse at 65% 42%,
-    rgba(18, 12, 28, 0.22) 0%,
-    rgba(10, 7, 16, 0.72) 58%,
-    rgba(7, 5, 12, 0.92) 100%
-  );
+  background:
+    linear-gradient(
+      90deg,
+      rgba(9, 6, 14, 0.93) 0%,
+      rgba(13, 8, 20, 0.86) 32%,
+      rgba(13, 8, 20, 0.42) 52%,
+      rgba(9, 6, 14, 0.14) 68%,
+      rgba(9, 6, 14, 0.34) 100%
+    ),
+    radial-gradient(ellipse at 72% 48%, rgba(255, 140, 54, 0.08) 0%, rgba(9, 6, 14, 0.45) 75%);
   pointer-events: auto;
 }
 
 .kh-title-content {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  align-items: center;
   flex: 1;
-  max-width: min(820px, 92vw);
-  gap: 16px;
+  min-height: 0;
+}
+
+.kh-title-pillar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 472px;
+  padding: 20px 28px 20px 10px;
+  gap: 12px;
+}
+
+.kh-title-crest-art {
+  display: flex;
+  align-items: center;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 18px rgba(240, 46, 70, 0.25));
+}
+
+.kh-title-eyebrow-rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.kh-title-rule-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(158, 110, 46, 0.15) 0%, var(--kh-gold) 50%, rgba(158, 110, 46, 0.15) 100%);
 }
 
 .kh-title-crest {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
   font-family: var(--kh-font-display);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.26em;
   text-transform: uppercase;
   color: var(--kh-gold-bright);
+  white-space: nowrap;
 }
 
 .kh-title-heading {
   margin: 0;
-  padding-right: 0.1em;
-  width: fit-content;
-  max-width: 100%;
-  font-family: var(--kh-font-display);
-  font-size: clamp(26px, 4.3vw, 54px);
-  font-weight: 800;
-  line-height: 1.06;
-  letter-spacing: 0.07em;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-family: var(--kh-font-deco);
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  background: linear-gradient(180deg, #fff5dc 0%, #f1c46d 56%, #c87b33 100%);
+  filter: drop-shadow(0 4px 12px rgba(9, 6, 14, 0.96)) drop-shadow(0 0 24px rgba(229, 185, 82, 0.22));
+}
+
+.kh-title-word-top {
+  font-size: clamp(24px, 3.1vw, 38px);
+  letter-spacing: 0.16em;
+  background: linear-gradient(180deg, #fff8dc 0%, #e5b952 62%, #b06d22 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.88));
+}
+
+.kh-title-word-main {
+  font-size: clamp(28px, 3.7vw, 48px);
+  background: linear-gradient(180deg, #fff6cf 0%, #f0c45c 48%, #b86c1e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.kh-title-tagline-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
 }
 
 .kh-title-sub {
   margin: 0;
-  font-family: var(--kh-font-display);
-  font-size: clamp(12px, 1.4vw, 15px);
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: #d6c8b6;
-  text-shadow: 0 2px 8px #000;
+  font-family: var(--kh-font-lore);
+  font-style: italic;
+  font-weight: 600;
+  font-size: clamp(17px, 1.9vw, 22px);
+  letter-spacing: 0.08em;
+  color: var(--kh-text-primary);
+  text-shadow: 0 2px 10px rgba(9, 6, 14, 0.98);
+}
+
+.kh-title-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
 }
 
 .kh-title-menu {
   display: flex;
   flex-direction: column;
   gap: 9px;
-  width: min(490px, 90vw);
-  margin-top: 6px;
+  width: 100%;
+  max-width: 432px;
+  margin-top: 4px;
 }
 
 .kh-title-menu .kh-btn {
   justify-content: space-between;
   width: 100%;
   text-align: left;
+  padding: 10px 18px;
+}
+
+.kh-title-btn-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.kh-title-btn-diamond {
+  width: 7px;
+  height: 7px;
+  background: var(--kh-bronze);
+  border: 1px solid var(--kh-gold);
+  transform: rotate(45deg);
+  transition: background 0.14s ease, transform 0.14s ease;
+  flex-shrink: 0;
+}
+
+.kh-btn:hover .kh-title-btn-diamond,
+.kh-btn.kh-focused .kh-title-btn-diamond {
+  background: var(--kh-gold-bright);
+  transform: rotate(45deg) scale(1.22);
+}
+
+.kh-title-btn-tag {
+  font-family: var(--kh-font-num);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--kh-gold-bright);
+  opacity: 0.82;
 }
 
 .kh-title-pack-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 9px;
 }
 
 .kh-title-pack-row .kh-btn {
   justify-content: center;
   text-align: center;
   white-space: nowrap;
-  padding: 10px 14px;
-  font-size: 12.5px;
+  padding: 10px 12px;
+  font-size: 12px;
   letter-spacing: 0.08em;
 }
 
@@ -884,20 +1329,35 @@ export const MYTHIC_UI_CSS = `
   justify-content: space-between;
   gap: 12px;
   padding-top: 10px;
-  border-top: 1px solid rgba(217, 159, 76, 0.28);
+  border-top: 1px solid rgba(229, 185, 82, 0.32);
+}
+
+.kh-title-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.kh-title-nav-hint {
+  font-family: var(--kh-font-ui);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--kh-text-secondary);
 }
 
 .kh-input-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  border-radius: 3px;
-  background: rgba(16, 12, 26, 0.88);
-  border: 1px solid rgba(217, 159, 76, 0.54);
-  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 2px;
+  background: rgba(17, 11, 24, 0.92);
+  border: 1px solid rgba(229, 185, 82, 0.56);
+  font-family: var(--kh-font-display);
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--kh-gold-bright);
 }
@@ -906,13 +1366,33 @@ export const MYTHIC_UI_CSS = `
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  font-size: 11px;
+}
+
+.kh-title-meta-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.kh-title-meta-label {
+  font-family: var(--kh-font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--kh-text-muted);
+}
+
+.kh-title-meta-num {
+  font-family: var(--kh-font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  font-weight: 800;
   letter-spacing: 0.06em;
-  color: var(--kh-ash);
+  color: var(--kh-gold-bright);
 }
 
 /* ============================================================================
-   MODAL BACKDROP & BOON SELECT MODAL
+   MODAL BACKDROP & BOON SELECT MODAL (RARITY SHIMMER + STAGGERED ENTRANCE)
    ============================================================================ */
 
 .kh-modal-backdrop {
@@ -927,23 +1407,21 @@ export const MYTHIC_UI_CSS = `
     max(16px, env(safe-area-inset-right, 0px))
     max(14px, env(safe-area-inset-bottom, 0px))
     max(16px, env(safe-area-inset-left, 0px));
-  background: radial-gradient(circle at 50% 50%, rgba(16, 11, 26, 0.78) 0%, rgba(5, 4, 9, 0.92) 100%);
-  backdrop-filter: blur(4px);
+  background: radial-gradient(circle at 50% 45%, rgba(20, 12, 32, 0.78) 0%, rgba(6, 4, 10, 0.94) 100%);
+  backdrop-filter: blur(5px);
   pointer-events: auto;
 }
 
 .kh-boon-shell {
-  width: min(1040px, 95vw);
+  width: min(1060px, 95vw);
   max-height: 92vh;
   display: grid;
-  grid-template-columns: minmax(220px, 310px) 1fr;
+  grid-template-columns: minmax(230px, 310px) 1fr;
   gap: 20px;
   align-items: stretch;
-  background: linear-gradient(160deg, rgba(20, 14, 30, 0.97) 0%, rgba(10, 8, 16, 0.98) 100%);
-  border: 2px solid var(--kh-gold);
-  border-radius: 5px;
-  padding: 18px 20px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85), 0 0 40px rgba(217, 159, 76, 0.16);
+  background: linear-gradient(160deg, rgba(24, 15, 36, 0.98) 0%, rgba(12, 8, 19, 0.99) 100%);
+  border-radius: 4px;
+  padding: 20px 22px;
 }
 
 .kh-boon-portrait-col {
@@ -951,11 +1429,15 @@ export const MYTHIC_UI_CSS = `
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  border-radius: 4px;
+  border-radius: 3px;
   overflow: hidden;
-  border: 1.5px solid rgba(217, 159, 76, 0.5);
-  background: radial-gradient(circle at 50% 35%, rgba(245, 203, 112, 0.2), rgba(10, 8, 16, 0.95) 75%);
-  min-height: 260px;
+  border: 2px solid var(--kh-patron-accent, var(--kh-gold));
+  background: radial-gradient(circle at 50% 35%, rgba(229, 185, 82, 0.22), rgba(11, 7, 17, 0.97) 75%);
+  min-height: 290px;
+}
+
+.kh-portrait-enter {
+  animation: kh-portrait-slide 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .kh-boon-portrait-img {
@@ -975,45 +1457,45 @@ export const MYTHIC_UI_CSS = `
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding-bottom: 54px;
+  padding-bottom: 58px;
 }
 
 .kh-boon-emblem {
-  width: 96px;
-  height: 96px;
+  width: 104px;
+  height: 104px;
   border-radius: 50%;
-  border: 3px solid currentColor;
+  border: 2.5px solid currentColor;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--kh-font-display);
-  font-size: 40px;
-  font-weight: 800;
-  background: rgba(10, 8, 16, 0.72);
-  box-shadow: 0 0 32px currentColor;
+  background: radial-gradient(circle, rgba(27, 18, 38, 0.9), rgba(9, 6, 14, 0.96));
+  box-shadow: 0 0 34px currentColor, inset 0 0 18px rgba(255, 240, 184, 0.16);
 }
 
 .kh-boon-patron-plate {
   position: relative;
   z-index: 2;
-  padding: 14px 14px 12px;
-  background: linear-gradient(180deg, rgba(10, 8, 16, 0) 0%, rgba(10, 8, 16, 0.92) 38%, rgba(8, 6, 14, 0.98) 100%);
+  padding: 20px 16px 14px;
+  background: linear-gradient(180deg, rgba(9, 6, 14, 0) 0%, rgba(11, 7, 17, 0.92) 42%, rgba(9, 6, 14, 0.98) 100%);
 }
 
 .kh-boon-patron-name {
   font-family: var(--kh-font-display);
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 24px;
+  font-weight: 900;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   margin: 0;
+  text-shadow: 0 2px 10px rgba(9, 6, 14, 0.95);
 }
 
 .kh-boon-patron-title {
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--kh-ash);
+  font-family: var(--kh-font-lore);
+  font-style: italic;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--kh-text-secondary);
   margin-top: 2px;
 }
 
@@ -1025,67 +1507,151 @@ export const MYTHIC_UI_CSS = `
 }
 
 .kh-boon-offer-head {
+  position: relative;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
+  overflow: hidden;
+  padding-right: 4px;
+}
+
+.kh-boon-header-watermark {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.12;
+  pointer-events: none;
 }
 
 .kh-boon-offer-title {
   margin: 0;
   font-family: var(--kh-font-display);
-  font-size: 19px;
-  letter-spacing: 0.1em;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--kh-gold-bright);
+  text-shadow: 0 2px 8px rgba(9, 6, 14, 0.9);
 }
 
 .kh-boon-offer-hint {
-  font-size: 11px;
-  color: var(--kh-ash);
-  letter-spacing: 0.05em;
+  font-family: var(--kh-font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--kh-text-secondary);
 }
 
 .kh-boon-list {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 10px;
   flex: 1;
 }
 
 .kh-boon-card {
   position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 5px;
   width: 100%;
-  min-height: 78px;
-  padding: 11px 14px;
+  min-height: 88px;
+  padding: 12px 15px;
   text-align: left;
-  border-radius: 4px;
+  border-radius: 3px;
   border: 2px solid var(--kh-rarity-common);
   border-left-width: 6px;
-  background: linear-gradient(95deg, rgba(28, 22, 42, 0.94) 0%, rgba(16, 12, 24, 0.96) 100%);
-  color: var(--kh-ivory);
+  background: linear-gradient(100deg, rgba(34, 23, 50, 0.96) 0%, rgba(17, 11, 24, 0.98) 100%);
+  color: var(--kh-text-primary);
   cursor: pointer;
   pointer-events: auto;
-  transition: transform 0.12s ease, box-shadow 0.14s ease, border-color 0.12s ease;
+  transition: transform 0.13s ease, box-shadow 0.14s ease, border-color 0.12s ease;
 }
 
-.kh-boon-card[data-rarity="common"] { border-color: var(--kh-rarity-common); }
-.kh-boon-card[data-rarity="rare"] { border-color: var(--kh-rarity-rare); }
-.kh-boon-card[data-rarity="epic"] { border-color: var(--kh-rarity-epic); }
+.kh-boon-card-enter {
+  animation: kh-card-enter 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--kh-card-delay, 0ms);
+}
+
+.kh-boon-shimmer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 20%,
+    rgba(255, 248, 220, 0.18) 46%,
+    rgba(255, 255, 255, 0.34) 50%,
+    rgba(255, 248, 220, 0.14) 54%,
+    transparent 80%
+  );
+  transform: translateX(-120%);
+}
+
+/* Rarity-Specific Metallic Borders & Shimmer */
+.kh-boon-card[data-rarity="common"] {
+  border-color: var(--kh-rarity-common);
+}
+
+.kh-boon-card[data-rarity="rare"] {
+  border-color: var(--kh-rarity-rare);
+  box-shadow: inset 0 0 18px rgba(62, 164, 255, 0.14), 0 0 14px rgba(62, 164, 255, 0.12);
+}
+.kh-boon-card[data-rarity="rare"]:hover .kh-boon-shimmer,
+.kh-boon-card[data-rarity="rare"].kh-focused .kh-boon-shimmer {
+  opacity: 0.75;
+  animation: kh-rarity-shimmer 1.1s ease-out 1;
+}
+
+.kh-boon-card[data-rarity="epic"] {
+  border-color: var(--kh-rarity-epic);
+  box-shadow: inset 0 0 22px rgba(178, 92, 255, 0.18), 0 0 18px rgba(178, 92, 255, 0.16);
+}
+.kh-boon-card[data-rarity="epic"] .kh-boon-shimmer {
+  opacity: 0.55;
+  background: linear-gradient(115deg, transparent 22%, rgba(210, 154, 255, 0.24) 50%, transparent 78%);
+  animation: kh-rarity-shimmer 3.8s ease-in-out infinite;
+}
+
 .kh-boon-card[data-rarity="heroic"] {
   border-color: var(--kh-rarity-heroic);
-  box-shadow: inset 0 0 18px rgba(235, 71, 84, 0.14);
+  box-shadow:
+    inset 0 0 24px rgba(255, 70, 90, 0.22),
+    inset 0 0 0 1px rgba(255, 240, 184, 0.25),
+    0 0 20px rgba(255, 70, 90, 0.2);
 }
+.kh-boon-card[data-rarity="heroic"] .kh-boon-shimmer {
+  opacity: 0.68;
+  background: linear-gradient(115deg, transparent 22%, rgba(255, 198, 128, 0.3) 50%, transparent 78%);
+  animation: kh-rarity-shimmer 3.1s ease-in-out infinite;
+}
+
 .kh-boon-card[data-rarity="duo"] {
-  border-color: var(--kh-rarity-duo);
-  box-shadow: inset 0 0 18px rgba(62, 228, 145, 0.14);
+  border-color: #44e6b8;
+  border-left-color: #c9f238;
+  box-shadow:
+    inset 0 0 24px rgba(68, 230, 184, 0.2),
+    0 0 20px rgba(201, 242, 56, 0.18);
 }
+.kh-boon-card[data-rarity="duo"] .kh-boon-shimmer {
+  opacity: 0.72;
+  background: linear-gradient(115deg, transparent 20%, rgba(201, 242, 56, 0.28) 46%, rgba(68, 230, 184, 0.28) 56%, transparent 80%);
+  animation: kh-rarity-shimmer 2.8s ease-in-out infinite;
+}
+
 .kh-boon-card[data-rarity="legendary"] {
   border-color: var(--kh-rarity-legendary);
-  box-shadow: inset 0 0 22px rgba(255, 177, 51, 0.18);
+  box-shadow:
+    inset 0 0 28px rgba(255, 174, 36, 0.26),
+    inset 0 0 0 1px rgba(255, 243, 168, 0.42),
+    0 0 24px rgba(255, 174, 36, 0.24);
+}
+.kh-boon-card[data-rarity="legendary"] .kh-boon-shimmer {
+  opacity: 0.85;
+  background: linear-gradient(115deg, transparent 18%, rgba(255, 243, 168, 0.36) 50%, transparent 82%);
+  animation: kh-rarity-shimmer 2.4s ease-in-out infinite;
 }
 
 .kh-boon-card:hover,
@@ -1094,7 +1660,38 @@ export const MYTHIC_UI_CSS = `
   outline: 2px solid var(--kh-gold-bright);
   outline-offset: 2px;
   transform: translateX(4px);
-  box-shadow: 0 0 0 4px rgba(245, 203, 112, 0.2), 0 8px 26px rgba(0, 0, 0, 0.72);
+  box-shadow:
+    0 0 0 4px rgba(229, 185, 82, 0.22),
+    0 10px 28px rgba(0, 0, 0, 0.76);
+}
+
+.kh-boon-card-layout {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.kh-boon-card-sigil {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--kh-gold);
+  background: radial-gradient(circle at 42% 35%, rgba(39, 27, 54, 0.96), rgba(9, 6, 14, 0.98));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6), inset 0 0 10px rgba(255, 240, 184, 0.14);
+}
+
+.kh-boon-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .kh-boon-card-top {
@@ -1114,25 +1711,25 @@ export const MYTHIC_UI_CSS = `
 .kh-boon-hotkey {
   width: 24px;
   height: 24px;
-  border-radius: 3px;
+  border-radius: 2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(10, 8, 16, 0.9);
-  border: 1px solid rgba(245, 203, 112, 0.65);
+  background: var(--kh-ink);
+  border: 1px solid rgba(229, 185, 82, 0.7);
   color: var(--kh-gold-bright);
-  font-family: var(--kh-font-display);
-  font-size: 12px;
+  font-family: var(--kh-font-num);
+  font-size: 13px;
   font-weight: 800;
   flex-shrink: 0;
 }
 
 .kh-boon-name {
   font-family: var(--kh-font-display);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: #fff6e5;
+  color: var(--kh-text-primary);
 }
 
 .kh-boon-badges {
@@ -1143,31 +1740,37 @@ export const MYTHIC_UI_CSS = `
 }
 
 .kh-boon-slot-tag {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #dfd6cb;
-}
-
-.kh-boon-rarity-pill {
-  font-size: 10px;
+  font-family: var(--kh-font-num);
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   padding: 2px 7px;
   border-radius: 2px;
-  background: rgba(8, 6, 14, 0.75);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(229, 185, 82, 0.24);
+  color: var(--kh-text-primary);
+}
+
+.kh-boon-rarity-pill {
+  font-family: var(--kh-font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  background: rgba(9, 6, 14, 0.82);
 }
 
 .kh-boon-desc {
   margin: 0;
-  font-size: 12.5px;
-  line-height: 1.38;
-  color: #dfd5c8;
+  font-family: var(--kh-font-ui);
+  font-size: 14.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--kh-text-secondary);
 }
 
 .kh-boon-meta-row {
@@ -1179,22 +1782,26 @@ export const MYTHIC_UI_CSS = `
 }
 
 .kh-boon-stat {
-  font-size: 12px;
+  font-family: var(--kh-font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
   font-weight: 800;
-  color: #79f7b8;
-  letter-spacing: 0.03em;
+  color: #6ef5b8;
+  letter-spacing: 0.04em;
 }
 
 .kh-boon-replace {
-  font-size: 11px;
+  font-family: var(--kh-font-display);
+  font-size: 10.5px;
   font-weight: 700;
-  color: #ffd37a;
+  color: var(--kh-gold-bright);
 }
 
 .kh-boon-curse {
-  font-size: 11px;
+  font-family: var(--kh-font-ui);
+  font-size: 12px;
   font-weight: 700;
-  color: #d8a6ff;
+  color: #dcaeff;
 }
 
 .kh-boon-footer {
@@ -1203,6 +1810,21 @@ export const MYTHIC_UI_CSS = `
   justify-content: space-between;
   gap: 10px;
   margin-top: 2px;
+}
+
+@keyframes kh-portrait-slide {
+  from { opacity: 0; transform: translateX(-18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes kh-card-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes kh-rarity-shimmer {
+  0% { transform: translateX(-125%); }
+  45%, 100% { transform: translateX(135%); }
 }
 
 /* ============================================================================
@@ -1215,48 +1837,105 @@ export const MYTHIC_UI_CSS = `
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 18px 22px;
-  border-radius: 5px;
-  background: linear-gradient(170deg, rgba(22, 15, 32, 0.97) 0%, rgba(10, 8, 16, 0.98) 100%);
-  border: 2px solid var(--kh-gold);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85), 0 0 36px rgba(217, 159, 76, 0.14);
+  padding: 20px 24px;
+  border-radius: 4px;
+  background: linear-gradient(170deg, rgba(27, 18, 38, 0.98) 0%, rgba(12, 8, 19, 0.99) 100%);
+  overflow-y: auto;
 }
 
-.kh-modal-panel-narrow {
-  width: min(440px, 92vw);
-}
-
-.kh-modal-panel-wide {
-  width: min(820px, 95vw);
-}
+.kh-modal-panel-narrow { width: min(450px, 92vw); }
+.kh-modal-panel-wide { width: min(840px, 95vw); }
 
 .kh-modal-title {
   margin: 0;
   text-align: center;
   font-family: var(--kh-font-display);
   font-size: clamp(20px, 3vw, 28px);
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--kh-gold-bright);
-  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.85);
-}
-
-.kh-modal-title.kh-victory-title {
-  color: #82f5be;
-}
-
-.kh-modal-title.kh-death-title {
-  color: #ff5864;
+  text-shadow: 0 3px 14px rgba(9, 6, 14, 0.92);
 }
 
 .kh-modal-subtitle {
   margin: -4px 0 2px;
   text-align: center;
+  font-family: var(--kh-font-lore);
+  font-style: italic;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--kh-text-secondary);
+}
+
+/* Monumental Victory / Death Banners */
+.kh-summary-panel {
+  width: min(760px, 95vw);
+}
+
+.kh-summary-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 18px 14px;
+  margin: -6px -6px 0;
+  border-radius: 3px;
+  border-bottom: 1.5px solid rgba(229, 185, 82, 0.45);
+}
+
+.kh-summary-banner.kh-banner-victory {
+  background: radial-gradient(ellipse at 50% 35%, rgba(229, 185, 82, 0.24) 0%, rgba(44, 128, 92, 0.18) 52%, rgba(17, 11, 24, 0.4) 100%);
+}
+
+.kh-summary-banner.kh-banner-death {
+  background: radial-gradient(ellipse at 50% 35%, rgba(240, 46, 70, 0.3) 0%, rgba(90, 11, 26, 0.28) 55%, rgba(17, 11, 24, 0.4) 100%);
+}
+
+.kh-summary-crest svg {
+  width: 120px;
+  height: 46px;
+}
+
+.kh-summary-title {
+  font-family: var(--kh-font-deco);
+  font-size: clamp(24px, 3.6vw, 36px);
+  letter-spacing: 0.12em;
+}
+
+.kh-modal-title.kh-victory-title {
+  background: linear-gradient(180deg, #fff8dc 0%, #e5b952 55%, #66f2b4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.kh-modal-title.kh-death-title {
+  background: linear-gradient(180deg, #ffd4da 0%, #f02e46 52%, #9e1128 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.kh-summary-boons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.kh-summary-boon-pill {
+  font-family: var(--kh-font-ui);
   font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--kh-ash);
+}
+
+.kh-submenu-body {
+  font-family: var(--kh-font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--kh-text-secondary);
+  text-align: center;
 }
 
 .kh-modal-actions {
@@ -1272,7 +1951,7 @@ export const MYTHIC_UI_CSS = `
   gap: 10px;
 }
 
-/* Options Grid */
+/* Options Grid & Custom Gilded Bronze Range Sliders */
 .kh-options-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1285,17 +1964,17 @@ export const MYTHIC_UI_CSS = `
   justify-content: space-between;
   gap: 10px;
   min-height: 48px;
-  padding: 6px 11px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(217, 159, 76, 0.24);
+  padding: 6px 12px;
+  border-radius: 3px;
+  background: rgba(17, 11, 24, 0.72);
+  border: 1px solid rgba(158, 110, 46, 0.36);
   transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
 }
 
 .kh-option-row.kh-focused {
   border-color: var(--kh-gold-bright);
-  background: rgba(245, 203, 112, 0.1);
-  box-shadow: 0 0 0 2px rgba(245, 203, 112, 0.24);
+  background: rgba(229, 185, 82, 0.12);
+  box-shadow: 0 0 0 2px rgba(229, 185, 82, 0.25);
 }
 
 .kh-option-label-wrap {
@@ -1306,15 +1985,18 @@ export const MYTHIC_UI_CSS = `
 }
 
 .kh-option-label {
+  font-family: var(--kh-font-display);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--kh-ivory);
+  letter-spacing: 0.06em;
+  color: var(--kh-text-primary);
 }
 
 .kh-option-sub {
-  font-size: 10px;
-  color: var(--kh-gold-bright);
+  font-family: var(--kh-font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--kh-gold);
 }
 
 .kh-seg-group {
@@ -1327,43 +2009,101 @@ export const MYTHIC_UI_CSS = `
   min-width: 48px;
   min-height: 48px;
   padding: 4px 10px;
-  border-radius: 3px;
-  border: 1px solid rgba(217, 159, 76, 0.4);
-  background: rgba(16, 12, 24, 0.9);
-  color: var(--kh-ash);
-  font-size: 11px;
-  font-weight: 700;
+  border-radius: 2px;
+  border: 1px solid rgba(158, 110, 46, 0.56);
+  background: linear-gradient(180deg, rgba(27, 18, 38, 0.94), rgba(14, 9, 20, 0.96));
+  color: var(--kh-text-secondary);
+  font-family: var(--kh-font-num);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
 }
 
 .kh-seg-btn.kh-active {
   border-color: var(--kh-gold-bright);
-  background: rgba(217, 159, 76, 0.26);
-  color: #fff8e6;
+  background: linear-gradient(180deg, rgba(162, 24, 46, 0.88), rgba(90, 11, 26, 0.94));
+  color: var(--kh-gold-bright);
+  box-shadow: 0 0 12px rgba(229, 185, 82, 0.28);
 }
 
 .kh-slider-wrap {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.kh-slider {
-  width: 96px;
-  accent-color: var(--kh-gold-bright);
+/* Custom Gilded Bronze Range Slider */
+input[type="range"].kh-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 112px;
+  height: 18px;
+  background: transparent;
   cursor: pointer;
 }
 
+input[type="range"].kh-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 2px;
+  border: 1px solid rgba(229, 185, 82, 0.58);
+  background: linear-gradient(
+    90deg,
+    var(--kh-gold) 0%,
+    var(--kh-gold-bright) var(--kh-slider-pct, 80%),
+    rgba(17, 11, 24, 0.95) var(--kh-slider-pct, 80%),
+    rgba(17, 11, 24, 0.95) 100%
+  );
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+
+input[type="range"].kh-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  background: linear-gradient(135deg, #fff4c4 0%, #e5b952 55%, #9e6e2e 100%);
+  border: 1.5px solid var(--kh-ink);
+  transform: rotate(45deg);
+  box-shadow: 0 0 8px rgba(229, 185, 82, 0.72);
+}
+
+input[type="range"].kh-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 2px;
+  border: 1px solid rgba(229, 185, 82, 0.58);
+  background: rgba(17, 11, 24, 0.95);
+}
+
+input[type="range"].kh-slider::-moz-range-progress {
+  height: 6px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--kh-bronze), var(--kh-gold-bright));
+}
+
+input[type="range"].kh-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 0;
+  background: linear-gradient(135deg, #fff4c4 0%, #e5b952 55%, #9e6e2e 100%);
+  border: 1.5px solid var(--kh-ink);
+  transform: rotate(45deg);
+  box-shadow: 0 0 8px rgba(229, 185, 82, 0.72);
+}
+
 .kh-slider-val {
-  width: 34px;
+  width: 38px;
   text-align: right;
-  font-size: 11px;
-  font-weight: 700;
+  font-family: var(--kh-font-num);
+  font-size: 14px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--kh-gold-bright);
 }
 
-/* Victory / Death Summary Stats Grid */
+/* Victory / Death & Codex Stats Grid */
 .kh-stats-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1371,29 +2111,31 @@ export const MYTHIC_UI_CSS = `
 }
 
 .kh-stat-card {
-  padding: 9px 11px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(217, 159, 76, 0.3);
+  padding: 10px 12px;
+  border-radius: 3px;
+  background: linear-gradient(160deg, rgba(31, 21, 44, 0.88), rgba(14, 9, 22, 0.94));
+  border: 1px solid rgba(229, 185, 82, 0.36);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .kh-stat-key {
+  font-family: var(--kh-font-display);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--kh-ash);
+  color: var(--kh-text-secondary);
 }
 
 .kh-stat-val {
-  font-family: var(--kh-font-display);
-  font-size: 16px;
-  font-weight: 700;
-  color: #fff6e2;
+  font-family: var(--kh-font-num);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--kh-gold-bright);
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
 }
 
 /* ============================================================================
@@ -1411,10 +2153,10 @@ export const MYTHIC_UI_CSS = `
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  border-radius: 5px;
-  background: rgba(9, 8, 15, 0.95);
+  border-radius: 4px;
+  background: rgba(11, 7, 17, 0.96);
   border: 1.5px solid var(--kh-gold);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.85);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.88);
   pointer-events: auto;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -1424,7 +2166,7 @@ export const MYTHIC_UI_CSS = `
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(217, 159, 76, 0.35);
+  border-bottom: 1px solid rgba(229, 185, 82, 0.35);
   padding-bottom: 8px;
 }
 
@@ -1443,18 +2185,20 @@ export const MYTHIC_UI_CSS = `
   padding: 8px;
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.04);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
-  color: #c8f5dc;
+  font-family: var(--kh-font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: #8ceec9;
 }
 
 .kh-debug-section-title {
-  font-size: 10px;
-  font-weight: 800;
+  font-family: var(--kh-font-display);
+  font-size: 11px;
+  font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--kh-gold);
-  margin: 2px 0 4px;
+  margin: 4px 0 3px;
 }
 
 .kh-debug-btn-grid {
@@ -1467,10 +2211,11 @@ export const MYTHIC_UI_CSS = `
   min-height: 36px;
   padding: 5px 8px;
   border-radius: 3px;
-  border: 1px solid rgba(217, 159, 76, 0.42);
-  background: rgba(24, 19, 36, 0.92);
-  color: #f3eadc;
-  font-size: 11px;
+  border: 1px solid rgba(229, 185, 82, 0.44);
+  background: rgba(27, 18, 38, 0.94);
+  color: var(--kh-text-primary);
+  font-family: var(--kh-font-ui);
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   display: inline-flex;
@@ -1481,113 +2226,16 @@ export const MYTHIC_UI_CSS = `
 
 .kh-debug-btn:hover {
   border-color: var(--kh-gold-bright);
-  background: rgba(62, 42, 74, 0.92);
+  background: rgba(68, 34, 58, 0.94);
 }
 
 .kh-debug-btn.kh-active {
   border-color: #6ef5b8;
-  background: rgba(34, 112, 82, 0.55);
+  background: rgba(34, 112, 82, 0.58);
 }
 
 /* ============================================================================
-   RESPONSIVE FIT (844x390 Mobile Landscape & Small Screens — ZERO Scrollbars)
-   ============================================================================ */
-
-@media (max-height: 500px) {
-  .kh-title-overlay {
-    padding: 10px 20px;
-  }
-  .kh-title-content {
-    gap: 8px;
-  }
-  .kh-title-menu {
-    gap: 5px;
-  }
-  .kh-title-menu .kh-btn {
-    min-height: 48px;
-    padding: 6px 16px;
-    font-size: 12px;
-  }
-  .kh-boon-shell {
-    grid-template-columns: 180px 1fr;
-    gap: 12px;
-    padding: 10px 14px;
-  }
-  .kh-boon-portrait-col {
-    min-height: 180px;
-  }
-  .kh-boon-card {
-    min-height: 60px;
-    padding: 7px 10px;
-  }
-  .kh-boon-name {
-    font-size: 13px;
-  }
-  .kh-boon-desc {
-    font-size: 11px;
-  }
-  .kh-modal-panel {
-    padding: 8px 12px;
-    gap: 6px;
-  }
-  .kh-options-grid {
-    gap: 4px 10px;
-  }
-  .kh-option-row {
-    min-height: 48px;
-    padding: 2px 8px;
-  }
-  .kh-hud-bottomleft {
-    width: min(290px, 44vw);
-  }
-  .kh-hud.kh-touch-active .kh-hud-bottomleft {
-    width: min(264px, 34vw);
-    gap: 4px;
-  }
-  .kh-hud.kh-touch-active .kh-boss-stack {
-    width: min(260px, 31vw);
-  }
-  .kh-hud:not(.kh-has-boss) .kh-top-center-stack {
-    top: max(54px, calc(env(safe-area-inset-top, 0px) + 52px));
-  }
-  .kh-hud.kh-has-boss .kh-top-center-stack {
-    top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
-  }
-  .kh-toast-container {
-    max-width: min(260px, 34vw);
-  }
-  .kh-toast {
-    padding: 4px 10px;
-    font-size: 10.5px;
-    letter-spacing: 0.05em;
-    max-width: min(260px, 34vw);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .kh-hero-frame {
-    padding: 7px 9px;
-  }
-}
-
-@media (max-width: 720px) {
-  .kh-boon-shell {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-  .kh-boon-portrait-col {
-    min-height: 92px;
-  }
-  .kh-options-grid {
-    grid-template-columns: 1fr;
-  }
-  .kh-stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-/* ============================================================================
-   WAVE 2 HUB COURTYARD QUICK-DOCK & META MODALS
+   COURTYARD QUICK-DOCK & UNIFIED META MODALS
    ============================================================================ */
 
 .kh-hub-dock {
@@ -1598,11 +2246,11 @@ export const MYTHIC_UI_CSS = `
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 8px;
-  border-radius: 4px;
-  background: linear-gradient(180deg, rgba(19, 14, 30, 0.9) 0%, rgba(10, 8, 17, 0.94) 100%);
-  border: 1.5px solid rgba(217, 159, 76, 0.58);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.62);
+  padding: 5px 9px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(27, 18, 38, 0.94) 0%, rgba(12, 8, 20, 0.96) 100%);
+  border: 1.5px solid var(--kh-gold);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.72), inset 0 1px 0 rgba(255, 240, 184, 0.16);
   pointer-events: auto;
   z-index: 15;
 }
@@ -1622,10 +2270,10 @@ export const MYTHIC_UI_CSS = `
   min-height: 48px;
   min-width: 48px;
   padding: 6px 12px;
-  border-radius: 3px;
-  border: 1px solid rgba(217, 159, 76, 0.42);
-  background: rgba(25, 19, 38, 0.92);
-  color: var(--kh-ivory);
+  border-radius: 2px;
+  border: 1px solid rgba(158, 110, 46, 0.54);
+  background: linear-gradient(180deg, rgba(34, 23, 50, 0.94), rgba(17, 11, 24, 0.96));
+  color: var(--kh-text-primary);
   font-family: var(--kh-font-display);
   font-size: 11px;
   font-weight: 700;
@@ -1641,18 +2289,18 @@ export const MYTHIC_UI_CSS = `
 .kh-dock-btn:focus-visible {
   outline: 2px solid var(--kh-gold-bright);
   border-color: var(--kh-gold-bright);
-  background: rgba(74, 36, 52, 0.95);
-  color: #fff8e6;
+  background: linear-gradient(180deg, rgba(114, 24, 42, 0.94), rgba(48, 12, 24, 0.96));
+  color: var(--kh-gold-bright);
 }
 
 .kh-dock-hotkey {
-  font-family: var(--kh-font-sans);
-  font-size: 9px;
+  font-family: var(--kh-font-num);
+  font-size: 10.5px;
   font-weight: 800;
-  padding: 1px 4px;
+  padding: 1px 5px;
   border-radius: 2px;
-  background: rgba(8, 6, 14, 0.86);
-  border: 1px solid rgba(245, 203, 112, 0.5);
+  background: var(--kh-ink);
+  border: 1px solid rgba(229, 185, 82, 0.58);
   color: var(--kh-gold-bright);
 }
 
@@ -1660,19 +2308,34 @@ export const MYTHIC_UI_CSS = `
   display: none;
 }
 
-/* Shared Wave 2 Meta Modal Shell */
+/* Shared Meta Modal Shell */
 .kh-meta-shell {
-  width: min(1040px, 95vw);
+  width: min(1060px, 95vw);
   max-height: 92vh;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px 20px;
-  border-radius: 5px;
-  background: linear-gradient(165deg, rgba(21, 15, 32, 0.97) 0%, rgba(10, 8, 16, 0.98) 100%);
-  border: 2px solid var(--kh-gold);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.88), 0 0 38px rgba(217, 159, 76, 0.16);
+  padding: 18px 22px;
+  border-radius: 4px;
+  background: linear-gradient(165deg, rgba(25, 16, 38, 0.98) 0%, rgba(11, 7, 18, 0.99) 100%);
   overflow: hidden;
+}
+
+/* Modal-Specific Atmospheric Tints */
+.kh-theme-mirror {
+  background: linear-gradient(165deg, rgba(32, 16, 52, 0.98) 0%, rgba(13, 8, 24, 0.99) 100%);
+}
+.kh-theme-keepsake {
+  background: linear-gradient(165deg, rgba(38, 13, 24, 0.98) 0%, rgba(15, 8, 16, 0.99) 100%);
+}
+.kh-theme-shrine {
+  background: linear-gradient(165deg, rgba(38, 17, 14, 0.98) 0%, rgba(14, 8, 12, 0.99) 100%);
+}
+.kh-theme-shop {
+  background: linear-gradient(165deg, rgba(14, 30, 34, 0.98) 0%, rgba(10, 10, 18, 0.99) 100%);
+}
+.kh-theme-codex {
+  background: linear-gradient(165deg, rgba(28, 20, 32, 0.98) 0%, rgba(13, 9, 18, 0.99) 100%);
 }
 
 .kh-meta-header {
@@ -1692,18 +2355,21 @@ export const MYTHIC_UI_CSS = `
 .kh-meta-title {
   margin: 0;
   font-family: var(--kh-font-display);
-  font-size: clamp(18px, 2.4vw, 25px);
-  font-weight: 800;
+  font-size: clamp(19px, 2.5vw, 26px);
+  font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--kh-gold-bright);
+  text-shadow: 0 2px 10px rgba(9, 6, 14, 0.92);
 }
 
 .kh-meta-sub {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--kh-ash);
+  font-family: var(--kh-font-lore);
+  font-style: italic;
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--kh-text-secondary);
 }
 
 .kh-meta-badges {
@@ -1717,31 +2383,45 @@ export const MYTHIC_UI_CSS = `
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  border-radius: 3px;
-  background: rgba(14, 10, 24, 0.92);
-  border: 1px solid rgba(217, 159, 76, 0.56);
-  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 2px;
+  background: rgba(13, 9, 20, 0.94);
+  border: 1px solid rgba(229, 185, 82, 0.56);
+  font-family: var(--kh-font-num);
+  font-size: 13.5px;
   font-weight: 800;
+  letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
-  color: #fff4d8;
+  color: var(--kh-text-primary);
+}
+
+.kh-meta-pill-gold {
+  border-color: var(--kh-gold);
+  color: var(--kh-gold-bright);
+  background: rgba(92, 61, 24, 0.32);
 }
 
 .kh-meta-pill-purple {
-  border-color: rgba(186, 122, 255, 0.72);
-  color: #e0b8ff;
+  border-color: rgba(178, 92, 255, 0.78);
+  color: #e2c2ff;
+  background: rgba(74, 28, 120, 0.36);
 }
 
 .kh-meta-pill-crimson {
-  border-color: rgba(242, 84, 98, 0.75);
-  color: #ffb8be;
-  background: rgba(88, 16, 26, 0.55);
+  border-color: rgba(240, 46, 70, 0.78);
+  color: #ffc2c8;
+  background: rgba(114, 16, 32, 0.55);
 }
 
 .kh-meta-pill-heat {
-  border-color: rgba(255, 134, 62, 0.85);
-  color: #ffd39e;
-  background: rgba(114, 34, 16, 0.62);
+  border-color: rgba(255, 134, 62, 0.88);
+  color: #ffd9a6;
+  background: rgba(130, 38, 16, 0.58);
+}
+
+.kh-heat-crest .kh-heat-num {
+  font-size: 16px;
+  color: #fff0b8;
 }
 
 .kh-meta-scroll {
@@ -1750,7 +2430,14 @@ export const MYTHIC_UI_CSS = `
   overflow-y: auto;
   padding-right: 4px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(217, 159, 76, 0.5) rgba(14, 10, 22, 0.6);
+  scrollbar-color: rgba(229, 185, 82, 0.56) rgba(14, 10, 22, 0.6);
+}
+
+.kh-armory-scroll,
+.kh-codex-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .kh-meta-footer {
@@ -1760,13 +2447,14 @@ export const MYTHIC_UI_CSS = `
   gap: 10px;
   flex-wrap: wrap;
   padding-top: 8px;
-  border-top: 1px solid rgba(217, 159, 76, 0.28);
+  border-top: 1px solid rgba(229, 185, 82, 0.32);
 }
 
 .kh-meta-hint {
-  font-size: 11px;
-  color: var(--kh-ash);
-  letter-spacing: 0.05em;
+  font-family: var(--kh-font-ui);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--kh-text-secondary);
 }
 
 /* Tab Strip (Weapons, Codex) */
@@ -1782,17 +2470,18 @@ export const MYTHIC_UI_CSS = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
+  flex: 1 1 auto;
   min-height: 48px;
-  padding: 6px 14px;
-  border-radius: 3px;
-  border: 1.5px solid rgba(217, 159, 76, 0.36);
-  background: rgba(18, 14, 28, 0.9);
-  color: var(--kh-ash);
+  padding: 6px 10px;
+  border-radius: 2px;
+  border: 1.5px solid rgba(158, 110, 46, 0.44);
+  background: linear-gradient(180deg, rgba(27, 18, 38, 0.94), rgba(14, 9, 21, 0.96));
+  color: var(--kh-text-secondary);
   font-family: var(--kh-font-display);
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
   white-space: nowrap;
@@ -1800,18 +2489,24 @@ export const MYTHIC_UI_CSS = `
   transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
 }
 
+.kh-tab-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .kh-tab-btn.kh-active {
   border-color: var(--kh-gold-bright);
-  background: linear-gradient(180deg, rgba(108, 28, 42, 0.92) 0%, rgba(44, 15, 28, 0.95) 100%);
-  color: #fff6e0;
-  box-shadow: 0 0 14px rgba(245, 203, 112, 0.25);
+  background: linear-gradient(180deg, rgba(148, 22, 42, 0.94) 0%, rgba(62, 11, 24, 0.98) 100%);
+  color: var(--kh-gold-bright);
+  box-shadow: 0 0 16px rgba(229, 185, 82, 0.28);
 }
 
 .kh-tab-btn:hover,
 .kh-tab-btn.kh-focused {
   outline: 2px solid var(--kh-gold-bright);
   outline-offset: 1px;
-  color: #fff6e0;
+  color: var(--kh-gold-bright);
 }
 
 /* Weapon Rack Modal */
@@ -1821,16 +2516,91 @@ export const MYTHIC_UI_CSS = `
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 9px 14px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(217, 159, 76, 0.34);
+  padding: 10px 14px;
+  border-radius: 3px;
+  background: linear-gradient(100deg, rgba(39, 27, 54, 0.85), rgba(17, 11, 24, 0.92));
+  border: 1px solid rgba(229, 185, 82, 0.42);
+}
+
+.kh-weapon-banner-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kh-weapon-emblem-medallion {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 2px solid var(--kh-gold);
+  background: radial-gradient(circle at 40% 35%, rgba(90, 11, 26, 0.72), rgba(9, 6, 14, 0.96));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 14px rgba(229, 185, 82, 0.24);
+}
+
+.kh-weapon-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.kh-weapon-banner-name {
+  font-family: var(--kh-font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--kh-gold-bright);
+}
+
+.kh-weapon-banner-sub {
+  font-family: var(--kh-font-lore);
+  font-style: italic;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--kh-text-secondary);
 }
 
 .kh-weapon-stat-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 7px;
+}
+
+.kh-stat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 2px;
+  background: rgba(11, 7, 17, 0.9);
+  border: 1px solid rgba(158, 110, 46, 0.56);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--kh-text-primary);
+}
+
+.kh-stat-badge-key {
+  font-family: var(--kh-font-display);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--kh-text-secondary);
+}
+
+.kh-stat-badge-num {
+  font-family: var(--kh-font-num);
+  font-size: 13.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--kh-gold-bright);
+}
+
+.kh-hammer-badge {
+  border-color: rgba(255, 155, 66, 0.72);
+  color: #ffd39e;
 }
 
 .kh-aspect-grid {
@@ -1844,22 +2614,75 @@ export const MYTHIC_UI_CSS = `
   flex-direction: column;
   justify-content: space-between;
   gap: 8px;
-  padding: 12px 14px;
-  border-radius: 4px;
-  background: linear-gradient(145deg, rgba(27, 20, 42, 0.95) 0%, rgba(14, 11, 22, 0.97) 100%);
-  border: 1.5px solid rgba(217, 159, 76, 0.42);
-  transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.1s ease;
+  padding: 13px 15px;
+  border-radius: 3px;
+  background: linear-gradient(145deg, rgba(31, 21, 46, 0.96) 0%, rgba(14, 9, 21, 0.98) 100%);
+  border: 1.5px solid rgba(158, 110, 46, 0.52);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .kh-aspect-card.kh-equipped {
   border-color: var(--kh-gold-bright);
-  box-shadow: inset 0 0 22px rgba(245, 203, 112, 0.14);
+  box-shadow: inset 0 0 26px rgba(229, 185, 82, 0.16), 0 0 18px rgba(229, 185, 82, 0.14);
 }
 
 .kh-aspect-card.kh-focused {
   outline: 2px solid var(--kh-gold-bright);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(245, 203, 112, 0.2);
+  box-shadow: 0 0 0 4px rgba(229, 185, 82, 0.22);
+}
+
+.kh-aspect-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kh-aspect-name {
+  font-family: var(--kh-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--kh-text-primary);
+}
+
+.kh-aspect-name.kh-aspect-hidden {
+  color: #ff9aa6;
+}
+
+.kh-aspect-badges {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.kh-tag-hidden {
+  color: #ff9ea8;
+  border-color: rgba(240, 46, 70, 0.65);
+}
+
+.kh-tag-rank {
+  color: var(--kh-gold-bright);
+}
+
+.kh-rank-pip-track {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.kh-rank-pip {
+  width: 14px;
+  height: 5px;
+  border-radius: 1px;
+  background: rgba(11, 7, 17, 0.9);
+  border: 1px solid rgba(158, 110, 46, 0.48);
+}
+
+.kh-rank-pip.kh-filled {
+  background: linear-gradient(90deg, var(--kh-crimson-bright), var(--kh-gold-bright));
+  border-color: var(--kh-gold-bright);
+  box-shadow: 0 0 7px rgba(229, 185, 82, 0.55);
 }
 
 .kh-aspect-actions {
@@ -1875,7 +2698,7 @@ export const MYTHIC_UI_CSS = `
   font-size: 11px;
 }
 
-/* Mirror of Dusk Rows (Purple Side A <-> Gold Side B) */
+/* Mirror of Dusk Rows (Amethyst Side A <-> Crimson-Gold Side B) */
 .kh-mirror-list {
   display: flex;
   flex-direction: column;
@@ -1886,50 +2709,98 @@ export const MYTHIC_UI_CSS = `
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: 4px;
-  background: rgba(22, 16, 34, 0.92);
-  border: 1.5px solid rgba(164, 96, 255, 0.48);
+  gap: 11px;
+  padding: 9px 12px;
+  border-radius: 3px;
+  background: linear-gradient(95deg, rgba(34, 18, 56, 0.92), rgba(16, 10, 26, 0.96));
+  border: 1.5px solid rgba(178, 92, 255, 0.56);
   border-left-width: 5px;
   transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
 }
 
 .kh-mirror-row[data-side="b"] {
-  border-color: rgba(243, 196, 88, 0.56);
-  background: rgba(30, 22, 20, 0.92);
+  border-color: rgba(229, 185, 82, 0.64);
+  border-left-color: var(--kh-crimson-bright);
+  background: linear-gradient(95deg, rgba(54, 18, 28, 0.92), rgba(22, 12, 18, 0.96));
 }
 
 .kh-mirror-row.kh-disabled-row {
-  opacity: 0.48;
+  opacity: 0.46;
   filter: grayscale(0.5);
 }
 
 .kh-mirror-row.kh-focused {
   outline: 2px solid var(--kh-gold-bright);
   outline-offset: 1px;
-  box-shadow: 0 0 0 3px rgba(245, 203, 112, 0.22);
+  box-shadow: 0 0 0 3px rgba(229, 185, 82, 0.24);
 }
 
 .kh-mirror-side-btn {
-  min-width: 88px;
+  min-width: 90px;
   min-height: 48px;
   padding: 6px 10px;
-  border-radius: 3px;
-  border: 1.5px solid #b475ff;
-  background: rgba(98, 42, 166, 0.42);
-  color: #ebd4ff;
+  border-radius: 2px;
+  border: 1.5px solid #b25cff;
+  background: linear-gradient(180deg, rgba(108, 42, 178, 0.52), rgba(48, 18, 86, 0.68));
+  color: #eedbff;
   font-family: var(--kh-font-display);
   font-size: 10.5px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.08em;
   cursor: pointer;
 }
 
 .kh-mirror-side-btn[data-side="b"] {
-  border-color: #f5cb70;
-  background: rgba(168, 118, 28, 0.4);
-  color: #fff3cb;
+  border-color: var(--kh-gold);
+  background: linear-gradient(180deg, rgba(168, 28, 46, 0.56), rgba(92, 34, 16, 0.68));
+  color: var(--kh-gold-bright);
+}
+
+.kh-mirror-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.kh-mirror-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.kh-mirror-name {
+  font-family: var(--kh-font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: #e8ccff;
+}
+
+.kh-mirror-name[data-side="b"] {
+  color: var(--kh-gold-bright);
+}
+
+.kh-tag-mirror-rank {
+  color: #6ef5b8;
+}
+
+.kh-mirror-pips[data-side="a"] .kh-rank-pip.kh-filled {
+  background: linear-gradient(90deg, #9846ff, #e4c4ff);
+  border-color: #e4c4ff;
+  box-shadow: 0 0 6px rgba(178, 92, 255, 0.6);
+}
+
+.kh-mirror-desc {
+  font-family: var(--kh-font-ui);
+  font-size: 13px;
+  color: var(--kh-text-secondary);
+}
+
+.kh-mirror-up-btn {
+  min-width: 138px;
+  font-size: 11px;
+  padding: 6px 12px;
 }
 
 /* Shrine of Torment Rows */
@@ -1950,20 +2821,57 @@ export const MYTHIC_UI_CSS = `
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 11px;
-  border-radius: 4px;
-  background: rgba(22, 15, 26, 0.92);
-  border: 1.5px solid rgba(217, 159, 76, 0.32);
+  padding: 9px 12px;
+  border-radius: 3px;
+  background: linear-gradient(120deg, rgba(28, 16, 22, 0.94), rgba(15, 9, 14, 0.96));
+  border: 1.5px solid rgba(158, 110, 46, 0.42);
 }
 
 .kh-shrine-row.kh-active-vow {
-  border-color: rgba(255, 118, 62, 0.78);
-  background: linear-gradient(120deg, rgba(64, 22, 20, 0.9) 0%, rgba(22, 14, 24, 0.95) 100%);
+  border-color: rgba(255, 118, 62, 0.85);
+  background: linear-gradient(120deg, rgba(84, 24, 18, 0.92) 0%, rgba(24, 12, 18, 0.96) 100%);
+  box-shadow: inset 0 0 18px rgba(255, 100, 44, 0.16);
 }
 
 .kh-shrine-row.kh-focused {
   outline: 2px solid var(--kh-gold-bright);
   outline-offset: 1px;
+}
+
+.kh-shrine-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.kh-shrine-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.kh-shrine-name {
+  font-family: var(--kh-font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--kh-text-primary);
+}
+
+.kh-active-vow .kh-shrine-name {
+  color: #ffd59c;
+}
+
+.kh-tag-heat-on {
+  color: #ff9d66;
+  border-color: rgba(255, 134, 62, 0.65);
+}
+
+.kh-shrine-desc {
+  font-family: var(--kh-font-ui);
+  font-size: 12.5px;
+  color: var(--kh-text-secondary);
 }
 
 .kh-stepper {
@@ -1976,13 +2884,20 @@ export const MYTHIC_UI_CSS = `
 .kh-step-btn {
   min-width: 48px;
   min-height: 48px;
-  border-radius: 3px;
-  border: 1px solid rgba(217, 159, 76, 0.56);
-  background: rgba(16, 12, 24, 0.94);
+  border-radius: 2px;
+  border: 1.5px solid var(--kh-bronze);
+  background: linear-gradient(180deg, rgba(39, 25, 42, 0.96), rgba(14, 9, 18, 0.98));
   color: var(--kh-gold-bright);
-  font-size: 16px;
-  font-weight: 800;
+  font-family: var(--kh-font-num);
+  font-size: 20px;
+  font-weight: 900;
   cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.kh-step-btn:hover:not(:disabled) {
+  border-color: var(--kh-gold-bright);
+  background: rgba(126, 26, 36, 0.92);
 }
 
 .kh-step-btn:disabled {
@@ -1991,15 +2906,16 @@ export const MYTHIC_UI_CSS = `
 }
 
 .kh-step-rank {
-  min-width: 34px;
+  min-width: 36px;
   text-align: center;
-  font-family: var(--kh-font-display);
-  font-size: 12px;
+  font-family: var(--kh-font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
   font-weight: 800;
-  color: #fff3d4;
+  color: var(--kh-gold-bright);
 }
 
-/* Keepsake Cabinet Grid */
+/* Keepsake Cabinet Grid (Velvet-Crimson & Hammered-Gold Compartments) */
 .kh-keepsake-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2010,25 +2926,26 @@ export const MYTHIC_UI_CSS = `
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 6px;
-  min-height: 118px;
+  gap: 7px;
+  min-height: 126px;
   padding: 10px 11px;
   text-align: left;
-  border-radius: 4px;
-  background: linear-gradient(155deg, rgba(26, 20, 40, 0.94) 0%, rgba(13, 10, 22, 0.96) 100%);
-  border: 1.5px solid rgba(217, 159, 76, 0.38);
-  color: var(--kh-ivory);
+  border-radius: 3px;
+  background: linear-gradient(160deg, rgba(46, 16, 30, 0.94) 0%, rgba(16, 9, 19, 0.97) 100%);
+  border: 1.5px solid rgba(158, 110, 46, 0.52);
+  border-top: 3px solid var(--kh-relic-accent, var(--kh-gold));
+  color: var(--kh-text-primary);
   cursor: pointer;
   transition: transform 0.1s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .kh-keepsake-card.kh-equipped {
   border-color: var(--kh-gold-bright);
-  box-shadow: inset 0 0 18px rgba(245, 203, 112, 0.2), 0 0 14px rgba(245, 203, 112, 0.25);
+  box-shadow: inset 0 0 22px rgba(229, 185, 82, 0.22), 0 0 16px rgba(229, 185, 82, 0.26);
 }
 
 .kh-keepsake-card.kh-locked {
-  opacity: 0.44;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -2037,6 +2954,59 @@ export const MYTHIC_UI_CSS = `
   outline: 2px solid var(--kh-gold-bright);
   outline-offset: 2px;
   transform: translateY(-1px);
+}
+
+.kh-keepsake-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.kh-keepsake-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.kh-keepsake-gem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kh-keepsake-name {
+  font-family: var(--kh-font-display);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--kh-text-primary);
+  line-height: 1.2;
+}
+
+.kh-keepsake-stars {
+  font-size: 11px;
+  color: var(--kh-gold-bright);
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+.kh-keepsake-desc {
+  font-family: var(--kh-font-ui);
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--kh-text-secondary);
+}
+
+.kh-keepsake-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--kh-font-num);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
 }
 
 /* Shop & Codex Cards */
@@ -2051,19 +3021,68 @@ export const MYTHIC_UI_CSS = `
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 76px;
-  padding: 12px 14px;
-  border-radius: 4px;
-  background: linear-gradient(120deg, rgba(26, 20, 42, 0.95) 0%, rgba(13, 10, 22, 0.97) 100%);
-  border: 1.5px solid rgba(217, 159, 76, 0.48);
-  color: var(--kh-ivory);
+  min-height: 80px;
+  padding: 12px 15px;
+  border-radius: 3px;
+  background: linear-gradient(120deg, rgba(22, 34, 42, 0.95) 0%, rgba(12, 11, 22, 0.98) 100%);
+  border: 1.5px solid rgba(229, 185, 82, 0.56);
+  color: var(--kh-text-primary);
   text-align: left;
   cursor: pointer;
+  transition: border-color 0.12s ease, transform 0.1s ease;
+}
+
+.kh-shop-card-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.kh-shop-name-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.kh-shop-sigil {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.kh-shop-item-title {
+  font-family: var(--kh-font-display);
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--kh-text-primary);
+}
+
+.kh-shop-item-sub {
+  font-family: var(--kh-font-lore);
+  font-style: italic;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--kh-text-secondary);
 }
 
 .kh-shop-card.kh-borrow-card {
-  border-color: rgba(255, 84, 96, 0.8);
-  background: linear-gradient(120deg, rgba(84, 18, 28, 0.9) 0%, rgba(28, 12, 22, 0.96) 100%);
+  border-color: rgba(240, 46, 70, 0.85);
+  background: linear-gradient(120deg, rgba(102, 16, 30, 0.92) 0%, rgba(30, 11, 20, 0.98) 100%);
+}
+
+.kh-shop-borrow-title {
+  font-family: var(--kh-font-display);
+  font-size: 14.5px;
+  font-weight: 900;
+  color: var(--kh-gold-bright);
+}
+
+.kh-shop-borrow-warn {
+  font-family: var(--kh-font-ui);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffb8c0;
 }
 
 .kh-shop-card.kh-unaffordable {
@@ -2074,6 +3093,7 @@ export const MYTHIC_UI_CSS = `
 .kh-shop-card:hover:not(:disabled) {
   outline: 2px solid var(--kh-gold-bright);
   outline-offset: 2px;
+  transform: translateY(-1px);
 }
 
 .kh-codex-grid {
@@ -2083,31 +3103,636 @@ export const MYTHIC_UI_CSS = `
 }
 
 .kh-codex-entry {
-  padding: 9px 11px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(217, 159, 76, 0.3);
+  padding: 10px 12px;
+  border-radius: 3px;
+  background: linear-gradient(155deg, rgba(31, 21, 42, 0.86), rgba(14, 10, 21, 0.94));
+  border: 1px solid rgba(158, 110, 46, 0.38);
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
 
+.kh-codex-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 20px;
+  font-family: var(--kh-font-lore);
+  font-style: italic;
+  font-size: 16px;
+  color: var(--kh-text-secondary);
+}
+
+.kh-codex-boss {
+  border-color: rgba(229, 185, 82, 0.72);
+}
+
+.kh-codex-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kh-codex-entry-title {
+  font-family: var(--kh-font-display);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.kh-codex-entry-sub {
+  font-family: var(--kh-font-num);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--kh-gold);
+}
+
+.kh-codex-entry-desc {
+  font-family: var(--kh-font-ui);
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--kh-text-secondary);
+}
+
+.kh-codex-kills {
+  font-family: var(--kh-font-num);
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #6ef5b8;
+}
+
+/* ============================================================================
+   MATHEMATICAL RESPONSIVE BREAKPOINTS (Section 5.5 — ZERO OVERLAP / ZERO TRUNCATION)
+   ============================================================================ */
+
+/* 1. TESLA TOUCH & TABLET / WIDE TOUCHSCREENS (1280x720, 1440x900, and tablets >= 681px) */
+.kh-hud.kh-touch-active .kh-hud-bottomleft {
+  top: max(10px, env(safe-area-inset-top, 0px));
+  bottom: auto;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  width: 292px;
+  flex-direction: column-reverse;
+  gap: 5px;
+}
+
+.kh-hud.kh-touch-active .kh-hud-topright,
+.kh-hud-topright.kh-touch-offset {
+  top: max(10px, env(safe-area-inset-top, 0px));
+  right: max(72px, calc(env(safe-area-inset-right, 0px) + 72px));
+  max-width: 228px;
+}
+
+.kh-hud.kh-touch-active .kh-top-center-stack {
+  top: max(10px, env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(530px, calc(100vw - 644px));
+}
+
+.kh-hud.kh-touch-active .kh-boon-medallion {
+  width: 28px;
+  height: 28px;
+}
+
+.kh-hud.kh-touch-active .kh-boss-name {
+  font-size: 14.5px;
+}
+
+.kh-hud.kh-touch-active .kh-boss-subtitle {
+  font-size: 13px;
+}
+
+.kh-hud.kh-touch-active .kh-chamber-pill {
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  white-space: normal;
+  padding: 5px 10px;
+  gap: 2px;
+}
+
+.kh-hud.kh-touch-active .kh-biome-name {
+  font-size: 11.5px;
+}
+
+.kh-hud.kh-touch-active .kh-chamber-depth {
+  font-size: 11px;
+  border-left: none;
+  padding-left: 0;
+}
+
+/* 2. MOBILE LANDSCAPE (844x390 — max-height: 500px) */
 @media (max-height: 500px) {
-  .kh-meta-shell {
-    padding: 10px 12px;
+  .kh-title-overlay {
+    padding: 8px 18px;
+  }
+  .kh-title-pillar {
+    padding: 6px 12px 6px 0;
+    gap: 6px;
+    max-width: 440px;
+  }
+  .kh-title-crest-art svg {
+    width: 102px;
+    height: 38px;
+  }
+  .kh-title-word-top { font-size: 20px; }
+  .kh-title-word-main { font-size: 26px; }
+  .kh-title-sub { font-size: 14px; }
+  .kh-title-menu { gap: 5px; margin-top: 2px; }
+  .kh-title-menu .kh-btn {
+    min-height: 48px;
+    padding: 6px 14px;
+    font-size: 11.5px;
+  }
+
+  /* Touch-Active Mobile Landscape Exact 3-Corridor Geometry */
+  .kh-hud.kh-touch-active .kh-hud-bottomleft {
+    top: max(6px, env(safe-area-inset-top, 0px));
+    bottom: auto;
+    left: max(8px, env(safe-area-inset-left, 0px));
+    width: 212px;
+    flex-direction: column-reverse;
+    gap: 4px;
+  }
+
+  .kh-hud:not(.kh-touch-active) .kh-hud-bottomleft {
+    width: 270px;
+    left: 10px;
+    bottom: 8px;
+    gap: 4px;
+  }
+
+  .kh-hud.kh-touch-active .kh-hud-topright,
+  .kh-hud-topright.kh-touch-offset {
+    top: max(6px, env(safe-area-inset-top, 0px));
+    right: max(62px, calc(env(safe-area-inset-right, 0px) + 62px));
+    max-width: 196px;
+    gap: 4px;
+  }
+
+  .kh-hud.kh-touch-active .kh-top-center-stack {
+    top: max(6px, env(safe-area-inset-top, 0px));
+    left: 226px;
+    right: 264px;
+    transform: none;
+    width: auto;
+    gap: 4px;
+  }
+
+  .kh-hud:not(.kh-touch-active) .kh-top-center-stack {
+    top: 6px;
+    width: min(440px, calc(100vw - 440px));
+    gap: 4px;
+  }
+
+  /* Compact Hero Frame & Medallion Rail */
+  .kh-hero-frame {
+    padding: 5px 7px;
+  }
+  .kh-hero-top-row {
+    margin-bottom: 3px;
+    gap: 4px;
+  }
+  .kh-weapon-icon {
+    width: 17px;
+    height: 17px;
+  }
+  .kh-weapon-icon svg {
+    width: 13px;
+    height: 13px;
+  }
+  .kh-weapon-tag {
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+  }
+  .kh-godmode-badge {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+  .kh-dd-skull {
+    width: 13px;
+    height: 13px;
+  }
+  .kh-hp-wing svg {
+    width: 14px;
+    height: 14px;
+  }
+  .kh-hp-track {
+    height: 15px;
+  }
+  .kh-hp-text {
+    font-size: 11px;
+    padding: 0 6px;
+  }
+  .kh-resources-row {
+    margin-top: 3px;
+    gap: 4px;
+  }
+  .kh-pip-label {
+    font-size: 8px;
+  }
+  .kh-bloodstone-socket svg {
+    width: 12px;
+    height: 14px;
+  }
+  .kh-dash-wing svg {
+    width: 16px;
+    height: 11px;
+  }
+  .kh-god-gauge-wrap {
+    margin-top: 3px;
+  }
+  .kh-god-gauge-header {
+    font-size: 8px;
+    margin-bottom: 2px;
+  }
+  .kh-god-gauge-status {
+    font-size: 9.5px;
+  }
+  .kh-god-seg {
+    height: 5px;
+  }
+
+  .kh-boon-strip {
+    gap: 4px;
+    flex-wrap: nowrap;
+  }
+  .kh-boon-medallion {
+    width: 24px;
+    height: 24px;
+  }
+  .kh-boon-medallion-sigil svg {
+    width: 13px;
+    height: 13px;
+  }
+  .kh-boon-medallion-slot {
+    font-size: 7px;
+    height: 10px;
+    line-height: 8px;
+  }
+
+  /* Compact Top-Right Chamber Pill */
+  .kh-chamber-pill {
+    padding: 3px 8px;
+    gap: 4px;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+  }
+  .kh-biome-name {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+  .kh-chamber-depth {
+    font-size: 10px;
+    border-left: none;
+    padding-left: 0;
+  }
+  .kh-currency-chip {
+    padding: 2px 7px;
+    font-size: 11.5px;
+  }
+
+  /* Compact Dual Boss Bars inside 354px Landscape Corridor (ZERO truncation!) */
+  .kh-boss-stack {
+    gap: 4px;
+  }
+  .kh-boss-bar-card {
+    padding: 4px 7px 5px;
+  }
+  .kh-boss-crown svg {
+    width: 17px;
+    height: 14px;
+  }
+  .kh-boss-crown-left { margin-right: 4px; margin-left: -2px; }
+  .kh-boss-crown-right { margin-left: 4px; margin-right: -2px; }
+  .kh-boss-header {
+    margin-bottom: 3px;
+    gap: 6px;
+    align-items: flex-start;
+  }
+  .kh-boss-title-group {
+    flex-direction: column;
+    gap: 0;
+  }
+  .kh-boss-name {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+  }
+  .kh-boss-subtitle {
+    font-size: 11px;
+    line-height: 1.1;
+  }
+  .kh-boss-phase-badge {
+    font-size: 11px;
+  }
+  .kh-boss-hp-track {
+    height: 13px;
+  }
+  .kh-boss-hp-pill {
+    height: 11px;
+    font-size: 9.5px;
+    padding: 0 6px;
+  }
+
+  /* Unwrapped, cleanly balanced toasts inside landscape corridor */
+  .kh-toast {
+    padding: 4px 16px;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    line-height: 1.22;
+  }
+  .kh-toast::before { left: 5px; font-size: 6px; }
+  .kh-toast::after { right: 5px; font-size: 6px; }
+
+  /* Compact Modals for Landscape */
+  .kh-boon-shell {
+    grid-template-columns: 185px 1fr;
+    gap: 12px;
+    padding: 10px 14px;
+  }
+  .kh-boon-portrait-col { min-height: 180px; }
+  .kh-boon-card { min-height: 62px; padding: 8px 10px; }
+  .kh-boon-card-sigil { width: 34px; height: 34px; }
+  .kh-boon-name { font-size: 13.5px; }
+  .kh-boon-desc { font-size: 12px; }
+  .kh-modal-panel { padding: 10px 14px; gap: 7px; }
+  .kh-options-grid { gap: 5px 10px; }
+  .kh-option-row { min-height: 48px; padding: 3px 8px; }
+  .kh-meta-shell { padding: 10px 14px; gap: 6px; }
+  .kh-dock-btn { padding: 4px 8px; font-size: 10px; }
+  .kh-keepsake-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .kh-keepsake-card { min-height: 88px; padding: 7px 8px; }
+}
+
+/* 3. MOBILE PORTRAIT (390x844 — max-width: 680px) — 2-ROW STACK, ZERO COLLISIONS */
+@media (max-width: 680px) {
+  .kh-title-overlay {
+    padding: 14px 16px;
+    background: linear-gradient(180deg, rgba(9, 6, 14, 0.88) 0%, rgba(9, 6, 14, 0.72) 55%, rgba(9, 6, 14, 0.94) 100%);
+  }
+  .kh-title-pillar {
+    padding: 8px 0;
+    max-width: 100%;
+    align-items: center;
+    text-align: center;
+  }
+  .kh-title-heading {
+    align-items: center;
+  }
+  .kh-title-pack-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Row 1 Left: Hero Frame + Single-Row Boon Strip (top: 8px, left: 8px, width: 204px) */
+  .kh-hud.kh-touch-active .kh-hud-bottomleft {
+    top: max(8px, env(safe-area-inset-top, 0px));
+    bottom: auto;
+    left: max(8px, env(safe-area-inset-left, 0px));
+    width: 204px;
+    flex-direction: column-reverse;
+    gap: 4px;
+  }
+
+  .kh-hud:not(.kh-touch-active) .kh-hud-bottomleft {
+    left: 8px;
+    bottom: 8px;
+    width: calc(100vw - 16px);
+  }
+
+  /* Row 1 Right: Compact Biome + Currency Pill (top: 8px, right: 62px, width: 112px — clears 48px pause at right: 8px) */
+  .kh-hud.kh-touch-active .kh-hud-topright,
+  .kh-hud-topright.kh-touch-offset {
+    top: max(8px, env(safe-area-inset-top, 0px));
+    right: max(62px, calc(env(safe-area-inset-right, 0px) + 62px));
+    width: 112px;
+    max-width: 112px;
+    gap: 4px;
+  }
+
+  .kh-hud:not(.kh-touch-active) .kh-hud-topright {
+    top: 8px;
+    right: 8px;
+    max-width: 180px;
+  }
+
+  .kh-chamber-pill {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    padding: 4px 7px;
+    gap: 1px;
+  }
+  .kh-biome-name {
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+    line-height: 1.15;
+    white-space: normal;
+  }
+  .kh-chamber-depth {
+    font-size: 9.5px;
+    border-left: none;
+    padding-left: 0;
+  }
+  .kh-currency-row {
+    gap: 3px;
+    flex-wrap: nowrap;
+  }
+  .kh-currency-chip {
+    padding: 2px 5px;
+    font-size: 10.5px;
+    gap: 3px;
+  }
+  .kh-currency-chip svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  /* Compact Hero Frame — Full Unwrapped Weapon Name (NEVER "STYG..."), total height <= 86px */
+  .kh-hero-frame {
+    padding: 5px 7px;
+  }
+  .kh-hero-top-row {
+    margin-bottom: 3px;
+    gap: 3px;
+    align-items: center;
+  }
+  .kh-hero-weapon-group {
+    gap: 4px;
+  }
+  .kh-weapon-icon {
+    width: 16px;
+    height: 16px;
+  }
+  .kh-weapon-icon svg {
+    width: 12px;
+    height: 12px;
+  }
+  .kh-weapon-tag {
+    font-size: 9.5px;
+    letter-spacing: 0.03em;
+    line-height: 1.1;
+    white-space: normal;
+  }
+  .kh-godmode-badge {
+    font-size: 8.5px;
+    padding: 1px 4px;
+  }
+  .kh-dd-row {
+    gap: 2px;
+  }
+  .kh-dd-skull {
+    width: 13px;
+    height: 13px;
+  }
+  .kh-hp-wing svg {
+    width: 13px;
+    height: 14px;
+  }
+  .kh-hp-track {
+    height: 15px;
+  }
+  .kh-hp-text {
+    font-size: 11px;
+    padding: 0 5px;
+  }
+  .kh-resources-row {
+    margin-top: 3px;
+    gap: 4px;
+  }
+  .kh-pip-group {
+    gap: 2px;
+  }
+  .kh-pip-label {
+    font-size: 8px;
+    margin-right: 1px;
+  }
+  .kh-bloodstone-socket svg {
+    width: 12px;
+    height: 14px;
+  }
+  .kh-dash-wing svg {
+    width: 15px;
+    height: 11px;
+  }
+  .kh-god-gauge-wrap {
+    margin-top: 3px;
+  }
+  .kh-god-gauge-header {
+    font-size: 8px;
+    margin-bottom: 2px;
+  }
+  .kh-god-gauge-status {
+    font-size: 9.5px;
+  }
+  .kh-god-seg {
+    height: 5px;
+  }
+
+  /* Single-row Boon Medallions tucked neatly right below Hero Frame (y ~96..122px) */
+  .kh-boon-strip {
+    flex-wrap: nowrap;
+    gap: 3px;
+    overflow: hidden;
+  }
+  .kh-boon-medallion {
+    width: 24px;
+    height: 24px;
+  }
+  .kh-boon-medallion-sigil svg {
+    width: 13px;
+    height: 13px;
+  }
+  .kh-boon-medallion-slot {
+    font-size: 7px;
+    height: 10px;
+    line-height: 8px;
+    padding: 0 2px;
+  }
+
+  /* Row 2: Full-Width Boss Bars + Unwrapped Toasts STRICTLY BELOW Row 1 (top: 132px) */
+  .kh-hud.kh-touch-active .kh-top-center-stack {
+    top: max(132px, calc(env(safe-area-inset-top, 0px) + 132px));
+    left: 8px;
+    right: 8px;
+    transform: none;
+    width: auto;
     gap: 6px;
   }
-  .kh-dock-btn {
-    padding: 4px 8px;
+
+  .kh-hud:not(.kh-touch-active) .kh-top-center-stack {
+    top: 86px;
+    left: 8px;
+    right: 8px;
+    transform: none;
+    width: auto;
+    gap: 6px;
+  }
+
+  .kh-boss-stack {
+    gap: 5px;
+  }
+  .kh-boss-bar-card {
+    padding: 5px 8px 6px;
+  }
+  .kh-boss-crown svg {
+    width: 18px;
+    height: 15px;
+  }
+  .kh-boss-crown-left { margin-right: 4px; margin-left: -2px; }
+  .kh-boss-crown-right { margin-left: 4px; margin-right: -2px; }
+  .kh-boss-header {
+    margin-bottom: 4px;
+    gap: 6px;
+  }
+  .kh-boss-name {
+    font-size: 13px;
+    letter-spacing: 0.06em;
+  }
+  .kh-boss-subtitle {
+    font-size: 11.5px;
+  }
+  .kh-boss-phase-badge {
+    font-size: 11.5px;
+  }
+  .kh-boss-hp-track {
+    height: 14px;
+  }
+  .kh-boss-hp-pill {
+    height: 12px;
     font-size: 10px;
   }
-  .kh-keepsake-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
+
+  .kh-toast {
+    padding: 5px 18px;
+    font-size: 11px;
+    letter-spacing: 0.06em;
   }
-  .kh-keepsake-card {
-    min-height: 86px;
-    padding: 7px 8px;
+
+  .kh-hub-dock {
+    max-width: calc(100vw - 16px);
+    overflow-x: auto;
+  }
+  .kh-dock-btn {
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 720px) {
+  .kh-boon-shell {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .kh-boon-portrait-col {
+    min-height: 108px;
+  }
+  .kh-options-grid {
+    grid-template-columns: 1fr;
+  }
+  .kh-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -2126,6 +3751,10 @@ export const MYTHIC_UI_CSS = `
 @media (prefers-reduced-motion: reduce) {
   .kh-btn,
   .kh-boon-card,
+  .kh-boon-card-enter,
+  .kh-boon-shimmer,
+  .kh-portrait-enter,
+  .kh-boss-invuln-shimmer,
   .kh-hp-fill,
   .kh-boss-hp-fill,
   .kh-toast {
@@ -2135,15 +3764,36 @@ export const MYTHIC_UI_CSS = `
 }
 `;
 
+const PRELOAD_FONT_SPECS = [
+  '400 16px "Cinzel"',
+  '700 16px "Cinzel"',
+  '900 16px "Cinzel"',
+  '700 16px "Cinzel Decorative"',
+  '900 16px "Cinzel Decorative"',
+  '400 16px "Alegreya Sans"',
+  '500 16px "Alegreya Sans"',
+  '700 16px "Alegreya Sans"',
+  '700 16px "Barlow Condensed"',
+  '800 16px "Barlow Condensed"',
+  '900 16px "Barlow Condensed"',
+  '600 16px "Cormorant Garamond"',
+  'italic 600 16px "Cormorant Garamond"',
+] as const;
+
 export function injectUiStyles(): void {
   if (typeof document === 'undefined') {
     return;
   }
-  if (document.getElementById(UI_STYLE_ID)) {
-    return;
+  if (!document.getElementById(UI_STYLE_ID)) {
+    const style = document.createElement('style');
+    style.id = UI_STYLE_ID;
+    style.textContent = MYTHIC_UI_CSS;
+    document.head.appendChild(style);
   }
-  const style = document.createElement('style');
-  style.id = UI_STYLE_ID;
-  style.textContent = MYTHIC_UI_CSS;
-  document.head.appendChild(style);
+  // Eagerly warm all 5 self-hosted OFL WOFF2 font families (including 900 combat glyph weights)
+  if (document.fonts && typeof document.fonts.load === 'function') {
+    for (const spec of PRELOAD_FONT_SPECS) {
+      void document.fonts.load(spec).catch(() => {});
+    }
+  }
 }
