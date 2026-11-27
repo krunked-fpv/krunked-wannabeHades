@@ -556,23 +556,30 @@ export class ParticlesAndDecals {
       switch (ev.type) {
         case 'room_entered': {
           this.clearRoomDecals();
-          this.spawnParticle(
-            'shockwave',
-            state.player.pos.x,
-            state.player.pos.y,
-            4,
-            0,
-            0,
-            0,
-            24,
-            180,
-            0.35,
-            0.95,
-            0.68,
-            0.7,
-            0.42,
-            1.4
-          );
+          // Subtle warm underworld arrival wisps (no stray pale white ring!)
+          for (let k = 0; k < 10; k++) {
+            const a = (k / 10) * Math.PI * 2;
+            const spd = this.randRange(45, 110);
+            this.spawnParticle(
+              'ember_footstep',
+              state.player.pos.x + Math.cos(a) * 18,
+              state.player.pos.y + Math.sin(a) * 14,
+              6,
+              Math.cos(a) * spd,
+              Math.sin(a) * spd,
+              this.randRange(35, 85),
+              16,
+              3,
+              0.32,
+              0.92,
+              0.68,
+              0.65,
+              0.34,
+              1.1,
+              a,
+              0
+            );
+          }
           break;
         }
 

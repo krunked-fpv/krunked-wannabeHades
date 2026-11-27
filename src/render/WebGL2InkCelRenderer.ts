@@ -1290,25 +1290,127 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     this.pushLine(x1, y0, x1, y1, 12 * cam.zoom, 0.08, 0.09, 0.12, 1);
     this.pushLine(x1, y0, x1, y1, 4.5 * cam.zoom, 0.84, 0.65, 0.3, 0.95, 0.15);
 
-    // Chasm Pits (Dashable cutouts with glowing emerald/magma rim!)
+    // Chasm Pits — Beveled Isometric Carved-Obsidian Chasm Cutouts (matches 45° flagstones, never neon cyan UI boxes!)
     for (let i = 0; i < state.room.obstacles.length; i++) {
       const obs = state.room.obstacles[i];
       if (obs.kind !== 'pit') continue;
-      const px0 = this.wxToSx(obs.pos.x - obs.halfW, cam);
-      const px1 = this.wxToSx(obs.pos.x + obs.halfW, cam);
-      const py0 = this.wyToSy(obs.pos.y - obs.halfH, 0, cam);
-      const py1 = this.wyToSy(obs.pos.y + obs.halfH, 0, cam);
+      const cx = this.wxToSx(obs.pos.x, cam);
+      const cy = this.wyToSy(obs.pos.y, 0, cam);
+      const hw = obs.halfW * cam.zoom;
+      const hh = obs.halfH * cam.isoScaleY * cam.zoom;
+      // 8-point chamfered isometric stone chasm polygon aligned to 2:1 diamond bevels
+      const cxOff = hw * 0.36;
+      const cyOff = hh * 0.42;
+      const pts: [number, number][] = [
+        [cx - hw + cxOff, cy - hh],
+        [cx + hw - cxOff, cy - hh],
+        [cx + hw, cy - hh + cyOff],
+        [cx + hw, cy + hh - cyOff],
+        [cx + hw - cxOff, cy + hh],
+        [cx - hw + cxOff, cy + hh],
+        [cx - hw, cy + hh - cyOff],
+        [cx - hw, cy - hh + cyOff],
+      ];
 
-      // Abyss void cavity
-      this.pushQuadSolid(px0, py0, px1, py0, px1, py1, px0, py1, theme.deep[0] * 0.7, theme.deep[1] * 0.7, theme.deep[2] * 0.7, 0.96);
-      // Inner chasm cliff depth wall at top of pit
-      this.pushSpriteSized('prop_chasm_rim', px0, py0, px1 - px0, Math.min(py1 - py0, 44 * cam.zoom), 0.9, 0.9, 0.9, 0.92);
-      // Glowing rim outline so player clearly sees dashable gap
-      const lw = 3.5 * cam.zoom;
-      this.pushLine(px0, py0, px1, py0, lw, theme.rimGlow[0], theme.rimGlow[1], theme.rimGlow[2], 0.85, 0.75);
-      this.pushLine(px1, py0, px1, py1, lw, theme.rimGlow[0], theme.rimGlow[1], theme.rimGlow[2], 0.85, 0.75);
-      this.pushLine(px1, py1, px0, py1, lw, theme.rimGlow[0], theme.rimGlow[1], theme.rimGlow[2], 0.85, 0.75);
-      this.pushLine(px0, py1, px0, py0, lw, theme.rimGlow[0], theme.rimGlow[1], theme.rimGlow[2], 0.85, 0.75);
+      // Deep dark stone outer bevel lip
+      for (let p = 0; p < 8; p++) {
+        const a = pts[p];
+        const next = pts[(p + 1) & 7];
+        const pad = 5.5 * cam.zoom;
+        const ax = cx + (a[0] - cx) * (1 + pad / Math.max(10, hw));
+        const ay = cy + (a[1] - cy) * (1 + pad / Math.max(8, hh));
+        const bx = cx + (next[0] - cx) * (1 + pad / Math.max(10, hw));
+        const by = cy + (next[1] - cy) * (1 + pad / Math.max(8, hh));
+        this.pushQuadSolid(ax, ay, bx, by, next[0], next[1], a[0], a[1], 0.1, 0.16, 0.17, 0.96);
+      }
+
+      // Recessed abyssal void interior
+      for (let p = 0; p < 8; p++) {
+        const a = pts[p];
+        const next = pts[(p + 1) & 7];
+        this.pushTriSolid(cx, cy, a[0], a[1], next[0], next[1], theme.deep[0] * 0.48, theme.deep[1] * 0.56, theme.deep[2] * 0.62, 0.98);
+      }
+
+      // Inner sunken basalt cliff face descending from north lip into chasm depth
+      const dropH = Math.min(hh * 1.15, 34 * cam.zoom);
+      this.pushQuadSolid(
+        pts[0][0],
+        pts[0][1],
+        pts[1][0],
+        pts[1][1],
+        pts[1][0],
+        pts[1][1] + dropH,
+        pts[0][0],
+        pts[0][1] + dropH,
+        0.09,
+        0.14,
+        0.15,
+        0.95
+      );
+      this.pushQuadSolid(
+        pts[7][0],
+        pts[7][1],
+        pts[0][0],
+        pts[0][1],
+        pts[0][0],
+        pts[0][1] + dropH,
+        pts[7][0],
+        pts[7][1] + dropH * 0.85,
+        0.07,
+        0.11,
+        0.13,
+        0.95
+      );
+      this.pushQuadSolid(
+        pts[1][0],
+        pts[1][1],
+        pts[2][0],
+        pts[2][1],
+        pts[2][0],
+        pts[2][1] + dropH * 0.85,
+        pts[1][0],
+        pts[1][1] + dropH,
+        0.05,
+        0.08,
+        0.1,
+        0.95
+      );
+
+      // Subtle glowing abyssal under-mist rising from center of pit
+      this.pushSprite(
+        'vfx_glow_soft',
+        cx,
+        cy + hh * 0.18,
+        (hw * 1.3) / 64,
+        (hh * 1.1) / 64,
+        0,
+        theme.rimGlow[0],
+        theme.rimGlow[1],
+        theme.rimGlow[2],
+        0.24,
+        0,
+        0.45
+      );
+
+      // Crisp jet-black comic ink ledge + subtle inlaid carved emerald-gold rim bevel
+      for (let p = 0; p < 8; p++) {
+        const a = pts[p];
+        const next = pts[(p + 1) & 7];
+        this.pushLine(a[0], a[1], next[0], next[1], 4.2 * cam.zoom, 0.04, 0.03, 0.06, 0.96);
+        const isLitEdge = p >= 3 && p <= 6; // southern/lower edge catches warm top-left light!
+        this.pushLine(
+          a[0],
+          a[1],
+          next[0],
+          next[1],
+          1.8 * cam.zoom,
+          isLitEdge ? 0.62 : theme.rimGlow[0] * 0.55,
+          isLitEdge ? 0.54 : theme.rimGlow[1] * 0.55,
+          isLitEdge ? 0.34 : theme.rimGlow[2] * 0.55,
+          0.75,
+          0.18
+        );
+      }
     }
 
     // Floor Hazards (spike traps, lava pools, poison pools, consecrated auras)
@@ -2014,15 +2116,31 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       0.08
     );
 
-    // Equipped Infernal Arm held dynamically along facingAngle!
+    // Equipped Infernal Arm held dynamically in heroic poise (never sticking vertically over head!)
     const wepId = getWeaponSpriteId(p.weaponId);
-    const swingOffset =
-      p.attackTimer > 0 ? (p.attackComboStep % 2 === 1 ? -1.15 : 1.15) : 0;
-    const wepAngle = p.facingAngle + swingOffset;
-    const handX = sx + Math.cos(p.facingAngle) * 20 * cam.zoom;
-    const handY = sy - 44 * cam.zoom - runBob + Math.sin(p.facingAngle) * 10 * cam.zoom;
-    const wepScale = 0.74 * cam.zoom;
-    const wepEmissive = p.attackTimer > 0 || p.attackChargeTimer > 0.15 ? 0.85 : 0.18;
+    const isSwinging = p.attackTimer > 0;
+    const isCharging = p.attackChargeTimer > 0.12;
+    const facingLeft = Math.cos(p.facingAngle) < -0.12;
+    let wepAngle: number;
+    let handX: number;
+    let handY: number;
+
+    if (isSwinging || isCharging) {
+      const swingOffset = isSwinging ? (p.attackComboStep % 2 === 1 ? -1.1 : 1.1) : 0;
+      wepAngle = p.facingAngle + swingOffset;
+      handX = sx + Math.cos(p.facingAngle) * 20 * cam.zoom;
+      handY = sy - 44 * cam.zoom - runBob + Math.sin(p.facingAngle) * 10 * cam.zoom;
+    } else {
+      // Heroic ready stance: blade angled low & outward at Prince Pyreus's sword-hand!
+      const sideSign = facingLeft ? -1 : 1;
+      const idleSway = Math.sin(timeSec * 4.4) * 0.06;
+      wepAngle = facingLeft ? Math.PI - 0.38 + idleSway : 0.38 + idleSway;
+      handX = sx + sideSign * 22 * cam.zoom;
+      handY = sy - 36 * cam.zoom - runBob;
+    }
+
+    const wepScale = 0.72 * cam.zoom;
+    const wepEmissive = isSwinging || isCharging ? 0.55 : 0.12;
 
     this.pushSprite(
       wepId,
@@ -2335,46 +2453,48 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       const ry = rb.radius * grow * cam.isoScaleY * cam.zoom;
       const thick = rb.thickness * (1 - progress * 0.55) * cam.zoom;
       // Outer comic ink contour ring
-      this.pushEllipseRing(sx, sy, rx + 5 * cam.zoom, ry + 3 * cam.zoom, Math.max(1, rx - thick - 4 * cam.zoom), Math.max(1, ry - thick * cam.isoScaleY - 2.5 * cam.zoom), 30, 0.04, 0.02, 0.06, fade * 0.9);
-      // Vivid Boon-tinted energy wave
-      this.pushEllipseRing(sx, sy, rx, ry, Math.max(1, rx - thick), Math.max(1, ry - thick * cam.isoScaleY), 30, rb.r, rb.g, rb.b, fade * 0.92, 1.85);
-      // Blazing white-hot core rim
-      this.pushEllipseRing(sx, sy, rx - thick * 0.25, ry - thick * 0.25 * cam.isoScaleY, Math.max(1, rx - thick * 0.55), Math.max(1, ry - thick * 0.55 * cam.isoScaleY), 30, rb.coreR, rb.coreG, rb.coreB, fade, 2.5);
+      this.pushEllipseRing(sx, sy, rx + 5 * cam.zoom, ry + 3 * cam.zoom, Math.max(1, rx - thick - 4 * cam.zoom), Math.max(1, ry - thick * cam.isoScaleY - 2.5 * cam.zoom), 30, 0.04, 0.02, 0.06, fade * 0.94);
+      // Vivid saturated Boon-tinted energy wave (low emissive preserves rich electric yellow/cyan/crimson hue!)
+      this.pushEllipseRing(sx, sy, rx, ry, Math.max(1, rx - thick), Math.max(1, ry - thick * cam.isoScaleY), 30, rb.r, rb.g, rb.b, fade * 0.94, 0.28);
+      // Thin hot inner rim
+      this.pushEllipseRing(sx, sy, rx - thick * 0.32, ry - thick * 0.32 * cam.isoScaleY, Math.max(1, rx - thick * 0.5), Math.max(1, ry - thick * 0.5 * cam.isoScaleY), 30, rb.coreR, rb.coreG, rb.coreB, fade, 0.85);
       return;
     }
 
     if (rb.kind === 'thrust') {
-      const reach = rb.radius * (0.45 + 0.65 * Math.min(1, progress * 2.2)) * cam.zoom;
+      const reach = rb.radius * 0.84 * (0.45 + 0.65 * Math.min(1, progress * 2.2)) * cam.zoom;
       const c = Math.cos(rb.angle);
       const s = Math.sin(rb.angle);
       const perpX = -s * rb.thickness * (1 - progress * 0.4) * cam.zoom;
       const perpY = c * rb.thickness * cam.isoScaleY * (1 - progress * 0.4) * cam.zoom;
       const tipX = sx + c * reach;
       const tipY = sy + s * reach * cam.isoScaleY;
-      const baseX = sx + c * reach * 0.14;
-      const baseY = sy + s * reach * 0.14 * cam.isoScaleY;
+      const baseX = sx + c * 18 * cam.zoom;
+      const baseY = sy + s * 18 * cam.isoScaleY * cam.zoom;
 
       // Bold ink lance contour
-      this.pushTriSolid(tipX + c * 8 * cam.zoom, tipY + s * 5 * cam.zoom, baseX + perpX * 1.25, baseY + perpY * 1.25, baseX - perpX * 1.25, baseY - perpY * 1.25, 0.04, 0.02, 0.06, fade * 0.9);
-      // Boon-tinted piercing blade wave
-      this.pushTriSolid(tipX, tipY, baseX + perpX, baseY + perpY, baseX - perpX, baseY - perpY, rb.r, rb.g, rb.b, fade * 0.95, 1.9);
-      // Hot white spear core
-      this.pushTriSolid(tipX - c * 4 * cam.zoom, tipY - s * 2 * cam.zoom, baseX + perpX * 0.42, baseY + perpY * 0.42, baseX - perpX * 0.42, baseY - perpY * 0.42, rb.coreR, rb.coreG, rb.coreB, fade, 2.6);
+      this.pushTriSolid(tipX + c * 9 * cam.zoom, tipY + s * 5 * cam.zoom, baseX + perpX * 1.28, baseY + perpY * 1.28, baseX - perpX * 1.28, baseY - perpY * 1.28, 0.04, 0.02, 0.06, fade * 0.94);
+      // Saturated Boon-tinted piercing blade wave
+      this.pushTriSolid(tipX, tipY, baseX + perpX, baseY + perpY, baseX - perpX, baseY - perpY, rb.r, rb.g, rb.b, fade * 0.96, 0.25);
+      // Thin bright inner spear streak
+      this.pushTriSolid(tipX - c * 4 * cam.zoom, tipY - s * 2 * cam.zoom, baseX + perpX * 0.32, baseY + perpY * 0.32, baseX - perpX * 0.32, baseY - perpY * 0.32, rb.coreR, rb.coreG, rb.coreB, fade, 0.9);
       return;
     }
 
-    // Sweeping Painterly Bezier Crescent Slash Ribbon ('arc')
-    const segs = 16;
-    const sweepHead = Math.min(1, progress * 2.6);
-    const sweepTail = Math.max(0, (progress - 0.16) * 1.25);
-    const startA = rb.angle - (rb.arcSpan * 0.5) * rb.flip;
-    const endA = rb.angle + (rb.arcSpan * 0.5) * rb.flip;
+    // Sweeping Painterly Bezier Crescent Slash Ribbon ('arc') — hugs tightly around hero's blade reach!
+    const segs = 18;
+    const sweepHead = Math.min(1, progress * 2.8);
+    const sweepTail = Math.max(0, (progress - 0.14) * 1.18);
+    const startA = rb.angle - (rb.arcSpan * 0.52) * rb.flip;
+    const endA = rb.angle + (rb.arcSpan * 0.52) * rb.flip;
 
-    const rx = rb.radius * cam.zoom;
-    const ry = rb.radius * cam.isoScaleY * cam.zoom;
-    const maxThick = rb.thickness * cam.zoom * (1 - progress * 0.35);
+    // Tighter radius around hero blade arc + dramatic wide crescent body so ribbon never floats detached!
+    const rx = rb.radius * 0.68 * cam.zoom;
+    const ry = rb.radius * 0.68 * cam.isoScaleY * cam.zoom;
+    const maxThick = Math.max(58, rb.thickness * 1.38) * cam.zoom * (1 - progress * 0.32);
 
     const drawRibbonBand = (
+      outerPad: number,
       thickScale: number,
       r: number,
       g: number,
@@ -2390,19 +2510,19 @@ export class WebGL2InkCelRenderer implements RenderBackend {
         const u = s / segs;
         const t = sweepTail + (sweepHead - sweepTail) * u;
         const ang = startA + (endA - startA) * t;
-        // Quadratic painterly taper: narrow sharp tip at both ends, sweeping wide crest near leading edge!
-        const taper = Math.sin(u * Math.PI) * (0.42 + 0.68 * u);
+        // Painterly tapered crescent: razor-sharp tail & leading blade tip, sweeping wide crest!
+        const taper = Math.sin(u * Math.PI) * (0.35 + 0.78 * u);
         const w = maxThick * thickScale * taper;
         const ca = Math.cos(ang);
         const sa = Math.sin(ang);
 
-        const ox = sx + ca * (rx + w * 0.25);
-        const oy = sy + sa * (ry + w * 0.25 * cam.isoScaleY);
-        const ix = sx + ca * Math.max(6, rx - w);
-        const iy = sy + sa * Math.max(4, ry - w * cam.isoScaleY);
+        const ox = sx + ca * (rx + outerPad * cam.zoom);
+        const oy = sy + sa * (ry + outerPad * cam.isoScaleY * cam.zoom);
+        const ix = sx + ca * Math.max(12 * cam.zoom, rx - w);
+        const iy = sy + sa * Math.max(7 * cam.zoom, ry - w * cam.isoScaleY);
 
         if (s > 0) {
-          this.pushQuadSolid(prevIx, prevIy, prevOx, prevOy, ox, oy, ix, iy, r, g, b, a * (0.35 + 0.65 * u), emissive);
+          this.pushQuadSolid(prevIx, prevIy, prevOx, prevOy, ox, oy, ix, iy, r, g, b, a * (0.3 + 0.7 * u), emissive);
         }
         prevOx = ox;
         prevOy = oy;
@@ -2411,12 +2531,14 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       }
     };
 
-    // Layer 1: Bold comic jet-black ink shadow rim
-    drawRibbonBand(1.24, 0.05, 0.02, 0.07, fade * 0.88, 0);
-    // Layer 2: Vivid Boon-tinted painterly crescent ribbon
-    drawRibbonBand(1.0, rb.r, rb.g, rb.b, fade * 0.96, 1.85);
-    // Layer 3: White-hot inner luminous streak (punches through selective bloom!)
-    drawRibbonBand(0.42, rb.coreR, rb.coreG, rb.coreB, fade, 2.65);
+    // Layer 1: Bold jet-black comic ink outer rim (unmistakable Supergiant hand-inked slash!)
+    drawRibbonBand(6.5, 1.14, 0.04, 0.02, 0.07, fade * 0.96, 0);
+    // Layer 2: Rich saturated Boon-colored outer crescent (low emissive keeps Voltaris electric #FFFA40, never beige!)
+    drawRibbonBand(2.0, 1.0, rb.r, rb.g, rb.b, fade * 0.95, 0.18);
+    // Layer 3: Mid-inner high-chroma band
+    drawRibbonBand(-1.5, 0.62, Math.min(1, rb.r * 1.08), Math.min(1, rb.g * 1.05), Math.min(1, rb.b * 1.05), fade * 0.92, 0.35);
+    // Layer 4: Razor-thin blazing specular edge along outer blade tip!
+    drawRibbonBand(0.5, 0.2, rb.coreR, rb.coreG, rb.coreB, fade * 0.95, 0.85);
   }
 
   private renderParticles(vfx: ParticlesAndDecals, cam: CameraView): void {

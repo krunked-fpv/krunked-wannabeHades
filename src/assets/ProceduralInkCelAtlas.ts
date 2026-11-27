@@ -673,57 +673,105 @@ function drawPillar(
 
 function drawStatue(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   const cx = w * 0.5;
-  const baseY = h * 0.87;
+  const baseY = h * 0.88;
 
-  // Pedestal
-  ctx.fillStyle = '#253237';
+  // Stepped isometric carved obsidian pedestal plinth
   ctx.beginPath();
-  ctx.moveTo(cx - 50, baseY);
-  ctx.lineTo(cx - 38, baseY - 26);
-  ctx.lineTo(cx + 38, baseY - 26);
-  ctx.lineTo(cx + 50, baseY);
-  ctx.lineTo(cx, baseY + 22);
+  ctx.moveTo(cx - 48, baseY + 2);
+  ctx.lineTo(cx - 34, baseY - 20);
+  ctx.lineTo(cx + 34, baseY - 20);
+  ctx.lineTo(cx + 48, baseY + 2);
+  ctx.lineTo(cx + 32, baseY + 20);
+  ctx.lineTo(cx - 32, baseY + 20);
   ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 4;
-  ctx.stroke();
-
-  // Cloaked Underworld sentinel torso
-  const bodyGrad = ctx.createLinearGradient(cx - 42, 40, cx + 42, baseY - 20);
-  bodyGrad.addColorStop(0, '#5a7076');
-  bodyGrad.addColorStop(0.5, '#2f4147');
-  bodyGrad.addColorStop(1, '#141e22');
-  ctx.fillStyle = bodyGrad;
-  ctx.beginPath();
-  ctx.moveTo(cx - 34, baseY - 22);
-  ctx.quadraticCurveTo(cx - 42, h * 0.46, cx - 24, h * 0.28);
-  ctx.quadraticCurveTo(cx, h * 0.08, cx + 24, h * 0.28);
-  ctx.quadraticCurveTo(cx + 42, h * 0.48, cx + 34, baseY - 22);
-  ctx.closePath();
+  const baseG = ctx.createLinearGradient(cx - 48, baseY - 20, cx + 48, baseY + 20);
+  baseG.addColorStop(0, '#4f5e66');
+  baseG.addColorStop(0.5, '#252f38');
+  baseG.addColorStop(1, '#0f131a');
+  ctx.fillStyle = baseG;
   ctx.fill();
   ctx.strokeStyle = INK;
   ctx.lineWidth = 4.2;
   ctx.stroke();
 
-  // Hooded void face + glowing emerald eyes
-  ctx.fillStyle = '#09080f';
+  // Tall chiseled fluted obsidian Greek stele/monolith shaft with beveled obelisk crown
+  ctx.save();
   ctx.beginPath();
-  ctx.ellipse(cx, h * 0.28, 14, 18, 0, 0, Math.PI * 2);
+  ctx.moveTo(cx - 32, baseY - 14);
+  ctx.lineTo(cx - 26, h * 0.24);
+  ctx.lineTo(cx, h * 0.08);
+  ctx.lineTo(cx + 26, h * 0.24);
+  ctx.lineTo(cx + 32, baseY - 14);
+  ctx.closePath();
+  const monoG = ctx.createLinearGradient(cx - 32, h * 0.1, cx + 32, baseY - 14);
+  monoG.addColorStop(0, '#5a6f75');
+  monoG.addColorStop(0.38, '#2b3a42');
+  monoG.addColorStop(0.7, '#151d24');
+  monoG.addColorStop(1, '#090c12');
+  ctx.fillStyle = monoG;
   ctx.fill();
+  ctx.clip();
 
-  ctx.fillStyle = '#5effb6';
+  // Central carved ridge & sharp cel shadow half
+  ctx.fillStyle = 'rgba(7, 5, 14, 0.48)';
+  ctx.fillRect(cx, h * 0.08, 40, baseY);
+  // Vertical architectural flutes
+  for (const fx of [-16, -6, 6, 16]) {
+    ctx.strokeStyle = fx < 0 ? 'rgba(186, 224, 218, 0.28)' : 'rgba(6, 5, 12, 0.65)';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(cx + fx, h * 0.26);
+    ctx.lineTo(cx + fx, baseY - 16);
+    ctx.stroke();
+  }
+  // Dramatic diagonal comic cross-hatching on shadow plane
+  drawCrossHatch(ctx, cx, h * 0.22, 34, baseY - h * 0.3, 7, -0.52, 'rgba(7, 5, 14, 0.56)', 1.5);
+  ctx.restore();
+
+  // Bold ink monolith outline
   ctx.beginPath();
-  ctx.ellipse(cx - 5, h * 0.27, 3.2, 2, -0.2, 0, Math.PI * 2);
-  ctx.ellipse(cx + 5, h * 0.27, 3.2, 2, 0.2, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.moveTo(cx - 32, baseY - 14);
+  ctx.lineTo(cx - 26, h * 0.24);
+  ctx.lineTo(cx, h * 0.08);
+  ctx.lineTo(cx + 26, h * 0.24);
+  ctx.lineTo(cx + 32, baseY - 14);
+  ctx.closePath();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 4.4;
+  ctx.stroke();
 
-  // Draped gold chain
-  ctx.strokeStyle = '#dfb051';
+  // Ornate burnished-gold Greek collar frieze & glowing Underworld crest inlay!
+  ctx.fillStyle = '#e5b149';
+  ctx.beginPath();
+  ctx.moveTo(cx - 30, h * 0.34);
+  ctx.lineTo(cx + 30, h * 0.34);
+  ctx.lineTo(cx + 28, h * 0.4);
+  ctx.lineTo(cx - 28, h * 0.4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = INK;
   ctx.lineWidth = 3.2;
+  ctx.stroke();
+
+  // Engraved glowing diamond Underworld sigil on front face
+  ctx.fillStyle = '#4de09d';
   ctx.beginPath();
-  ctx.moveTo(cx - 24, h * 0.4);
-  ctx.quadraticCurveTo(cx, h * 0.56, cx + 24, h * 0.4);
+  ctx.moveTo(cx, h * 0.48);
+  ctx.lineTo(cx + 12, h * 0.58);
+  ctx.lineTo(cx, h * 0.68);
+  ctx.lineTo(cx - 12, h * 0.58);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Crisp left rim highlight catching light
+  ctx.strokeStyle = '#92d6c8';
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(cx - 25, h * 0.25);
+  ctx.lineTo(cx - 31, baseY - 18);
   ctx.stroke();
 }
 
@@ -1054,241 +1102,287 @@ function drawHeroPose(
   pose: 'down' | 'up' | 'side' | 'diag_down' | 'diag_up'
 ): void {
   const cx = w * 0.5;
-  const footY = h * 0.85;
+  const footY = h * 0.87;
   const isUp = pose === 'up' || pose === 'diag_up';
   const isSide = pose === 'side';
 
-  // Blazing Ember Feet (athletic combat stance with rising flame tongues!)
-  const drawEmberFoot = (fx: number, fy: number) => {
-    const fGrad = ctx.createRadialGradient(fx, fy, 2, fx, fy - 4, 20);
-    fGrad.addColorStop(0, '#fff9b8');
-    fGrad.addColorStop(0.45, '#ff6218');
-    fGrad.addColorStop(1, 'rgba(210, 22, 16, 0)');
+  // Sleek Sculpted Fiery Ankle Flames & Athletic Combat Boots/Greaves
+  const drawEmberAnkle = (fx: number, fy: number) => {
+    const fGrad = ctx.createRadialGradient(fx, fy, 2, fx, fy - 4, 19);
+    fGrad.addColorStop(0, '#fff7b0');
+    fGrad.addColorStop(0.45, '#ff5b14');
+    fGrad.addColorStop(1, 'rgba(200, 18, 14, 0)');
     ctx.fillStyle = fGrad;
     ctx.beginPath();
-    ctx.ellipse(fx, fy, 18, 10, 0, 0, Math.PI * 2);
+    ctx.ellipse(fx, fy, 17, 9, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Stylized rising ink-cel flame lick on ankle
-    ctx.fillStyle = '#ff7b24';
+    // Tapered stylized flame lick curling back from heel
+    ctx.fillStyle = '#ff6b1a';
     ctx.beginPath();
-    ctx.moveTo(fx - 8, fy - 2);
-    ctx.quadraticCurveTo(fx - 13, fy - 14, fx - 2, fy - 20);
-    ctx.quadraticCurveTo(fx + 5, fy - 12, fx + 8, fy - 2);
+    ctx.moveTo(fx - 7, fy);
+    ctx.quadraticCurveTo(fx - 18, fy - 12, fx - 12, fy - 24);
+    ctx.quadraticCurveTo(fx - 3, fy - 14, fx + 6, fy - 2);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = INK;
-    ctx.lineWidth = 2.6;
+    ctx.lineWidth = 2.4;
     ctx.stroke();
   };
 
-  const lFootX = cx - (isSide ? 14 : 18);
-  const rFootX = cx + (isSide ? 18 : 18);
-  drawEmberFoot(lFootX, footY - 1);
-  drawEmberFoot(rFootX, footY + 3);
+  const lFootX = cx - (isSide ? 13 : 17);
+  const rFootX = cx + (isSide ? 18 : 16);
+  drawEmberAnkle(lFootX, footY - 2);
+  drawEmberAnkle(rFootX, footY + 3);
 
-  // Athletic tapered legs in wide heroic warrior lunge + gilded shin greaves
-  ctx.fillStyle = '#c4835e';
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 4;
-  // Back leg
-  ctx.beginPath();
-  ctx.moveTo(cx - 14, footY - 46);
-  ctx.lineTo(lFootX - 6, footY - 2);
-  ctx.lineTo(lFootX + 8, footY - 2);
-  ctx.lineTo(cx - 2, footY - 44);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  // Front leg
-  ctx.beginPath();
-  ctx.moveTo(cx + 2, footY - 46);
-  ctx.lineTo(rFootX - 7, footY + 1);
-  ctx.lineTo(rFootX + 8, footY + 1);
-  ctx.lineTo(cx + 16, footY - 44);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  // Tall athletic combat legs with dark-bronze greaves & knee guards (sleek Hades proportions!)
+  const drawLeg = (hipX: number, hipY: number, footX: number, footYPos: number, front: boolean) => {
+    ctx.beginPath();
+    ctx.moveTo(hipX - 7, hipY);
+    ctx.lineTo(footX - 5, footYPos - 18);
+    ctx.lineTo(footX - 6, footYPos);
+    ctx.lineTo(footX + 7, footYPos);
+    ctx.lineTo(footX + 5, footYPos - 18);
+    ctx.lineTo(hipX + 7, hipY);
+    ctx.closePath();
+    ctx.fillStyle = front ? '#d69973' : '#9c6649';
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 3.8;
+    ctx.stroke();
 
-  // Flowing Asymmetric Crimson Cloak sweeping dramatically behind stride
+    // Burnished bronze shin greave
+    ctx.fillStyle = front ? '#c98e3a' : '#784e1d';
+    ctx.beginPath();
+    ctx.moveTo(footX - 6, footYPos - 22);
+    ctx.lineTo(footX + 6, footYPos - 22);
+    ctx.lineTo(footX + 5, footYPos - 2);
+    ctx.lineTo(footX - 5, footYPos - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2.8;
+    ctx.stroke();
+  };
+
+  drawLeg(cx - 8, footY - 56, lFootX, footY - 2, false);
+  drawLeg(cx + 8, footY - 56, rFootX, footY + 2, true);
+
+  // Billowing Asymmetric Crimson Cloak Mantle sweeping behind warrior stride
   ctx.beginPath();
-  ctx.moveTo(cx - 24, footY - 88);
-  ctx.bezierCurveTo(cx - 48, footY - 56, cx - 50, footY - 22, cx - 36, footY - 6);
-  ctx.lineTo(cx - 10, footY - 18);
-  ctx.lineTo(cx + 22, footY - 14);
-  ctx.quadraticCurveTo(cx + 36, footY - 54, cx + 24, footY - 88);
+  ctx.moveTo(cx - 22, footY - 98);
+  ctx.bezierCurveTo(cx - 52, footY - 72, cx - 54, footY - 30, cx - 40, footY - 12);
+  ctx.lineTo(cx - 16, footY - 26);
+  ctx.lineTo(cx + 4, footY - 18);
+  ctx.quadraticCurveTo(cx + 26, footY - 54, cx + 20, footY - 96);
   ctx.closePath();
-  const cloakGrad = ctx.createLinearGradient(cx - 46, footY - 88, cx + 32, footY - 8);
-  cloakGrad.addColorStop(0, '#e62434');
-  cloakGrad.addColorStop(0.52, '#961020');
+  const cloakGrad = ctx.createLinearGradient(cx - 50, footY - 98, cx + 22, footY - 14);
+  cloakGrad.addColorStop(0, '#e82334');
+  cloakGrad.addColorStop(0.55, '#961022');
   cloakGrad.addColorStop(1, '#3b0612');
   ctx.fillStyle = cloakGrad;
   ctx.fill();
   ctx.strokeStyle = INK;
-  ctx.lineWidth = 4.2;
+  ctx.lineWidth = 4;
   ctx.stroke();
 
-  // Tapered Obsidian Warrior Chiton Tunic (V-shaped heroic torso!)
+  // Sleek Tapered Obsidian Warrior Chiton (broad shoulders -> athletic narrow waist -> pleated battle-skirt!)
   ctx.beginPath();
-  ctx.moveTo(cx - 22, footY - 88);
-  ctx.lineTo(cx + 22, footY - 88);
-  ctx.lineTo(cx + 17, footY - 54);
-  ctx.lineTo(cx + 25, footY - 30);
-  ctx.lineTo(cx - 25, footY - 30);
-  ctx.lineTo(cx - 17, footY - 54);
+  ctx.moveTo(cx - 20, footY - 98);
+  ctx.lineTo(cx + 20, footY - 98);
+  ctx.lineTo(cx + 13, footY - 64); // narrow athletic waist!
+  ctx.lineTo(cx + 22, footY - 40); // flared battle skirt
+  ctx.lineTo(cx + 6, footY - 46);
+  ctx.lineTo(cx - 22, footY - 40);
+  ctx.lineTo(cx - 13, footY - 64);
   ctx.closePath();
-  const tunicGrad = ctx.createLinearGradient(cx - 22, footY - 88, cx + 22, footY - 30);
-  tunicGrad.addColorStop(0, '#362e42');
-  tunicGrad.addColorStop(0.55, '#191522');
-  tunicGrad.addColorStop(1, '#0b0812');
+  const tunicGrad = ctx.createLinearGradient(cx - 20, footY - 98, cx + 20, footY - 40);
+  tunicGrad.addColorStop(0, '#3a3248');
+  tunicGrad.addColorStop(0.55, '#191424');
+  tunicGrad.addColorStop(1, '#090710');
   ctx.fillStyle = tunicGrad;
   ctx.fill();
   ctx.strokeStyle = INK;
-  ctx.lineWidth = 4;
-  ctx.stroke();
-
-  // Gold skirt border & diagonal crimson himation drape across chest
-  ctx.fillStyle = '#ebb446';
-  ctx.fillRect(cx - 23, footY - 37, 46, 5.5);
-  ctx.beginPath();
-  ctx.moveTo(cx - 24, footY - 88);
-  ctx.lineTo(cx + 2, footY - 84);
-  ctx.lineTo(cx + 22, footY - 52);
-  ctx.lineTo(cx - 18, footY - 56);
-  ctx.closePath();
-  ctx.fillStyle = isUp ? '#850e1c' : '#db2232';
-  ctx.fill();
-  ctx.strokeStyle = INK;
   ctx.lineWidth = 3.8;
   ctx.stroke();
 
-  // Sculpted Burnished-Gold Horned-Skull Shoulder Pauldron (left shoulder!)
-  const px = isSide ? cx - 6 : cx - 23;
-  const py = footY - 86;
+  // Gold filigree hem & sculpted diagonal crimson chest-drape
+  ctx.strokeStyle = '#f2be4c';
+  ctx.lineWidth = 3.5;
   ctx.beginPath();
-  ctx.moveTo(px - 17, py + 8);
-  ctx.bezierCurveTo(px - 20, py - 14, px + 6, py - 18, px + 18, py - 4);
-  ctx.bezierCurveTo(px + 16, py + 12, px - 4, py + 14, px - 17, py + 8);
+  ctx.moveTo(cx - 20, footY - 44);
+  ctx.lineTo(cx + 20, footY - 44);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx - 22, footY - 98);
+  ctx.lineTo(cx + 4, footY - 92);
+  ctx.lineTo(cx + 18, footY - 60);
+  ctx.lineTo(cx - 15, footY - 64);
+  ctx.closePath();
+  ctx.fillStyle = isUp ? '#8a1020' : '#df2234';
+  ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 3.6;
+  ctx.stroke();
+
+  // Sculpted Burnished-Gold Skull Shoulder Pauldron (angled heroically!)
+  const px = isSide ? cx - 6 : cx - 20;
+  const py = footY - 96;
+  ctx.beginPath();
+  ctx.moveTo(px - 18, py + 8);
+  ctx.bezierCurveTo(px - 22, py - 14, px + 6, py - 19, px + 16, py - 4);
+  ctx.bezierCurveTo(px + 15, py + 12, px - 5, py + 14, px - 18, py + 8);
   ctx.closePath();
   const paulGrad = ctx.createLinearGradient(px - 16, py - 14, px + 16, py + 12);
-  paulGrad.addColorStop(0, '#fff2b0');
-  paulGrad.addColorStop(0.45, '#e8ac3c');
-  paulGrad.addColorStop(1, '#663a0e');
+  paulGrad.addColorStop(0, '#fff4b8');
+  paulGrad.addColorStop(0.45, '#eba934');
+  paulGrad.addColorStop(1, '#63370c');
   ctx.fillStyle = paulGrad;
   ctx.fill();
   ctx.strokeStyle = INK;
-  ctx.lineWidth = 3.8;
+  ctx.lineWidth = 3.6;
   ctx.stroke();
 
-  // Sculpted Angular Heroic Head (3/4 jawline, not a flat pill!)
-  const headY = footY - 108;
+  // Refined 3/4 Angular Warrior Head & Neck (sleek heroic chin, NEVER a flat square!)
+  const headY = footY - 118;
+  ctx.fillStyle = '#a86b4c';
+  ctx.fillRect(cx - 5, headY + 10, 10, 10);
+
   ctx.beginPath();
-  ctx.moveTo(cx - 14, headY - 12);
-  ctx.quadraticCurveTo(cx, headY - 22, cx + 15, headY - 10);
-  ctx.lineTo(cx + 13, headY + 8);
-  ctx.quadraticCurveTo(cx + 2, headY + 19, cx - 2, headY + 18);
-  ctx.lineTo(cx - 14, headY + 7);
+  ctx.moveTo(cx - 12, headY - 12);
+  ctx.quadraticCurveTo(cx, headY - 20, cx + 13, headY - 10);
+  ctx.lineTo(cx + 12, headY + 6);
+  ctx.quadraticCurveTo(cx + 4, headY + 18, cx - 2, headY + 17);
+  ctx.quadraticCurveTo(cx - 12, headY + 12, cx - 12, headY - 12);
   ctx.closePath();
-  ctx.fillStyle = isUp ? '#1a1524' : '#e0a580';
+  ctx.fillStyle = isUp ? '#171222' : '#e4aa84';
   ctx.fill();
   ctx.strokeStyle = INK;
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 3.6;
   ctx.stroke();
 
   if (!isUp) {
-    // Fierce narrow comic eyes (glowing crimson + emerald heterochromia!)
-    const exOff = isSide ? 4 : 0;
+    // Bold sharp comic brow shadow + gleaming crimson/emerald warrior eyes!
+    const exOff = isSide ? 4 : 1;
     ctx.fillStyle = INK;
-    ctx.fillRect(cx - 10 + exOff, headY - 4, 8, 4.5);
-    ctx.fillRect(cx + 2 + exOff, headY - 4, 8, 4.5);
-    ctx.fillStyle = '#ff3838';
-    ctx.fillRect(cx - 8 + exOff, headY - 3, 3.6, 2.5);
-    ctx.fillStyle = '#48ffa2';
-    ctx.fillRect(cx + 4 + exOff, headY - 3, 3.6, 2.5);
+    ctx.beginPath();
+    ctx.moveTo(cx - 9 + exOff, headY - 4);
+    ctx.lineTo(cx - 1 + exOff, headY - 2);
+    ctx.lineTo(cx - 8 + exOff, headY + 1);
+    ctx.closePath();
+    ctx.moveTo(cx + 10 + exOff, headY - 4);
+    ctx.lineTo(cx + 2 + exOff, headY - 2);
+    ctx.lineTo(cx + 9 + exOff, headY + 1);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#ff3636';
+    ctx.fillRect(cx - 7 + exOff, headY - 2, 3, 2);
+    ctx.fillStyle = '#48ffa6';
+    ctx.fillRect(cx + 4 + exOff, headY - 2, 3, 2);
   }
 
-  // Wild Swept Charcoal Hair with Blazing Crimson-Gold Tips
+  // Wild Layered Raven-Black Spiky Underworld Prince Hair w/ Fiery Ember Underglow!
   ctx.beginPath();
-  ctx.moveTo(cx - 18, headY - 2);
-  ctx.lineTo(cx - 28, headY - 16);
-  ctx.lineTo(cx - 14, headY - 17);
-  ctx.lineTo(cx - 20, headY - 34);
-  ctx.lineTo(cx - 4, headY - 22);
-  ctx.lineTo(cx + 5, headY - 38);
-  ctx.lineTo(cx + 12, headY - 22);
-  ctx.lineTo(cx + 28, headY - 26);
-  ctx.lineTo(cx + 18, headY - 6);
-  ctx.quadraticCurveTo(cx, headY - 14, cx - 18, headY - 2);
+  ctx.moveTo(cx - 16, headY + 4);
+  ctx.lineTo(cx - 32, headY - 8);
+  ctx.lineTo(cx - 18, headY - 12);
+  ctx.lineTo(cx - 34, headY - 26);
+  ctx.lineTo(cx - 14, headY - 22);
+  ctx.lineTo(cx - 18, headY - 42);
+  ctx.lineTo(cx - 2, headY - 26);
+  ctx.lineTo(cx + 8, headY - 44);
+  ctx.lineTo(cx + 14, headY - 24);
+  ctx.lineTo(cx + 32, headY - 30);
+  ctx.lineTo(cx + 20, headY - 14);
+  ctx.lineTo(cx + 30, headY - 6);
+  ctx.lineTo(cx + 14, headY - 2);
+  ctx.quadraticCurveTo(cx + 2, headY - 14, cx - 16, headY + 4);
   ctx.closePath();
-  const hairGrad = ctx.createLinearGradient(cx, headY - 38, cx, headY);
-  hairGrad.addColorStop(0, '#ff592b');
-  hairGrad.addColorStop(0.32, '#291c2e');
-  hairGrad.addColorStop(1, '#0d0914');
+  const hairGrad = ctx.createLinearGradient(cx, headY - 44, cx, headY + 2);
+  hairGrad.addColorStop(0, '#ff5c28');
+  hairGrad.addColorStop(0.24, '#24172b');
+  hairGrad.addColorStop(1, '#0a0712');
   ctx.fillStyle = hairGrad;
   ctx.fill();
   ctx.strokeStyle = INK;
-  ctx.lineWidth = 3.8;
+  ctx.lineWidth = 3.6;
   ctx.stroke();
 
-  // Glowing Golden Laurel Crown
-  ctx.strokeStyle = '#ffd24a';
-  ctx.lineWidth = 4.2;
-  ctx.beginPath();
-  ctx.arc(cx, headY - 11, 17, Math.PI * 1.1, Math.PI * 1.9);
-  ctx.stroke();
+  // Gleaming Gold Laurel Wreath woven delicately around temple
+  ctx.fillStyle = '#ffd84d';
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.6;
+  for (let i = -3; i <= 3; i++) {
+    const a = -Math.PI * 0.5 + i * 0.3;
+    const lx = cx + Math.cos(a) * 16;
+    const ly = headY - 10 + Math.sin(a) * 12;
+    ctx.beginPath();
+    ctx.ellipse(lx, ly, 4.8, 2.2, a + 0.75, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
 }
 
 function drawWeapons(ctx: CanvasRenderingContext2D): void {
-  // Stygian Blade (broad glowing mythic short-sword)
+  // Stygian Blade (sleek tapered leaf-bladed mythic short-sword w/ obsidian fuller & rune edge!)
   withCell(ctx, 'weapon_stygian_blade', (c, w, h) => {
     const cy = h * 0.5;
-    // Broad double-edged blade
+    // Sleek Greek xiphos leaf-blade silhouette tapering to deadly needle point!
     c.beginPath();
-    c.moveTo(34, cy - 11);
-    c.lineTo(w - 28, cy - 14);
-    c.lineTo(w - 6, cy);
-    c.lineTo(w - 28, cy + 14);
-    c.lineTo(34, cy + 11);
+    c.moveTo(34, cy - 7);
+    c.quadraticCurveTo(w * 0.58, cy - 13, w - 34, cy - 10);
+    c.lineTo(w - 4, cy);
+    c.lineTo(w - 34, cy + 10);
+    c.quadraticCurveTo(w * 0.58, cy + 13, 34, cy + 7);
     c.closePath();
-    const bGrad = c.createLinearGradient(34, cy - 14, w - 6, cy + 14);
-    bGrad.addColorStop(0, '#ffe8b6');
-    bGrad.addColorStop(0.45, '#d6dde8');
-    bGrad.addColorStop(0.75, '#596378');
-    bGrad.addColorStop(1, '#222634');
+    const bGrad = c.createLinearGradient(34, cy - 12, w - 4, cy + 12);
+    bGrad.addColorStop(0, '#f2f6ff');
+    bGrad.addColorStop(0.38, '#9aa8bd');
+    bGrad.addColorStop(0.62, '#2f3647');
+    bGrad.addColorStop(1, '#12151f');
     c.fillStyle = bGrad;
     c.fill();
     c.strokeStyle = INK;
-    c.lineWidth = 3.8;
+    c.lineWidth = 3.6;
     c.stroke();
 
-    // Glowing crimson-gold fuller rune line
-    c.strokeStyle = '#ff4b3a';
-    c.lineWidth = 3.2;
+    // Central recessed obsidian blood-fuller & glowing crimson ember edge streak
+    c.strokeStyle = '#ff3838';
+    c.lineWidth = 2.6;
     c.beginPath();
     c.moveTo(42, cy);
-    c.lineTo(w - 26, cy);
+    c.lineTo(w - 28, cy);
+    c.stroke();
+    c.strokeStyle = '#ffffff';
+    c.lineWidth = 1.6;
+    c.beginPath();
+    c.moveTo(44, cy - 6);
+    c.lineTo(w - 16, cy - 2);
     c.stroke();
 
-    // Gold crossguard & hilt
-    c.fillStyle = '#e8b246';
+    // Angled winged burnished-gold crossguard & wrapped crimson hilt
+    c.fillStyle = '#e8ae3c';
     c.beginPath();
-    c.moveTo(32, cy - 22);
-    c.lineTo(42, cy - 16);
-    c.lineTo(42, cy + 16);
-    c.lineTo(32, cy + 22);
-    c.lineTo(26, cy);
+    c.moveTo(28, cy - 20);
+    c.lineTo(42, cy - 11);
+    c.lineTo(39, cy);
+    c.lineTo(42, cy + 11);
+    c.lineTo(28, cy + 20);
+    c.lineTo(32, cy);
     c.closePath();
     c.fill();
     c.strokeStyle = INK;
-    c.lineWidth = 3.4;
+    c.lineWidth = 3.2;
     c.stroke();
 
-    c.fillStyle = '#7e1a24';
-    c.fillRect(10, cy - 5, 20, 10);
-    c.strokeRect(10, cy - 5, 20, 10);
+    c.fillStyle = '#751520';
+    c.fillRect(10, cy - 4, 21, 8);
+    c.strokeRect(10, cy - 4, 21, 8);
     c.beginPath();
-    c.arc(9, cy, 7, 0, Math.PI * 2);
-    c.fillStyle = '#f2c15d';
+    c.arc(9, cy, 6.5, 0, Math.PI * 2);
+    c.fillStyle = '#f2be4c';
     c.fill();
     c.stroke();
   });
@@ -1572,59 +1666,109 @@ function drawEnemiesAndBosses(ctx: CanvasRenderingContext2D): void {
     c.fill();
   });
 
-  // 3. Bone Archer: Cloaked crystalline shade with glowing bow
+  // 3. Bone Archer: Sinister hooded skeletal ranger drawing crystalline longbow!
   withCell(ctx, 'enemy_bone_archer', (c, w, h) => {
-    const cx = w * 0.45;
-    const baseY = h * 0.85;
+    const cx = w * 0.42;
+    const baseY = h * 0.86;
 
-    // Tattered floating teal-violet robes
+    // Billowing tattered dark indigo-emerald assassin cloak with jagged tails
     c.beginPath();
-    c.moveTo(cx - 28, baseY);
-    c.quadraticCurveTo(cx - 38, baseY - 64, cx - 22, baseY - 112);
-    c.quadraticCurveTo(cx, baseY - 148, cx + 24, baseY - 112);
-    c.quadraticCurveTo(cx + 34, baseY - 64, cx + 26, baseY - 4);
-    c.lineTo(cx + 8, baseY - 22);
+    c.moveTo(cx - 34, baseY - 6);
+    c.lineTo(cx - 44, baseY - 44);
+    c.quadraticCurveTo(cx - 38, baseY - 104, cx - 22, baseY - 134);
+    c.quadraticCurveTo(cx, baseY - 166, cx + 22, baseY - 130);
+    c.lineTo(cx + 30, baseY - 64);
+    c.lineTo(cx + 22, baseY - 4);
+    c.lineTo(cx + 6, baseY - 26);
     c.lineTo(cx - 8, baseY + 2);
+    c.lineTo(cx - 20, baseY - 22);
     c.closePath();
-    const aGrad = c.createLinearGradient(cx - 32, baseY - 140, cx + 32, baseY);
-    aGrad.addColorStop(0, '#5a94b8');
-    aGrad.addColorStop(0.5, '#2b3e5e');
-    aGrad.addColorStop(1, '#121526');
+    const aGrad = c.createLinearGradient(cx - 42, baseY - 160, cx + 32, baseY);
+    aGrad.addColorStop(0, '#3e6d8a');
+    aGrad.addColorStop(0.5, '#1d2d4a');
+    aGrad.addColorStop(1, '#0b0e1c');
     c.fillStyle = aGrad;
     c.fill();
     c.strokeStyle = INK;
     c.lineWidth = 4.2;
     c.stroke();
 
-    // Glowing skeletal skull mask inside hood
-    c.fillStyle = '#e2eef7';
+    // Exposed inked ivory ribcage & dark bronze quiver strap
+    c.fillStyle = '#110d1a';
     c.beginPath();
-    c.ellipse(cx, baseY - 114, 15, 18, 0, 0, Math.PI * 2);
+    c.ellipse(cx + 2, baseY - 84, 15, 24, 0, 0, Math.PI * 2);
     c.fill();
-    c.stroke();
-    c.fillStyle = '#40fff4';
+    c.strokeStyle = '#dce8f2';
+    c.lineWidth = 3.2;
+    for (const ry of [-96, -86, -76]) {
+      c.beginPath();
+      c.moveTo(cx - 10, baseY + ry);
+      c.quadraticCurveTo(cx + 2, baseY + ry - 4, cx + 14, baseY + ry);
+      c.stroke();
+    }
+
+    // Shadowed pointed cowl cavity + angular grinning skeletal skull & glowing cyan eyes
+    c.fillStyle = '#07050c';
     c.beginPath();
-    c.arc(cx - 5, baseY - 115, 3.6, 0, Math.PI * 2);
-    c.arc(cx + 5, baseY - 115, 3.6, 0, Math.PI * 2);
+    c.ellipse(cx + 2, baseY - 126, 18, 22, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#e5f2fa';
+    c.beginPath();
+    c.moveTo(cx - 11, baseY - 130);
+    c.quadraticCurveTo(cx + 2, baseY - 144, cx + 14, baseY - 128);
+    c.lineTo(cx + 10, baseY - 110);
+    c.lineTo(cx - 6, baseY - 110);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 3;
+    c.stroke();
+    c.fillStyle = '#38fff4';
+    c.beginPath();
+    c.moveTo(cx - 6, baseY - 128);
+    c.lineTo(cx, baseY - 124);
+    c.lineTo(cx - 5, baseY - 122);
+    c.closePath();
+    c.moveTo(cx + 11, baseY - 128);
+    c.lineTo(cx + 4, baseY - 124);
+    c.lineTo(cx + 10, baseY - 122);
+    c.closePath();
     c.fill();
 
-    // Crystalline cyan bow held forward
-    c.strokeStyle = '#6cf8ff';
-    c.lineWidth = 6.5;
+    // Skeletal bow-arm reaching forward + ornate curved bone-and-crystal recurve longbow!
+    c.strokeStyle = '#dce8f2';
+    c.lineWidth = 6;
     c.beginPath();
-    c.moveTo(cx + 22, baseY - 122);
-    c.quadraticCurveTo(cx + 58, baseY - 82, cx + 22, baseY - 42);
+    c.moveTo(cx + 12, baseY - 96);
+    c.lineTo(cx + 42, baseY - 92);
     c.stroke();
     c.strokeStyle = INK;
     c.lineWidth = 2.4;
     c.stroke();
 
-    c.strokeStyle = '#ffffff';
+    c.strokeStyle = INK;
+    c.lineWidth = 11;
+    c.beginPath();
+    c.moveTo(cx + 26, baseY - 146);
+    c.bezierCurveTo(cx + 68, baseY - 122, cx + 68, baseY - 62, cx + 26, baseY - 38);
+    c.stroke();
+    c.strokeStyle = '#52f0ff';
+    c.lineWidth = 5;
+    c.stroke();
+
+    // Taut bowstring + glowing nocked energy arrow!
+    c.strokeStyle = '#d6ffff';
     c.lineWidth = 2;
     c.beginPath();
-    c.moveTo(cx + 22, baseY - 120);
-    c.lineTo(cx + 12, baseY - 82);
-    c.lineTo(cx + 22, baseY - 44);
+    c.moveTo(cx + 26, baseY - 144);
+    c.lineTo(cx + 10, baseY - 92);
+    c.lineTo(cx + 26, baseY - 40);
+    c.stroke();
+    c.strokeStyle = '#70ffff';
+    c.lineWidth = 3.8;
+    c.beginPath();
+    c.moveTo(cx + 10, baseY - 92);
+    c.lineTo(cx + 66, baseY - 92);
     c.stroke();
   });
 
@@ -1752,94 +1896,131 @@ function drawEnemiesAndBosses(ctx: CanvasRenderingContext2D): void {
     c.fillRect(cx + 4, baseY - 116, 7, 4);
   });
 
-  // 6. Rattlebones Training Dummy: Charming skeletal mannequin w/ emerald eyes & wooden plaque!
+  // 6. Rattlebones Training Dummy: Expressive grinning skeleton warrior mannequin (no googly dots!)
   withCell(ctx, 'enemy_rattlebones_dummy', (c, w, h) => {
     const cx = w * 0.5;
-    const baseY = h * 0.88;
+    const baseY = h * 0.89;
 
-    // Wooden training post & cross-brace base
-    c.fillStyle = '#6e4527';
-    c.fillRect(cx - 8, baseY - 122, 16, 118);
-    c.strokeStyle = INK;
-    c.lineWidth = 3.8;
-    c.strokeRect(cx - 8, baseY - 122, 16, 118);
-
-    c.fillStyle = '#57351d';
+    // Staked oak training post & iron-banded base block
+    c.fillStyle = '#5e391f';
     c.beginPath();
     c.ellipse(cx, baseY, 34, 12, 0, 0, Math.PI * 2);
     c.fill();
-    c.stroke();
-
-    // Skeletal arms & jaunty wooden practice buckler
-    c.strokeStyle = '#efe2c6';
-    c.lineWidth = 8;
-    c.beginPath();
-    c.moveTo(cx - 38, baseY - 94);
-    c.lineTo(cx + 38, baseY - 94);
-    c.stroke();
     c.strokeStyle = INK;
-    c.lineWidth = 3;
+    c.lineWidth = 3.8;
     c.stroke();
 
-    // Ribcage + nailed painted target bullseye plaque on chest
-    c.fillStyle = '#c88c4b';
+    c.fillStyle = '#6e4526';
+    c.fillRect(cx - 8, baseY - 128, 16, 124);
+    c.strokeRect(cx - 8, baseY - 128, 16, 124);
+
+    // Tattered burgundy sparring scarf draped over wooden crossbar
+    c.fillStyle = '#8c1d2c';
+    c.beginPath();
+    c.moveTo(cx - 34, baseY - 102);
+    c.lineTo(cx + 34, baseY - 102);
+    c.lineTo(cx + 42, baseY - 72);
+    c.lineTo(cx + 22, baseY - 82);
+    c.lineTo(cx - 24, baseY - 78);
+    c.lineTo(cx - 42, baseY - 68);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 3.6;
+    c.stroke();
+
+    // Weathered iron-riveted oak bullseye practice plaque strapped across ribcage
+    c.fillStyle = '#a86e39';
     c.beginPath();
     c.arc(cx, baseY - 76, 26, 0, Math.PI * 2);
     c.fill();
     c.strokeStyle = INK;
     c.lineWidth = 4;
     c.stroke();
-    c.fillStyle = '#cf2a34';
+    c.fillStyle = '#b8212e';
     c.beginPath();
     c.arc(cx, baseY - 76, 17, 0, Math.PI * 2);
     c.fill();
-    c.fillStyle = '#f8ecd4';
+    c.fillStyle = '#efe0c2';
     c.beginPath();
     c.arc(cx, baseY - 76, 9, 0, Math.PI * 2);
     c.fill();
-    c.fillStyle = '#cf2a34';
+    c.fillStyle = '#b8212e';
     c.beginPath();
     c.arc(cx, baseY - 76, 4, 0, Math.PI * 2);
     c.fill();
 
-    // Grinning inked skull
-    c.fillStyle = '#f4ead2';
+    // Sculpted angular grinning skull (cheekbones + toothed jaw + angled hollow emerald eye sockets!)
+    const sy = baseY - 128;
+    c.fillStyle = '#f2e5c9';
     c.beginPath();
-    c.ellipse(cx, baseY - 128, 22, 24, 0, 0, Math.PI * 2);
+    c.moveTo(cx - 20, sy - 10);
+    c.quadraticCurveTo(cx, sy - 28, cx + 20, sy - 10);
+    c.lineTo(cx + 22, sy + 4);
+    c.lineTo(cx + 13, sy + 18);
+    c.lineTo(cx - 13, sy + 18);
+    c.lineTo(cx - 22, sy + 4);
+    c.closePath();
     c.fill();
     c.strokeStyle = INK;
     c.lineWidth = 4;
     c.stroke();
 
-    // Glowing emerald eye sockets
-    c.fillStyle = '#09070f';
+    // Fierce jaunty angled hollow eye sockets (NOT googly circles!) + glowing emerald flames
+    c.fillStyle = INK;
     c.beginPath();
-    c.arc(cx - 8, baseY - 130, 6.5, 0, Math.PI * 2);
-    c.arc(cx + 8, baseY - 130, 6.5, 0, Math.PI * 2);
+    c.moveTo(cx - 15, sy - 6);
+    c.lineTo(cx - 3, sy - 1);
+    c.lineTo(cx - 6, sy + 5);
+    c.lineTo(cx - 15, sy + 2);
+    c.closePath();
+    c.moveTo(cx + 15, sy - 6);
+    c.lineTo(cx + 3, sy - 1);
+    c.lineTo(cx + 6, sy + 5);
+    c.lineTo(cx + 15, sy + 2);
+    c.closePath();
     c.fill();
-    c.fillStyle = '#54ff9f';
-    c.beginPath();
-    c.arc(cx - 8, baseY - 130, 3.2, 0, Math.PI * 2);
-    c.arc(cx + 8, baseY - 130, 3.2, 0, Math.PI * 2);
-    c.fill();
+    c.fillStyle = '#48ffa2';
+    c.fillRect(cx - 11, sy - 2, 4, 3);
+    c.fillRect(cx + 7, sy - 2, 4, 3);
 
-    // Jaunty dented bronze warrior helm
-    c.fillStyle = '#d49e46';
+    // Grinning inked teeth
+    c.strokeStyle = INK;
+    c.lineWidth = 2.6;
     c.beginPath();
-    c.arc(cx, baseY - 138, 23, Math.PI, 0);
+    c.moveTo(cx - 11, sy + 11);
+    c.lineTo(cx + 11, sy + 11);
+    for (const tx of [-6, 0, 6]) {
+      c.moveTo(cx + tx, sy + 8);
+      c.lineTo(cx + tx, sy + 17);
+    }
+    c.stroke();
+
+    // Tilted battered bronze Spartan warrior helmet & torn crimson crest plume!
+    c.save();
+    c.translate(cx, sy - 12);
+    c.rotate(-0.14);
+    c.fillStyle = '#d99e3e';
+    c.beginPath();
+    c.arc(0, 0, 22, Math.PI * 1.05, -0.05);
+    c.lineTo(20, 8);
+    c.lineTo(10, 0);
+    c.lineTo(0, 6);
+    c.lineTo(-10, 0);
+    c.lineTo(-20, 8);
     c.closePath();
     c.fill();
     c.strokeStyle = INK;
     c.lineWidth = 3.8;
     c.stroke();
-    // Red plume
-    c.fillStyle = '#d92938';
+    c.fillStyle = '#cf2232';
     c.beginPath();
-    c.moveTo(cx, baseY - 160);
-    c.quadraticCurveTo(cx + 26, baseY - 178, cx + 22, baseY - 146);
-    c.quadraticCurveTo(cx + 8, baseY - 154, cx, baseY - 160);
+    c.moveTo(-6, -22);
+    c.quadraticCurveTo(22, -40, 26, -12);
+    c.quadraticCurveTo(10, -18, -6, -22);
     c.fill();
     c.stroke();
+    c.restore();
   });
 
   // 7. Generic Armored Shade (clean fallback for Wave 2 archetypes)
@@ -1868,110 +2049,87 @@ function drawEnemiesAndBosses(ctx: CanvasRenderingContext2D): void {
     c.fill();
   });
 
-  // 8. WARDEN MALICE (BOSS): Commanding dark-ink winged violet-and-crimson Fury boss!
+  // 8. WARDEN MALICE (BOSS): Gothic dark-ink winged Fury warrior (asymmetric dramatic silhouette!)
   withCell(ctx, 'boss_warden_malice', (c, w, h) => {
     const cx = w * 0.5;
-    const baseY = h * 0.85;
+    const baseY = h * 0.87;
 
-    // Subtle dark crimson-violet Fury aura behind silhouette
-    const halo = c.createRadialGradient(cx, baseY - 156, 10, cx, baseY - 156, 86);
-    halo.addColorStop(0, 'rgba(220, 42, 168, 0.55)');
-    halo.addColorStop(0.55, 'rgba(110, 18, 92, 0.22)');
-    halo.addColorStop(1, 'rgba(20, 6, 26, 0)');
+    // Moody violet-crimson underworld backlight aura
+    const halo = c.createRadialGradient(cx, baseY - 152, 10, cx, baseY - 152, 92);
+    halo.addColorStop(0, 'rgba(198, 28, 138, 0.48)');
+    halo.addColorStop(0.58, 'rgba(72, 12, 74, 0.2)');
+    halo.addColorStop(1, 'rgba(14, 4, 22, 0)');
     c.fillStyle = halo;
     c.beginPath();
-    c.arc(cx, baseY - 156, 86, 0, Math.PI * 2);
+    c.arc(cx, baseY - 152, 92, 0, Math.PI * 2);
     c.fill();
 
-    // Sweeping dramatic jagged bat-feathered obsidian wings (left & right)
-    const drawWing = (dir: -1 | 1) => {
+    // Layered Gothic Razor-Ribbed Obsidian Fury Wings (asymmetric 3/4 flare + comic cross-hatching!)
+    const drawGothicWing = (dir: -1 | 1, spreadX: number, liftY: number) => {
+      c.save();
       c.beginPath();
-      c.moveTo(cx + dir * 16, baseY - 144);
-      c.bezierCurveTo(cx + dir * 72, baseY - 240, cx + dir * 124, baseY - 226, cx + dir * 144, baseY - 196);
-      c.quadraticCurveTo(cx + dir * 120, baseY - 146, cx + dir * 130, baseY - 104);
-      c.quadraticCurveTo(cx + dir * 96, baseY - 124, cx + dir * 92, baseY - 76);
-      c.quadraticCurveTo(cx + dir * 60, baseY - 102, cx + dir * 50, baseY - 56);
-      c.lineTo(cx + dir * 16, baseY - 98);
+      c.moveTo(cx + dir * 14, baseY - 148);
+      c.bezierCurveTo(cx + dir * (66 * spreadX), baseY - (236 + liftY), cx + dir * (114 * spreadX), baseY - (222 + liftY), cx + dir * (142 * spreadX), baseY - (184 + liftY * 0.6));
+      c.quadraticCurveTo(cx + dir * (116 * spreadX), baseY - 148, cx + dir * (126 * spreadX), baseY - 110);
+      c.quadraticCurveTo(cx + dir * (92 * spreadX), baseY - 128, cx + dir * (88 * spreadX), baseY - 82);
+      c.quadraticCurveTo(cx + dir * (56 * spreadX), baseY - 108, cx + dir * (46 * spreadX), baseY - 62);
+      c.lineTo(cx + dir * 14, baseY - 102);
       c.closePath();
-      const wGrad = c.createLinearGradient(cx, baseY - 228, cx + dir * 140, baseY - 70);
-      wGrad.addColorStop(0, '#441559');
-      wGrad.addColorStop(0.45, '#1d0a2b');
-      wGrad.addColorStop(1, '#090410');
+
+      const wGrad = c.createLinearGradient(cx, baseY - 230, cx + dir * 138, baseY - 66);
+      wGrad.addColorStop(0, '#46155e');
+      wGrad.addColorStop(0.45, '#1c0929');
+      wGrad.addColorStop(1, '#08030f');
       c.fillStyle = wGrad;
       c.fill();
+
+      c.clip();
+      // Wing bone struts & gothic cross-hatching inside membrane shadows
+      drawCrossHatch(c, cx + (dir < 0 ? -145 : 10), baseY - 230, 140, 175, 9, dir * 0.55, 'rgba(6, 3, 12, 0.52)', 1.5);
+      c.strokeStyle = '#090410';
+      c.lineWidth = 4.5;
+      c.beginPath();
+      c.moveTo(cx + dir * 24, baseY - 150);
+      c.lineTo(cx + dir * (118 * spreadX), baseY - 114);
+      c.moveTo(cx + dir * 24, baseY - 146);
+      c.lineTo(cx + dir * (84 * spreadX), baseY - 84);
+      c.stroke();
+      c.restore();
+
+      // Bold outer ink wing edge + crimson-magenta rim highlight along upper bone spur!
+      c.beginPath();
+      c.moveTo(cx + dir * 14, baseY - 148);
+      c.bezierCurveTo(cx + dir * (66 * spreadX), baseY - (236 + liftY), cx + dir * (114 * spreadX), baseY - (222 + liftY), cx + dir * (142 * spreadX), baseY - (184 + liftY * 0.6));
+      c.quadraticCurveTo(cx + dir * (116 * spreadX), baseY - 148, cx + dir * (126 * spreadX), baseY - 110);
+      c.quadraticCurveTo(cx + dir * (92 * spreadX), baseY - 128, cx + dir * (88 * spreadX), baseY - 82);
+      c.quadraticCurveTo(cx + dir * (56 * spreadX), baseY - 108, cx + dir * (46 * spreadX), baseY - 62);
+      c.lineTo(cx + dir * 14, baseY - 102);
+      c.closePath();
       c.strokeStyle = INK;
-      c.lineWidth = 5;
+      c.lineWidth = 4.8;
       c.stroke();
 
-      // Wing bone spurs & crimson inner edge highlight
       c.strokeStyle = '#ff3898';
       c.lineWidth = 2.4;
       c.beginPath();
-      c.moveTo(cx + dir * 22, baseY - 144);
-      c.bezierCurveTo(cx + dir * 74, baseY - 232, cx + dir * 122, baseY - 218, cx + dir * 140, baseY - 194);
+      c.moveTo(cx + dir * 20, baseY - 150);
+      c.bezierCurveTo(cx + dir * (68 * spreadX), baseY - (228 + liftY), cx + dir * (112 * spreadX), baseY - (214 + liftY), cx + dir * (138 * spreadX), baseY - (182 + liftY * 0.6));
       c.stroke();
     };
-    drawWing(-1);
-    drawWing(1);
+    drawGothicWing(-1, 1.04, 10);
+    drawGothicWing(1, 0.94, -4);
 
-    // Coiled barbed ink whip arcing menacingly around right flank
-    c.strokeStyle = INK;
-    c.lineWidth = 9;
-    c.beginPath();
-    c.moveTo(cx + 30, baseY - 108);
-    c.bezierCurveTo(cx + 122, baseY - 96, cx + 114, baseY - 12, cx + 48, baseY - 16);
-    c.stroke();
-    c.strokeStyle = '#ff2864';
-    c.lineWidth = 3.5;
-    c.stroke();
-
-    // Tattered flowing dark obsidian-crimson battle-skirt with boots visible below!
-    c.beginPath();
-    c.moveTo(cx - 24, baseY - 138);
-    c.lineTo(cx + 24, baseY - 138);
-    c.lineTo(cx + 16, baseY - 92);
-    c.quadraticCurveTo(cx + 42, baseY - 46, cx + 48, baseY + 2);
-    c.lineTo(cx + 22, baseY - 20);
-    c.lineTo(cx + 6, baseY + 6);
-    c.lineTo(cx - 8, baseY - 18);
-    c.lineTo(cx - 24, baseY + 4);
-    c.lineTo(cx - 46, baseY - 4);
-    c.quadraticCurveTo(cx - 38, baseY - 52, cx - 16, baseY - 92);
-    c.closePath();
-    const dressGrad = c.createLinearGradient(cx - 38, baseY - 138, cx + 38, baseY + 4);
-    dressGrad.addColorStop(0, '#8f133b');
-    dressGrad.addColorStop(0.5, '#3b0924');
-    dressGrad.addColorStop(1, '#120514');
-    c.fillStyle = dressGrad;
-    c.fill();
-    c.strokeStyle = INK;
-    c.lineWidth = 4.6;
-    c.stroke();
-
-    // Sleek spiked obsidian corset armor + burnished gold V-trim
-    c.fillStyle = '#1b0d24';
-    c.beginPath();
-    c.moveTo(cx - 24, baseY - 144);
-    c.lineTo(cx + 24, baseY - 144);
-    c.lineTo(cx + 15, baseY - 88);
-    c.lineTo(cx - 15, baseY - 88);
-    c.closePath();
-    c.fill();
-    c.strokeStyle = '#e8ac3c';
-    c.lineWidth = 2.8;
-    c.stroke();
-    c.strokeStyle = INK;
-    c.lineWidth = 3.8;
-    c.stroke();
-
-    // Sharp angular spiked shoulder blades (NOT round balls!)
-    for (const dir of [-1, 1] as const) {
-      c.fillStyle = '#2d123b';
+    // Armored Warrior Legs & Thigh-High Obsidian Boots (sleek athletic silhouette, NO triangle dress!)
+    for (const [lx, rx] of [
+      [cx - 18, cx - 5],
+      [cx + 6, cx + 22],
+    ]) {
+      c.fillStyle = '#190c24';
       c.beginPath();
-      c.moveTo(cx + dir * 14, baseY - 142);
-      c.lineTo(cx + dir * 48, baseY - 154);
-      c.lineTo(cx + dir * 36, baseY - 126);
-      c.lineTo(cx + dir * 18, baseY - 128);
+      c.moveTo(lx, baseY - 76);
+      c.lineTo(rx, baseY - 76);
+      c.lineTo(rx + 2, baseY + 2);
+      c.lineTo(lx - 2, baseY + 2);
       c.closePath();
       c.fill();
       c.strokeStyle = INK;
@@ -1979,58 +2137,133 @@ function drawEnemiesAndBosses(ctx: CanvasRenderingContext2D): void {
       c.stroke();
     }
 
-    // Fierce alabaster angular visage & wild flowing dark-violet hair
-    const hy = baseY - 170;
-    c.fillStyle = '#dcd0e8';
+    // Flowing Asymmetric Tattered Crimson-Violet Battle Cloak & Hip Tassets
     c.beginPath();
-    c.moveTo(cx - 15, hy - 14);
-    c.quadraticCurveTo(cx, hy - 22, cx + 15, hy - 14);
-    c.lineTo(cx + 13, hy + 10);
-    c.lineTo(cx, hy + 20);
-    c.lineTo(cx - 13, hy + 10);
+    c.moveTo(cx - 24, baseY - 104);
+    c.lineTo(cx + 22, baseY - 104);
+    c.bezierCurveTo(cx + 46, baseY - 64, cx + 56, baseY - 26, cx + 44, baseY + 4);
+    c.lineTo(cx + 24, baseY - 26);
+    c.lineTo(cx + 2, baseY - 46);
+    c.lineTo(cx - 22, baseY - 16);
+    c.lineTo(cx - 46, baseY - 2);
+    c.bezierCurveTo(cx - 48, baseY - 46, cx - 34, baseY - 78, cx - 24, baseY - 104);
+    c.closePath();
+    const cloakG = c.createLinearGradient(cx - 44, baseY - 104, cx + 48, baseY);
+    cloakG.addColorStop(0, '#96123e');
+    cloakG.addColorStop(0.55, '#420926');
+    cloakG.addColorStop(1, '#120414');
+    c.fillStyle = cloakG;
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4.4;
+    c.stroke();
+
+    // Sculpted Obsidian Armor Corset + Gold Filigree Trim & Spiked Collar
+    c.fillStyle = '#1c0c26';
+    c.beginPath();
+    c.moveTo(cx - 22, baseY - 148);
+    c.lineTo(cx + 22, baseY - 148);
+    c.lineTo(cx + 14, baseY - 98);
+    c.lineTo(cx, baseY - 88);
+    c.lineTo(cx - 14, baseY - 98);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 4;
+    c.stroke();
+    // Gold V-breastplate filigree
+    c.strokeStyle = '#e5a93c';
+    c.lineWidth = 2.6;
+    c.beginPath();
+    c.moveTo(cx - 16, baseY - 140);
+    c.lineTo(cx, baseY - 104);
+    c.lineTo(cx + 16, baseY - 140);
+    c.stroke();
+
+    // Swept Spiked Obsidian Pauldron (asymmetric left battle-shoulder!)
+    c.fillStyle = '#2d123d';
+    c.beginPath();
+    c.moveTo(cx - 14, baseY - 146);
+    c.lineTo(cx - 48, baseY - 158);
+    c.lineTo(cx - 38, baseY - 130);
+    c.lineTo(cx - 16, baseY - 132);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 3.8;
+    c.stroke();
+
+    // Crackling Coiled Barbed Fury Whip in Extended Right Hand!
+    c.strokeStyle = INK;
+    c.lineWidth = 8.5;
+    c.beginPath();
+    c.moveTo(cx + 26, baseY - 118);
+    c.bezierCurveTo(cx + 124, baseY - 104, cx + 114, baseY - 10, cx + 44, baseY - 18);
+    c.stroke();
+    c.strokeStyle = '#ff2874';
+    c.lineWidth = 3.4;
+    c.stroke();
+
+    // Fierce Pale 3/4 Warrior Face + Cascading Wild Dark-Violet Hair Locks
+    const hy = baseY - 172;
+    c.fillStyle = '#140721';
+    c.beginPath();
+    c.moveTo(cx - 26, hy + 28);
+    c.bezierCurveTo(cx - 34, hy - 18, cx - 16, hy - 34, cx + 4, hy - 32);
+    c.bezierCurveTo(cx + 26, hy - 30, cx + 36, hy + 4, cx + 24, hy + 44);
     c.closePath();
     c.fill();
     c.strokeStyle = INK;
     c.lineWidth = 4;
     c.stroke();
 
-    c.fillStyle = '#150821';
+    c.fillStyle = '#dfd2eb';
     c.beginPath();
-    c.moveTo(cx - 22, hy + 18);
-    c.quadraticCurveTo(cx - 28, hy - 26, cx, hy - 30);
-    c.quadraticCurveTo(cx + 28, hy - 26, cx + 24, hy + 22);
-    c.lineTo(cx + 14, hy - 8);
-    c.lineTo(cx - 14, hy - 8);
-    c.closePath();
-    c.fill();
-    c.stroke();
-
-    // Curved dark-gold twin-horned Fury crown
-    c.fillStyle = '#ebae38';
-    c.beginPath();
-    c.moveTo(cx - 18, hy - 16);
-    c.quadraticCurveTo(cx - 32, hy - 36, cx - 26, hy - 54);
-    c.quadraticCurveTo(cx - 14, hy - 34, cx - 6, hy - 22);
-    c.lineTo(cx, hy - 36);
-    c.lineTo(cx + 6, hy - 22);
-    c.quadraticCurveTo(cx + 14, hy - 34, cx + 26, hy - 54);
-    c.quadraticCurveTo(cx + 32, hy - 36, cx + 18, hy - 16);
+    c.moveTo(cx - 13, hy - 12);
+    c.quadraticCurveTo(cx, hy - 20, cx + 13, hy - 12);
+    c.lineTo(cx + 11, hy + 9);
+    c.lineTo(cx - 1, hy + 19);
+    c.lineTo(cx - 12, hy + 8);
     c.closePath();
     c.fill();
     c.strokeStyle = INK;
     c.lineWidth = 3.6;
     c.stroke();
 
-    // Fierce blazing crimson slit eyes
-    c.fillStyle = '#ff1f5a';
+    // Sweeping dark side-bang framing temple
+    c.fillStyle = '#1b0a2b';
     c.beginPath();
-    c.moveTo(cx - 11, hy - 3);
-    c.lineTo(cx - 3, hy);
-    c.lineTo(cx - 10, hy + 2);
+    c.moveTo(cx - 14, hy - 14);
+    c.quadraticCurveTo(cx + 4, hy - 24, cx + 18, hy - 6);
+    c.lineTo(cx + 12, hy + 14);
+    c.lineTo(cx + 6, hy - 6);
     c.closePath();
-    c.moveTo(cx + 11, hy - 3);
-    c.lineTo(cx + 3, hy);
-    c.lineTo(cx + 10, hy + 2);
+    c.fill();
+
+    // Curved Swept Obsidian-and-Gold Twin Fury Horns (gothic & menacing, NO cartoon paper crown!)
+    c.fillStyle = '#d99e36';
+    c.strokeStyle = INK;
+    c.lineWidth = 3.4;
+    for (const dir of [-1, 1] as const) {
+      c.beginPath();
+      c.moveTo(cx + dir * 8, hy - 16);
+      c.quadraticCurveTo(cx + dir * 28, hy - 30, cx + dir * 24, hy - 54);
+      c.quadraticCurveTo(cx + dir * 16, hy - 34, cx + dir * 2, hy - 20);
+      c.closePath();
+      c.fill();
+      c.stroke();
+    }
+
+    // Fierce blazing crimson Fury eyes
+    c.fillStyle = '#ff1c5e';
+    c.beginPath();
+    c.moveTo(cx - 10, hy - 3);
+    c.lineTo(cx - 2, hy);
+    c.lineTo(cx - 9, hy + 2);
+    c.closePath();
+    c.moveTo(cx + 9, hy - 3);
+    c.lineTo(cx + 2, hy);
+    c.lineTo(cx + 8, hy + 2);
     c.closePath();
     c.fill();
   });
