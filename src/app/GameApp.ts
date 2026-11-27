@@ -141,9 +141,8 @@ export class GameApp {
     boonSelectIndex: null as number | null,
   };
 
-  // Buffered SimEvents retained until HudOverlay.processToasts() consumes them on ui.update()
+  // Buffered SimEvents passed to UiManager.update(..., drainedEvents) for HUD toasts
   private pendingUiEvents: SimEvent[] = [];
-  private lastUiToastTick = -1;
 
   private readonly handleResizeBound: () => void;
   private readonly handleGestureUnlockBound: () => void;
@@ -624,32 +623,22 @@ export class GameApp {
     }
 
     // 6. Always update UI when rendering OR when a menu/debug input edge occurred
-    if (shouldRender || hasAnyMenuNav(uiMenuNav)) {
+    if (shouldRender || hasAnyMenuNav(uiMenuNav) || this.pendingUiEvents.length > 0) {
       const renderStats = this.renderer.getStats();
       const hash = this.ui.isDebugDrawerOpen() ? hashSimState(this.state) : '';
-      let uiState = this.state;
-      if (this.pendingUiEvents.length > 0 && this.state.tick !== this.lastUiToastTick) {
-        uiState = { ...this.state, events: this.pendingUiEvents };
-        this.lastUiToastTick = this.state.tick;
-        this.ui.update(
-          uiState,
-          this.screen,
-          this.input.getActiveSource(),
-          renderStats,
-          uiMenuNav,
-          hash
-        );
+      const drainedForUi = this.pendingUiEvents.length > 0 ? this.pendingUiEvents : undefined;
+      if (drainedForUi) {
         this.pendingUiEvents = [];
-      } else {
-        this.ui.update(
-          uiState,
-          this.screen,
-          this.input.getActiveSource(),
-          renderStats,
-          uiMenuNav,
-          hash
-        );
       }
+      this.ui.update(
+        this.state,
+        this.screen,
+        this.input.getActiveSource(),
+        renderStats,
+        uiMenuNav,
+        hash,
+        drainedForUi
+      );
     }
   }
 }
