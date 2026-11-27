@@ -16,6 +16,7 @@ export interface DebugDrawerCallbacks {
   getDebugBridge(): DebugBridge | null;
   onToggleGodMode(enabled: boolean): void;
   onResetSave(): void;
+  onOpenScreen?(screen: import('../contracts/index.js').ScreenId): void;
 }
 
 const PATRON_ORDER: readonly PatronId[] = [
@@ -88,8 +89,11 @@ export class DebugDrawer {
       { label: 'Obsidian Pit', run: (b) => b.warpBiome('obsidian_pit' as BiomeId, 1) },
       { label: 'Warden Malice', run: (b) => b.warpBoss('warden_malice' as BossId) },
       { label: 'Cinder Mire', run: (b) => b.warpBiome('cinder_mire' as BiomeId, 1) },
+      { label: 'Bone Leviathan', run: (b) => b.warpBoss('bone_leviathan' as BossId) },
       { label: 'Verdant Colosseum', run: (b) => b.warpBiome('verdant_colosseum' as BiomeId, 1) },
+      { label: 'Champions', run: (b) => b.warpBoss('colosseum_bull' as BossId) },
       { label: 'Crypt of Bile', run: (b) => b.warpBiome('crypt_of_bile' as BiomeId, 1) },
+      { label: 'The Ferryman', run: (b) => b.warpBoss('the_ferryman' as BossId) },
       { label: 'Sovereign Lord', run: (b) => b.warpBoss('sovereign_lord' as BossId) },
     ];
     for (const target of warpTargets) {
@@ -188,6 +192,26 @@ export class DebugDrawer {
 
     toolsGrid.append(this.godModeBtn, this.touchToggleBtn, this.gamepadSimBtn, killAllBtn, healBtn, resetBtn);
 
+    // 5. Open Wave 2 Modals (Hub Meta, Shop, Codex)
+    const modalTitle = this.makeSectionTitle('Sanctum Modals');
+    const modalGrid = document.createElement('div');
+    modalGrid.className = 'kh-debug-btn-grid';
+    const modalTargets: { label: string; screen: import('../contracts/index.js').ScreenId }[] = [
+      { label: 'Weapons', screen: 'weapon_menu' },
+      { label: 'Mirror', screen: 'mirror_menu' },
+      { label: 'Shrine', screen: 'shrine_menu' },
+      { label: 'Keepsakes', screen: 'keepsake_menu' },
+      { label: 'Shop', screen: 'shop_menu' },
+      { label: 'Codex', screen: 'codex_menu' },
+    ];
+    for (const target of modalTargets) {
+      modalGrid.appendChild(
+        this.makeActionBtn(target.label, () => {
+          this.callbacks.onOpenScreen?.(target.screen);
+        })
+      );
+    }
+
     this.root.append(
       head,
       this.telemetryEl,
@@ -198,7 +222,9 @@ export class DebugDrawer {
       weaponTitle,
       weaponGrid,
       toolsTitle,
-      toolsGrid
+      toolsGrid,
+      modalTitle,
+      modalGrid
     );
     uiRoot.appendChild(this.root);
   }

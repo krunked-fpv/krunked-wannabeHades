@@ -8,6 +8,9 @@ export interface GamepadMenuNav {
   confirm: boolean;
   back: boolean;
   pause: boolean;
+  codex?: boolean;
+  tabPrev?: boolean;
+  tabNext?: boolean;
 }
 
 export interface GamepadPollResult {
@@ -149,6 +152,9 @@ function createEmptyResult(): GamepadPollResult {
       confirm: false,
       back: false,
       pause: false,
+      codex: false,
+      tabPrev: false,
+      tabNext: false,
     },
   };
 }
@@ -477,6 +483,9 @@ export class GamepadAdapter {
       confirm: dashPressed, // Xbox A
       back: castPressed, // Xbox B
       pause: pausePressed, // Xbox Start
+      codex: codexPressed, // Xbox LB
+      tabPrev: codexPressed, // Xbox LB
+      tabNext: interactPressed, // Xbox RB
     };
 
     return out;

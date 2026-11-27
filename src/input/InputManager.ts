@@ -11,6 +11,9 @@ export interface MenuNavInput {
   back: boolean;
   pause: boolean;
   toggleDebug: boolean;
+  codex?: boolean;
+  tabPrev?: boolean;
+  tabNext?: boolean;
 }
 
 export interface InputPollContext {
@@ -25,6 +28,7 @@ const MOUSE_SWITCH_DISTANCE_PX = 6;
 
 const PREVENT_DEFAULT_CODES = new Set([
   'Space',
+  'Tab',
   'ArrowUp',
   'ArrowDown',
   'ArrowLeft',
@@ -42,6 +46,9 @@ function createEmptyMenuNav(): MenuNavInput {
     back: false,
     pause: false,
     toggleDebug: false,
+    codex: false,
+    tabPrev: false,
+    tabNext: false,
   };
 }
 
@@ -355,6 +362,9 @@ export class InputManager {
     this.pendingMenuNav.back = this.pendingMenuNav.back || src.back;
     this.pendingMenuNav.pause = this.pendingMenuNav.pause || src.pause;
     this.pendingMenuNav.toggleDebug = this.pendingMenuNav.toggleDebug || src.toggleDebug;
+    this.pendingMenuNav.codex = Boolean(this.pendingMenuNav.codex || src.codex);
+    this.pendingMenuNav.tabPrev = Boolean(this.pendingMenuNav.tabPrev || src.tabPrev);
+    this.pendingMenuNav.tabNext = Boolean(this.pendingMenuNav.tabNext || src.tabNext);
   }
 
   private clearKbPressed(): void {
@@ -462,6 +472,18 @@ export class InputManager {
         break;
       case 'F9':
         this.kbMenuNav.toggleDebug = true;
+        break;
+      case 'Tab':
+      case 'KeyC':
+        this.kbMenuNav.codex = true;
+        break;
+      case 'BracketLeft':
+      case 'PageUp':
+        this.kbMenuNav.tabPrev = true;
+        break;
+      case 'BracketRight':
+      case 'PageDown':
+        this.kbMenuNav.tabNext = true;
         break;
       case 'Digit1':
       case 'Numpad1':

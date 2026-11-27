@@ -152,6 +152,12 @@ export class HudOverlay {
   private activeToasts: ActiveToast[] = [];
   private lastProcessedTick = -1;
 
+  // Hub Courtyard Quick-Dock Bar
+  private readonly hubDock: HTMLElement;
+  private readonly dockCodexKeyEl: HTMLSpanElement;
+  private readonly onOpenScreen?: (screen: ScreenId) => void;
+  private isHubActive = false;
+
   // Dirty-checking caches for zero-churn 120fps updates
   private lastBoonsKey = '';
   private lastDdKey = '';
@@ -159,7 +165,34 @@ export class HudOverlay {
   private lastDashKey = '';
   private lastPromptKey = '';
 
-  constructor(uiRoot: HTMLElement) {
+  private readonly onHubKeyDown = (ev: KeyboardEvent): void => {
+    if (!this.isHubActive || !this.onOpenScreen) {
+      return;
+    }
+    const target = ev.target as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')
+    ) {
+      return;
+    }
+    if (ev.code === 'Digit1' || ev.code === 'Numpad1') {
+      ev.preventDefault();
+      this.onOpenScreen('weapon_menu');
+    } else if (ev.code === 'Digit2' || ev.code === 'Numpad2') {
+      ev.preventDefault();
+      this.onOpenScreen('mirror_menu');
+    } else if (ev.code === 'Digit3' || ev.code === 'Numpad3') {
+      ev.preventDefault();
+      this.onOpenScreen('shrine_menu');
+    } else if (ev.code === 'Digit4' || ev.code === 'Numpad4') {
+      ev.preventDefault();
+      this.onOpenScreen('keepsake_menu');
+    }
+  };
+
+  constructor(uiRoot: HTMLElement, onOpenScreen?: (screen: ScreenId) => void) {
+    this.onOpenScreen = onOpenScreen;
     this.root = document.createElement('div');
     this.root.className = 'kh-hud kh-hidden';
     this.root.setAttribute('data-hud-root', 'true');
@@ -292,8 +325,50 @@ export class HudOverlay {
     this.toastContainer = document.createElement('div');
     this.toastContainer.className = 'kh-toast-container';
 
+    // Hub Courtyard Quick-Dock Bar (Weapons / Mirror / Shrine / Keepsakes / Codex)
+    this.hubDock = document.createElement('nav');
+    this.hubDock.className = 'kh-hub-dock kh-hidden';
+    this.hubDock.setAttribute('aria-label', 'Courtyard Sanctum Stations');
+    this.hubDock.setAttribute('data-hub-dock', 'true');
+
+    const dockItems: { screen: ScreenId; label: string; hotkey: string }[] = [
+      { screen: 'weapon_menu', label: 'ARMS', hotkey: '1' },
+      { screen: 'mirror_menu', label: 'MIRROR', hotkey: '2' },
+      { screen: 'shrine_menu', label: 'SHRINE', hotkey: '3' },
+      { screen: 'keepsake_menu', label: 'KEEPSAKES', hotkey: '4' },
+      { screen: 'codex_menu', label: 'CODEX', hotkey: 'TAB' },
+    ];
+
+    let codexKeySpan: HTMLSpanElement | null = null;
+    for (const item of dockItems) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'kh-dock-btn';
+      btn.dataset.dockScreen = item.screen;
+
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = item.label;
+
+      const keySpan = document.createElement('span');
+      keySpan.className = 'kh-dock-hotkey';
+      keySpan.textContent = item.hotkey;
+      if (item.screen === 'codex_menu') {
+        codexKeySpan = keySpan;
+      }
+
+      btn.append(labelSpan, keySpan);
+      btn.addEventListener('click', () => this.onOpenScreen?.(item.screen));
+      this.hubDock.appendChild(btn);
+    }
+    this.dockCodexKeyEl = codexKeySpan as HTMLSpanElement;
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', this.onHubKeyDown);
+    }
+
     this.root.append(
       this.bossStack,
+      this.hubDock,
       this.topRight,
       bottomLeft,
       this.promptStrip,
@@ -317,6 +392,15 @@ export class HudOverlay {
       screen === 'boon_select';
 
     this.root.classList.toggle('kh-hidden', !showHud);
+    this.isHubActive = screen === 'hub';
+    this.hubDock.classList.toggle('kh-hidden', !this.isHubActive);
+    if (this.isHubActive) {
+      const codexGlyph = activeSource === 'gamepad' ? 'LB' : 'TAB';
+      if (this.dockCodexKeyEl.textContent !== codexGlyph) {
+        this.dockCodexKeyEl.textContent = codexGlyph;
+      }
+    }
+
     if (!showHud) {
       return;
     }
@@ -448,6 +532,9 @@ export class HudOverlay {
   }
 
   public dispose(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('keydown', this.onHubKeyDown);
+    }
     this.activeToasts = [];
     this.root.remove();
   }
@@ -734,6 +821,7 @@ export class HudOverlay {
       if (nearInteractable) {
         appendChip('RB', 'kh-xbox-btn kh-xbox-bumper', 'Use', true);
       }
+      appendChip('LB', 'kh-xbox-btn kh-xbox-bumper', 'Codex');
     } else {
       appendChip('WASD', 'kh-keycap', 'Move');
       appendChip('LMB', 'kh-keycap', 'Attack');
@@ -747,6 +835,7 @@ export class HudOverlay {
       if (nearInteractable) {
         appendChip('E', 'kh-keycap', 'Use', true);
       }
+      appendChip('TAB', 'kh-keycap', 'Codex');
     }
   }
 

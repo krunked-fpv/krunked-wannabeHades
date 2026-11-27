@@ -459,13 +459,6 @@ export class PauseAndOptionsModal {
         return 'victory';
       case 'death':
         return 'death';
-      case 'weapon_menu':
-      case 'mirror_menu':
-      case 'shrine_menu':
-      case 'keepsake_menu':
-      case 'shop_menu':
-      case 'codex_menu':
-        return 'submenu';
       default:
         return 'none';
     }

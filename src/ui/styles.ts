@@ -637,7 +637,7 @@ export const MYTHIC_UI_CSS = `
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
-  max-width: 44vw;
+  max-width: 54vw;
 }
 
 .kh-prompt-chip {
@@ -1544,7 +1544,7 @@ export const MYTHIC_UI_CSS = `
   }
   .kh-toast-container {
     top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
-    max-width: 31vw;
+    max-width: min(244px, 29vw);
   }
   .kh-hud.kh-has-boss .kh-toast-container {
     top: max(70px, calc(env(safe-area-inset-top, 0px) + 66px));
@@ -1552,8 +1552,11 @@ export const MYTHIC_UI_CSS = `
   .kh-toast {
     padding: 4px 10px;
     font-size: 10.5px;
-    letter-spacing: 0.06em;
-    max-width: 31vw;
+    letter-spacing: 0.05em;
+    max-width: min(244px, 29vw);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .kh-hero-frame {
     padding: 7px 9px;
@@ -1572,6 +1575,543 @@ export const MYTHIC_UI_CSS = `
     grid-template-columns: 1fr;
   }
   .kh-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ============================================================================
+   WAVE 2 HUB COURTYARD QUICK-DOCK & META MODALS
+   ============================================================================ */
+
+.kh-hub-dock {
+  position: fixed;
+  top: max(12px, calc(env(safe-area-inset-top, 0px) + 8px));
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(19, 14, 30, 0.9) 0%, rgba(10, 8, 17, 0.94) 100%);
+  border: 1.5px solid rgba(217, 159, 76, 0.58);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.62);
+  pointer-events: auto;
+  z-index: 15;
+}
+
+.kh-hud.kh-touch-active .kh-hub-dock {
+  top: auto;
+  bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 8px));
+  padding: 4px 6px;
+  gap: 4px;
+}
+
+.kh-dock-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  min-width: 48px;
+  padding: 6px 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(217, 159, 76, 0.42);
+  background: rgba(25, 19, 38, 0.92);
+  color: var(--kh-ivory);
+  font-family: var(--kh-font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.kh-dock-btn:hover,
+.kh-dock-btn:focus-visible {
+  outline: 2px solid var(--kh-gold-bright);
+  border-color: var(--kh-gold-bright);
+  background: rgba(74, 36, 52, 0.95);
+  color: #fff8e6;
+}
+
+.kh-dock-hotkey {
+  font-family: var(--kh-font-sans);
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: rgba(8, 6, 14, 0.86);
+  border: 1px solid rgba(245, 203, 112, 0.5);
+  color: var(--kh-gold-bright);
+}
+
+.kh-hud.kh-touch-active .kh-dock-hotkey {
+  display: none;
+}
+
+/* Shared Wave 2 Meta Modal Shell */
+.kh-meta-shell {
+  width: min(1040px, 95vw);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px;
+  border-radius: 5px;
+  background: linear-gradient(165deg, rgba(21, 15, 32, 0.97) 0%, rgba(10, 8, 16, 0.98) 100%);
+  border: 2px solid var(--kh-gold);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.88), 0 0 38px rgba(217, 159, 76, 0.16);
+  overflow: hidden;
+}
+
+.kh-meta-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.kh-meta-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kh-meta-title {
+  margin: 0;
+  font-family: var(--kh-font-display);
+  font-size: clamp(18px, 2.4vw, 25px);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--kh-gold-bright);
+}
+
+.kh-meta-sub {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--kh-ash);
+}
+
+.kh-meta-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.kh-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 3px;
+  background: rgba(14, 10, 24, 0.92);
+  border: 1px solid rgba(217, 159, 76, 0.56);
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff4d8;
+}
+
+.kh-meta-pill-purple {
+  border-color: rgba(186, 122, 255, 0.72);
+  color: #e0b8ff;
+}
+
+.kh-meta-pill-crimson {
+  border-color: rgba(242, 84, 98, 0.75);
+  color: #ffb8be;
+  background: rgba(88, 16, 26, 0.55);
+}
+
+.kh-meta-pill-heat {
+  border-color: rgba(255, 134, 62, 0.85);
+  color: #ffd39e;
+  background: rgba(114, 34, 16, 0.62);
+}
+
+.kh-meta-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(217, 159, 76, 0.5) rgba(14, 10, 22, 0.6);
+}
+
+.kh-meta-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid rgba(217, 159, 76, 0.28);
+}
+
+.kh-meta-hint {
+  font-size: 11px;
+  color: var(--kh-ash);
+  letter-spacing: 0.05em;
+}
+
+/* Tab Strip (Weapons, Codex) */
+.kh-tab-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.kh-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 6px 14px;
+  border-radius: 3px;
+  border: 1.5px solid rgba(217, 159, 76, 0.36);
+  background: rgba(18, 14, 28, 0.9);
+  color: var(--kh-ash);
+  font-family: var(--kh-font-display);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.kh-tab-btn.kh-active {
+  border-color: var(--kh-gold-bright);
+  background: linear-gradient(180deg, rgba(108, 28, 42, 0.92) 0%, rgba(44, 15, 28, 0.95) 100%);
+  color: #fff6e0;
+  box-shadow: 0 0 14px rgba(245, 203, 112, 0.25);
+}
+
+.kh-tab-btn:hover,
+.kh-tab-btn.kh-focused {
+  outline: 2px solid var(--kh-gold-bright);
+  outline-offset: 1px;
+  color: #fff6e0;
+}
+
+/* Weapon Rack Modal */
+.kh-weapon-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 9px 14px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(217, 159, 76, 0.34);
+}
+
+.kh-weapon-stat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kh-aspect-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.kh-aspect-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 4px;
+  background: linear-gradient(145deg, rgba(27, 20, 42, 0.95) 0%, rgba(14, 11, 22, 0.97) 100%);
+  border: 1.5px solid rgba(217, 159, 76, 0.42);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.1s ease;
+}
+
+.kh-aspect-card.kh-equipped {
+  border-color: var(--kh-gold-bright);
+  box-shadow: inset 0 0 22px rgba(245, 203, 112, 0.14);
+}
+
+.kh-aspect-card.kh-focused {
+  outline: 2px solid var(--kh-gold-bright);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(245, 203, 112, 0.2);
+}
+
+.kh-aspect-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.kh-aspect-actions .kh-btn {
+  flex: 1;
+  min-height: 48px;
+  padding: 6px 12px;
+  font-size: 11px;
+}
+
+/* Mirror of Dusk Rows (Purple Side A <-> Gold Side B) */
+.kh-mirror-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.kh-mirror-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: rgba(22, 16, 34, 0.92);
+  border: 1.5px solid rgba(164, 96, 255, 0.48);
+  border-left-width: 5px;
+  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.kh-mirror-row[data-side="b"] {
+  border-color: rgba(243, 196, 88, 0.56);
+  background: rgba(30, 22, 20, 0.92);
+}
+
+.kh-mirror-row.kh-disabled-row {
+  opacity: 0.48;
+  filter: grayscale(0.5);
+}
+
+.kh-mirror-row.kh-focused {
+  outline: 2px solid var(--kh-gold-bright);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px rgba(245, 203, 112, 0.22);
+}
+
+.kh-mirror-side-btn {
+  min-width: 88px;
+  min-height: 48px;
+  padding: 6px 10px;
+  border-radius: 3px;
+  border: 1.5px solid #b475ff;
+  background: rgba(98, 42, 166, 0.42);
+  color: #ebd4ff;
+  font-family: var(--kh-font-display);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.kh-mirror-side-btn[data-side="b"] {
+  border-color: #f5cb70;
+  background: rgba(168, 118, 28, 0.4);
+  color: #fff3cb;
+}
+
+/* Shrine of Torment Rows */
+.kh-shrine-callouts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kh-shrine-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.kh-shrine-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 11px;
+  border-radius: 4px;
+  background: rgba(22, 15, 26, 0.92);
+  border: 1.5px solid rgba(217, 159, 76, 0.32);
+}
+
+.kh-shrine-row.kh-active-vow {
+  border-color: rgba(255, 118, 62, 0.78);
+  background: linear-gradient(120deg, rgba(64, 22, 20, 0.9) 0%, rgba(22, 14, 24, 0.95) 100%);
+}
+
+.kh-shrine-row.kh-focused {
+  outline: 2px solid var(--kh-gold-bright);
+  outline-offset: 1px;
+}
+
+.kh-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.kh-step-btn {
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 3px;
+  border: 1px solid rgba(217, 159, 76, 0.56);
+  background: rgba(16, 12, 24, 0.94);
+  color: var(--kh-gold-bright);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.kh-step-btn:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+}
+
+.kh-step-rank {
+  min-width: 34px;
+  text-align: center;
+  font-family: var(--kh-font-display);
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff3d4;
+}
+
+/* Keepsake Cabinet Grid */
+.kh-keepsake-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.kh-keepsake-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 118px;
+  padding: 10px 11px;
+  text-align: left;
+  border-radius: 4px;
+  background: linear-gradient(155deg, rgba(26, 20, 40, 0.94) 0%, rgba(13, 10, 22, 0.96) 100%);
+  border: 1.5px solid rgba(217, 159, 76, 0.38);
+  color: var(--kh-ivory);
+  cursor: pointer;
+  transition: transform 0.1s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.kh-keepsake-card.kh-equipped {
+  border-color: var(--kh-gold-bright);
+  box-shadow: inset 0 0 18px rgba(245, 203, 112, 0.2), 0 0 14px rgba(245, 203, 112, 0.25);
+}
+
+.kh-keepsake-card.kh-locked {
+  opacity: 0.44;
+  cursor: not-allowed;
+}
+
+.kh-keepsake-card.kh-focused,
+.kh-keepsake-card:hover:not(.kh-locked) {
+  outline: 2px solid var(--kh-gold-bright);
+  outline-offset: 2px;
+  transform: translateY(-1px);
+}
+
+/* Shop & Codex Cards */
+.kh-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.kh-shop-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 76px;
+  padding: 12px 14px;
+  border-radius: 4px;
+  background: linear-gradient(120deg, rgba(26, 20, 42, 0.95) 0%, rgba(13, 10, 22, 0.97) 100%);
+  border: 1.5px solid rgba(217, 159, 76, 0.48);
+  color: var(--kh-ivory);
+  text-align: left;
+  cursor: pointer;
+}
+
+.kh-shop-card.kh-borrow-card {
+  border-color: rgba(255, 84, 96, 0.8);
+  background: linear-gradient(120deg, rgba(84, 18, 28, 0.9) 0%, rgba(28, 12, 22, 0.96) 100%);
+}
+
+.kh-shop-card.kh-unaffordable {
+  opacity: 0.52;
+}
+
+.kh-shop-card.kh-focused,
+.kh-shop-card:hover:not(:disabled) {
+  outline: 2px solid var(--kh-gold-bright);
+  outline-offset: 2px;
+}
+
+.kh-codex-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.kh-codex-entry {
+  padding: 9px 11px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(217, 159, 76, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+@media (max-height: 500px) {
+  .kh-meta-shell {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+  .kh-dock-btn {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+  .kh-keepsake-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .kh-keepsake-card {
+    min-height: 86px;
+    padding: 7px 8px;
+  }
+}
+
+@media (max-width: 820px) {
+  .kh-aspect-grid,
+  .kh-shrine-grid,
+  .kh-shop-grid {
+    grid-template-columns: 1fr;
+  }
+  .kh-keepsake-grid,
+  .kh-codex-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
