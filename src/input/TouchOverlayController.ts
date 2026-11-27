@@ -72,11 +72,11 @@ const TOUCH_OVERLAY_CSS = `
   opacity: 0.16;
 }
 
-/* Left 45% dynamic floating thumbstick zone */
+/* Left 45% dynamic floating thumbstick zone (stays cleanly below top-left Hero HUD) */
 .kh-touch-stick-zone {
   position: fixed;
   left: env(safe-area-inset-left, 0px);
-  top: max(68px, env(safe-area-inset-top, 0px));
+  top: max(168px, calc(env(safe-area-inset-top, 0px) + 156px));
   bottom: env(safe-area-inset-bottom, 0px);
   width: 45vw;
   pointer-events: auto;
@@ -319,6 +319,9 @@ const TOUCH_OVERLAY_CSS = `
 
 /* Compact Mobile Landscape (e.g. 844x390) */
 @media (max-height: 500px) {
+  .kh-touch-stick-zone {
+    top: max(142px, calc(env(safe-area-inset-top, 0px) + 134px));
+  }
   .kh-touch-stick-base {
     width: 110px;
     height: 110px;
@@ -893,8 +896,9 @@ export class TouchOverlayController {
     const pad = 64;
     const w = window.innerWidth || 1280;
     const h = window.innerHeight || 720;
+    const minTopY = h <= 500 ? 186 : 226;
     this.stickOriginX = Math.max(pad, Math.min(w * 0.45 - 24, ev.clientX));
-    this.stickOriginY = Math.max(pad + 36, Math.min(h - pad, ev.clientY));
+    this.stickOriginY = Math.max(minTopY, Math.min(h - pad, ev.clientY));
     this.stickBase.style.left = `${this.stickOriginX}px`;
     this.stickBase.style.top = `${this.stickOriginY}px`;
     this.stickBase.classList.add('kh-active');

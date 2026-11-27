@@ -307,7 +307,8 @@ export class HudOverlay {
     state: SimState,
     screen: ScreenId,
     activeSource: InputSource,
-    renderStats: HudRenderStats
+    renderStats: HudRenderStats,
+    drainedEvents?: readonly SimEvent[]
   ): void {
     const showHud =
       screen === 'hub' ||
@@ -325,7 +326,8 @@ export class HudOverlay {
     const room = state.room;
     const biome = BIOME_CONSTANTS[room.biome];
 
-    // Shift top-right slightly left when touch pause pill is active in top-right
+    // Relocate Hero HUD + Boons to top-left & shift top-right away from pause pill when touch is active
+    this.root.classList.toggle('kh-touch-active', activeSource === 'touch');
     this.topRight.classList.toggle('kh-touch-offset', activeSource === 'touch');
 
     // Top-right Biome & Chamber Depth
@@ -442,7 +444,7 @@ export class HudOverlay {
     );
 
     // Mythic event toasts
-    this.processToasts(state.tick, state.events);
+    this.processToasts(state.tick, state.events, drainedEvents);
   }
 
   public dispose(): void {
@@ -653,7 +655,10 @@ export class HudOverlay {
 
       const hpText = document.createElement('div');
       hpText.className = 'kh-boss-hp-text';
-      hpText.textContent = `${Math.ceil(boss.hp)} / ${Math.ceil(boss.maxHp)}`;
+      const hpPill = document.createElement('span');
+      hpPill.className = 'kh-boss-hp-pill';
+      hpPill.textContent = `${Math.ceil(boss.hp)} / ${Math.ceil(boss.maxHp)}`;
+      hpText.appendChild(hpPill);
       hpTrack.appendChild(hpText);
 
       card.appendChild(hpTrack);
@@ -744,7 +749,11 @@ export class HudOverlay {
     }
   }
 
-  private processToasts(tick: number, events: readonly SimEvent[]): void {
+  private processToasts(
+    tick: number,
+    stateEvents: readonly SimEvent[],
+    drainedEvents?: readonly SimEvent[]
+  ): void {
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
     // Expire old toasts
@@ -760,12 +769,19 @@ export class HudOverlay {
       this.activeToasts = remaining;
     }
 
-    if (tick === this.lastProcessedTick) {
-      return;
+    let eventsToShow: readonly SimEvent[];
+    if (drainedEvents && drainedEvents.length > 0) {
+      eventsToShow = drainedEvents;
+      this.lastProcessedTick = tick;
+    } else {
+      if (tick === this.lastProcessedTick) {
+        return;
+      }
+      this.lastProcessedTick = tick;
+      eventsToShow = stateEvents;
     }
-    this.lastProcessedTick = tick;
 
-    for (const ev of events) {
+    for (const ev of eventsToShow) {
       if (ev.type === 'ui_toast') {
         this.pushToast(ev.text, ev.colorHex ?? '#f5cb70', now);
       } else if (ev.type === 'room_cleared') {
