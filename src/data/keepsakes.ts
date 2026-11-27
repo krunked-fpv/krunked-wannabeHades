@@ -34,17 +34,8 @@ export const KEEPSAKE_ORDER: readonly KeepsakeId[] = [
   'frostbitten_horn',
 ] as const;
 
-export const STARTER_UNLOCKED_KEEPSAKES: readonly KeepsakeId[] = [
-  'old_collar',
-  'lucky_fang',
-  'coin_pouch',
-  'evergreen_acorn',
-  'shattered_shackle',
-  'thunder_signet',
-  'conch_shell',
-  'owl_pendant',
-  'eternal_rose',
-] as const;
+/** All 16 Keepsakes unlocked cleanly for full Wave 2 hub selection & testing. */
+export const STARTER_UNLOCKED_KEEPSAKES: readonly KeepsakeId[] = [...KEEPSAKE_ORDER];
 
 export const KEEPSAKE_META: Record<KeepsakeId, KeepsakeMetaInfo> = {
   old_collar: { id: 'old_collar', category: 'defense', accentHex: '#d94c4c' },

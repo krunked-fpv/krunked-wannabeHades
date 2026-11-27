@@ -9,6 +9,7 @@ import {
   type BoonOfferOption,
   type BoonRarity,
   type BoonSlot,
+  type ChaosCurse,
   type EnemyState,
   type HammerId,
   type PatronId,
@@ -18,8 +19,10 @@ import {
 import {
   BOON_CATALOG,
   BOON_CATALOG_BY_ID,
+  CHAOS_CURSE_TEMPLATES,
   CORE_BOON_SLOTS,
-  WAVE1_PATRONS,
+  STANDARD_PATRONS,
+  WELL_OF_ASH_ITEMS,
   computeBoonScaledValue,
   formatBoonDescription,
   formatBoonValue,
@@ -37,30 +40,124 @@ import {
   detNextInt,
   detPick,
   getEffectiveMirrorUpgrade,
+  getHealingMultiplier,
   getKeepsakeRank,
+  getShopPriceMultiplier,
+  getWellBonusEncounters,
   type RngProvider,
   type SimCombatContext,
 } from './meta.js';
 
 // ============================================================================
-// Internal Call Runtime Tracker (WeakMap avoids mutating SimState shape)
+// Internal Runtime Trackers (WeakMap keeps SimState 100% pure & serializable)
 // ============================================================================
 
-interface GodCallRuntime {
-  lastSeenTimer: number;
-  greater: boolean;
-  pulseAccumulator: number;
+interface BoonRuntimeState {
+  lastSeenCallTimer: number;
+  greaterCall: boolean;
+  callPulseAcc: number;
+  deadlyReversalTimer: number;
+  vengefulMoodAcc: number;
+  lightningRodAcc: number;
+  killingFreezeAcc: number;
+  hyperSprintTimer: number;
+  /** Pending Chaos curses generated for the active pendingOffer */
+  pendingChaosMap: Map<string, ChaosCurse>;
+  /** Pending Well-of-Ash gold costs for active offer */
+  pendingWellCostMap: Map<string, number>;
+  /** Temporary Well of Ash encounter buffs */
+  wellBuffs: Array<{
+    effectKind: 'heal' | 'attack_buff' | 'special_buff' | 'cast_buff';
+    magnitude: number;
+    encountersLeft: number;
+  }>;
+  /** Permanent Strong Drink fountain damage stacks */
+  strongDrinkStacks: number;
 }
 
-const godCallStateMap = new WeakMap<SimState, GodCallRuntime>();
+const boonRuntimeMap = new WeakMap<SimState, BoonRuntimeState>();
 
-function getGodCallRuntime(state: SimState): GodCallRuntime {
-  let rt = godCallStateMap.get(state);
+function getBoonRuntime(state: SimState): BoonRuntimeState {
+  let rt = boonRuntimeMap.get(state);
   if (!rt) {
-    rt = { lastSeenTimer: 0, greater: false, pulseAccumulator: 0 };
-    godCallStateMap.set(state, rt);
+    rt = {
+      lastSeenCallTimer: 0,
+      greaterCall: false,
+      callPulseAcc: 0,
+      deadlyReversalTimer: 0,
+      vengefulMoodAcc: 0,
+      lightningRodAcc: 0,
+      killingFreezeAcc: 0,
+      hyperSprintTimer: 0,
+      pendingChaosMap: new Map(),
+      pendingWellCostMap: new Map(),
+      wellBuffs: [],
+      strongDrinkStacks: 0,
+    };
+    boonRuntimeMap.set(state, rt);
   }
   return rt;
+}
+
+export function onChamberEnteredBoons(state: SimState): void {
+  const rt = getBoonRuntime(state);
+
+  // Veloce Side Hustle (+Gold on every chamber entry)
+  const sideHustle = getBoonById(state, 'veloce_side_hustle');
+  if (sideHustle && !state.player.chaosCurses.some((c) => c.curseKind === 'no_gold_gain')) {
+    const gain = Math.round(sideHustle.scaledValue);
+    state.player.gold += gain;
+  }
+
+  // Well of Ash encounter buffs tick down
+  for (let i = rt.wellBuffs.length - 1; i >= 0; i--) {
+    const buff = rt.wellBuffs[i];
+    if (buff.effectKind === 'heal') {
+      const heal = Math.round(10 * getHealingMultiplier(state.run.vows));
+      if (heal > 0) {
+        state.player.hp = Math.min(state.player.maxHp, state.player.hp + heal);
+      }
+    }
+    buff.encountersLeft -= 1;
+    if (buff.encountersLeft <= 0) {
+      rt.wellBuffs.splice(i, 1);
+    }
+  }
+}
+
+export function onChamberClearedBoons(state: SimState): void {
+  // Bacchion After Party: restore up to 35%+ HP after clearing any combat encounter
+  const afterParty = getBoonById(state, 'bacchion_after_party');
+  if (afterParty && !state.player.isDead) {
+    const targetHp = Math.round(state.player.maxHp * afterParty.scaledValue);
+    if (state.player.hp < targetHp) {
+      const gain = Math.round(
+        (targetHp - state.player.hp) * getHealingMultiplier(state.run.vows)
+      );
+      if (gain > 0) {
+        state.player.hp = Math.min(state.player.maxHp, state.player.hp + gain);
+        state.events.push({
+          type: 'ui_toast',
+          text: `After Party restored +${gain} HP!`,
+          colorHex: PATRON_CONSTANTS.bacchion.colorHex,
+        });
+      }
+    }
+  }
+}
+
+export function onFountainUsedBoons(state: SimState): boolean {
+  const strongDrink = getBoonById(state, 'bacchion_strong_drink');
+  if (!strongDrink) return false;
+  const rt = getBoonRuntime(state);
+  rt.strongDrinkStacks += 1;
+  state.player.hp = state.player.maxHp;
+  state.events.push({
+    type: 'ui_toast',
+    text: `Strong Drink: Full HP & +${Math.round(strongDrink.scaledValue * 100 * rt.strongDrinkStacks)}% Damage!`,
+    colorHex: PATRON_CONSTANTS.bacchion.colorHex,
+  });
+  return true;
 }
 
 // ============================================================================
@@ -181,8 +278,156 @@ function getOfferOptionCount(state: SimState): number {
 }
 
 // ============================================================================
-// Boon, Pom, and Hammer Offer Generation
+// Boon, Chaos, Pom, Hammer, Well of Ash & Underworld Customs Offer Generators
 // ============================================================================
+
+export function generateChaosOffer(
+  state: SimState,
+  ctx?: RngProvider,
+  excludeIds?: ReadonlySet<string>
+): BoonOffer {
+  const targetCount = getOfferOptionCount(state);
+  const rt = getBoonRuntime(state);
+  rt.pendingChaosMap.clear();
+
+  const chaosEntries = getBoonsForPatron('abyssos').filter((e) => !excludeIds?.has(e.id));
+  const pool = chaosEntries.length > 0 ? [...chaosEntries] : [...getBoonsForPatron('abyssos')];
+  const options: BoonOfferOption[] = [];
+
+  if (!state.run.seenPatrons.includes('abyssos')) {
+    state.run.seenPatrons.push('abyssos');
+  }
+
+  while (options.length < targetCount && pool.length > 0) {
+    const idx = detNextInt(state, 0, pool.length - 1, ctx);
+    const entry = pool.splice(idx, 1)[0];
+    const curseTpl = detPick(state, CHAOS_CURSE_TEMPLATES, ctx);
+    const encounters = detNextInt(
+      state,
+      curseTpl.minEncounters,
+      curseTpl.maxEncounters,
+      ctx
+    );
+    const rarity = rollBoonRarity(state, 'abyssos', ctx);
+    const blessing = instantiateBoon(entry, rarity, 1);
+    const optId = `chaos_${entry.id}_${state.tick}_${options.length}`;
+    const curseDesc = curseTpl.description.replace('{n}', String(encounters));
+
+    const curseObj: ChaosCurse = {
+      id: optId,
+      curseKind: curseTpl.curseKind,
+      curseMagnitude: curseTpl.magnitude,
+      encountersRemaining: encounters,
+      blessingBoon: blessing,
+    };
+    rt.pendingChaosMap.set(optId, curseObj);
+
+    const previewVal = formatBoonValue(blessing.scaledValue, entry.valueFormat);
+    options.push({
+      id: optId,
+      kind: 'chaos_blessing',
+      name: `${curseTpl.label} -> ${blessing.name}`,
+      description: `After ${encounters} encounters: ${blessing.description}`,
+      rarity,
+      patronId: 'abyssos',
+      slot: 'chaos',
+      boonId: entry.id,
+      previewValue: entry.valueFormat === 'percent' ? `+${previewVal}` : `+${previewVal}`,
+      curseDescription: curseDesc,
+      curseEncounters: encounters,
+    });
+  }
+
+  const offer: BoonOffer = {
+    source: 'chaos',
+    patronId: 'abyssos',
+    title: 'Abyssos, Primordial Void',
+    subtitle: 'Endure a Void Curse to Awaken Immense Power',
+    options,
+    rerollsRemaining: state.run.boonRerolls,
+  };
+  state.run.pendingOffer = offer;
+  state.events.push({ type: 'boon_offered', offer });
+  return offer;
+}
+
+export function generateWellOfAshOffer(
+  state: SimState,
+  ctx?: RngProvider,
+  hasLoyaltyCard = false
+): BoonOffer {
+  const targetCount = getOfferOptionCount(state);
+  const rt = getBoonRuntime(state);
+  rt.pendingWellCostMap.clear();
+
+  const priceMult = getShopPriceMultiplier(state.run.vows, hasLoyaltyCard);
+  const bonusEnc = getWellBonusEncounters(state);
+  const pool = [...WELL_OF_ASH_ITEMS];
+  const options: BoonOfferOption[] = [];
+
+  while (options.length < targetCount && pool.length > 0) {
+    const idx = detNextInt(state, 0, pool.length - 1, ctx);
+    const item = pool.splice(idx, 1)[0];
+    const cost = Math.round(item.costGold * priceMult);
+    const totalEnc = item.baseEncounters + (item.effectKind === 'defiance_refill' ? 0 : bonusEnc);
+    rt.pendingWellCostMap.set(item.id, cost);
+
+    options.push({
+      id: item.id,
+      kind: 'well_item',
+      name: `${item.name} (${cost}g)`,
+      description: item.description.replace('{n}', String(totalEnc)),
+      rarity: item.effectKind === 'defiance_refill' ? 'epic' : 'rare',
+      previewValue: `${cost} Gold`,
+    });
+  }
+
+  const offer: BoonOffer = {
+    source: 'well',
+    title: 'Well of Ash',
+    subtitle: 'Purchase Temporary Underworld Provisions',
+    options,
+    rerollsRemaining: state.run.boonRerolls,
+  };
+  state.run.pendingOffer = offer;
+  state.events.push({ type: 'boon_offered', offer });
+  return offer;
+}
+
+export function generateUnderworldCustomsPurgeOffer(
+  state: SimState,
+  ctx?: RngProvider
+): BoonOffer | null {
+  if (state.player.boons.length === 0) return null;
+  const pool = [...state.player.boons];
+  const options: BoonOfferOption[] = [];
+
+  while (options.length < 3 && pool.length > 0) {
+    const idx = detNextInt(state, 0, pool.length - 1, ctx);
+    const boon = pool.splice(idx, 1)[0];
+    options.push({
+      id: `purge_${boon.id}`,
+      kind: 'well_item',
+      name: `Purge ${boon.name} (+55g)`,
+      description: `Sacrifice ${boon.name} to satisfy Underworld Customs and claim +55 Gold.`,
+      rarity: boon.rarity,
+      patronId: boon.patronId,
+      boonId: boon.id,
+      previewValue: '+55 Gold',
+    });
+  }
+
+  const offer: BoonOffer = {
+    source: 'well',
+    title: 'Pool of Purging (Underworld Customs)',
+    subtitle: 'Purge 1 Blessing before entering the next Biome',
+    options,
+    rerollsRemaining: 0,
+  };
+  state.run.pendingOffer = offer;
+  state.events.push({ type: 'boon_offered', offer });
+  return offer;
+}
 
 export function generateBoonOffer(
   state: SimState,
@@ -190,8 +435,11 @@ export function generateBoonOffer(
   ctx?: RngProvider,
   excludeIds?: ReadonlySet<string>
 ): BoonOffer {
-  // Choose Patron (respecting Keepsake forced patron if unspecified)
-  let chosenPatron: PatronId = patronId ?? detPick(state, WAVE1_PATRONS, ctx);
+  if (patronId === 'abyssos') {
+    return generateChaosOffer(state, ctx, excludeIds);
+  }
+
+  let chosenPatron: PatronId = patronId ?? detPick(state, STANDARD_PATRONS, ctx);
   if (!patronId && state.player.keepsakeId && !state.player.keepsakeUsed) {
     const forced = getKeepsakeForcedPatron(state.player.keepsakeId);
     if (forced) {
@@ -222,23 +470,22 @@ export function generateBoonOffer(
       if (!existing) {
         candidates.push({ entry, weight: 4 });
       } else if (existing.patronId !== chosenPatron) {
-        // Replacement / Exchange offer with guaranteed +1 rarity bump!
         candidates.push({ entry, replaces: existing, weight: 1.3 });
       }
     } else if (entry.slot === 'duo') {
       const legacy = getEffectiveMirrorUpgrade(state.meta, state.run.vows, 'divine_pride');
-      const duoWeight = 2.2 + (legacy.side === 'b' ? legacy.value * 20 : 0);
+      const duoWeight = 2.6 + (legacy.side === 'b' ? legacy.value * 25 : 0);
       candidates.push({ entry, weight: duoWeight });
     } else {
       candidates.push({ entry, weight: 2.5 });
     }
   }
 
-  // Fallback if exclusion narrowed pool too far
   if (candidates.length < targetCount) {
     for (const entry of patronPool) {
       if (hasBoon(state, entry.id)) continue;
       if (candidates.some((c) => c.entry.id === entry.id)) continue;
+      if (entry.slot === 'duo' && !isEntryEligible(state, entry)) continue;
       const existing = CORE_BOON_SLOTS.includes(entry.slot)
         ? getBoonInSlot(state, entry.slot)
         : undefined;
@@ -247,7 +494,6 @@ export function generateBoonOffer(
     }
   }
 
-  // Weighted deterministic selection without replacement
   const selected: Candidate[] = [];
   const pool = [...candidates];
   let hasReplacement = false;
@@ -282,7 +528,7 @@ export function generateBoonOffer(
   }
 
   const options: BoonOfferOption[] = selected.map((c) => {
-    let rarity: BoonRarity =
+    const rarity: BoonRarity =
       c.entry.slot === 'duo'
         ? 'duo'
         : c.replaces
@@ -305,7 +551,7 @@ export function generateBoonOffer(
         ? `${desc} (Replaces ${c.replaces.name})`
         : desc,
       rarity,
-      patronId: chosenPatron,
+      patronId: c.entry.patronId,
       slot: c.entry.slot,
       boonId: c.entry.id,
       previewValue:
@@ -314,7 +560,6 @@ export function generateBoonOffer(
     };
   });
 
-  // Safety fallback if player literally collected every boon of this patron
   if (options.length === 0) {
     options.push({
       id: `${chosenPatron}_tribute_gold`,
@@ -327,7 +572,6 @@ export function generateBoonOffer(
     });
   }
 
-  // Consume patron keepsake guarantee once this patron's offer is generated
   if (
     state.player.keepsakeId &&
     !state.player.keepsakeUsed &&
@@ -465,7 +709,7 @@ export function generateHammerOffer(
 }
 
 // ============================================================================
-// Apply Selected Boon / Reroll / Direct Debug Grants
+// Apply Selected Boon / Chaos / Well / Reroll / Direct Debug Grants
 // ============================================================================
 
 export function applySelectedBoon(
@@ -477,7 +721,9 @@ export function applySelectedBoon(
   if (!offer) return false;
   if (optionIndex < 0 || optionIndex >= offer.options.length) return false;
 
+  const rt = getBoonRuntime(state);
   const opt = offer.options[optionIndex];
+
   if (opt.kind === 'boon' && opt.boonId) {
     const entry = getBoonCatalogEntry(opt.boonId);
     if (!entry) return false;
@@ -503,8 +749,10 @@ export function applySelectedBoon(
       state.meta.codexBoonsSeen.push(instance.id);
     }
 
-    // Immediate stat passives (e.g. Hyper Reflex extra dash)
-    if (instance.id === 'veloce_greatest_reflex') {
+    if (
+      instance.id === 'veloce_greatest_reflex' ||
+      instance.id === 'veloce_greater_evasion'
+    ) {
       applyMetaToPlayer(state, { resetVitals: false });
     }
 
@@ -519,6 +767,35 @@ export function applySelectedBoon(
       text: `Acquired ${instance.name} (${instance.rarity.toUpperCase()})`,
       colorHex: PATRON_CONSTANTS[instance.patronId].colorHex,
     });
+  } else if (opt.kind === 'chaos_blessing') {
+    let curse = rt.pendingChaosMap.get(opt.id);
+    if (!curse && opt.boonId) {
+      const entry = getBoonCatalogEntry(opt.boonId);
+      if (entry) {
+        curse = {
+          id: opt.id,
+          curseKind: 'extra_damage_taken',
+          curseMagnitude: 0.35,
+          encountersRemaining: opt.curseEncounters ?? 3,
+          blessingBoon: instantiateBoon(entry, opt.rarity, 1),
+        };
+      }
+    }
+    if (curse) {
+      state.player.chaosCurses.push(curse);
+      state.events.push({
+        type: 'boon_selected',
+        optionId: opt.id,
+        patronId: 'abyssos',
+        rarity: opt.rarity,
+      });
+      state.events.push({
+        type: 'ui_toast',
+        text: `Void Pact sealed (${curse.encountersRemaining} rooms -> ${curse.blessingBoon.name})`,
+        colorHex: PATRON_CONSTANTS.abyssos.colorHex,
+      });
+    }
+    rt.pendingChaosMap.clear();
   } else if (opt.kind === 'pom_upgrade' && opt.boonId) {
     const boon = getBoonById(state, opt.boonId);
     if (boon) {
@@ -562,15 +839,78 @@ export function applySelectedBoon(
       colorHex: '#f5c742',
     });
   } else if (opt.kind === 'well_item') {
-    if (opt.id === 'pom_vitality_fallback') {
+    if (opt.id.startsWith('purge_') && opt.boonId) {
+      const idx = state.player.boons.findIndex((b) => b.id === opt.boonId);
+      if (idx >= 0) {
+        const purged = state.player.boons.splice(idx, 1)[0];
+        state.player.gold += 55;
+        state.events.push({
+          type: 'ui_toast',
+          text: `Purged ${purged.name} for +55 Gold`,
+          colorHex: '#ffd942',
+        });
+      }
+    } else if (opt.id === 'pom_vitality_fallback') {
       state.player.maxHp += 25;
       state.player.hp = Math.min(state.player.maxHp, state.player.hp + 25);
       state.player.gold += 60;
     } else if (opt.id === 'hammer_anvil_gold') {
       state.player.gold += 120;
     } else {
-      state.player.gold += 90;
-      state.player.hp = Math.min(state.player.maxHp, state.player.hp + 25);
+      const wellDef = WELL_OF_ASH_ITEMS.find((w) => w.id === opt.id);
+      if (wellDef) {
+        const cost = rt.pendingWellCostMap.get(wellDef.id) ?? wellDef.costGold;
+        if (state.player.gold < cost) {
+          state.events.push({
+            type: 'ui_toast',
+            text: `Need ${cost} Gold for ${wellDef.name}!`,
+            colorHex: '#ff6666',
+          });
+          return false;
+        }
+        state.player.gold -= cost;
+        const enc = wellDef.baseEncounters + getWellBonusEncounters(state);
+        if (wellDef.effectKind === 'defiance_refill') {
+          state.player.deathDefiances = Math.min(
+            Math.max(1, state.player.maxDeathDefiances),
+            state.player.deathDefiances + 1
+          );
+          state.events.push({
+            type: 'ui_toast',
+            text: 'Death Defiance replenished!',
+            colorHex: '#ffd942',
+          });
+        } else {
+          if (wellDef.effectKind === 'heal') {
+            const gain = Math.round(
+              state.player.maxHp *
+                wellDef.magnitude *
+                getHealingMultiplier(state.run.vows)
+            );
+            state.player.hp = Math.min(state.player.maxHp, state.player.hp + gain);
+          }
+          if (
+            wellDef.effectKind === 'heal' ||
+            wellDef.effectKind === 'attack_buff' ||
+            wellDef.effectKind === 'special_buff' ||
+            wellDef.effectKind === 'cast_buff'
+          ) {
+            rt.wellBuffs.push({
+              effectKind: wellDef.effectKind,
+              magnitude: wellDef.magnitude,
+              encountersLeft: enc,
+            });
+          }
+          state.events.push({
+            type: 'ui_toast',
+            text: `Purchased ${wellDef.name} (${enc} rooms)`,
+            colorHex: '#c084fc',
+          });
+        }
+      } else {
+        state.player.gold += 90;
+        state.player.hp = Math.min(state.player.maxHp, state.player.hp + 25);
+      }
     }
     state.events.push({
       type: 'boon_selected',
@@ -601,6 +941,14 @@ export function rerollBoonOffer(
     generateBoonOffer(state, offer.patronId, ctx, previousIds);
     return true;
   }
+  if (offer.source === 'chaos') {
+    generateChaosOffer(state, ctx, previousIds);
+    return true;
+  }
+  if (offer.source === 'well') {
+    generateWellOfAshOffer(state, ctx);
+    return true;
+  }
   if (offer.source === 'pom') {
     generatePomOffer(state, ctx);
     return true;
@@ -624,7 +972,6 @@ export function grantBoonDirect(
       entry = patronEntries.find((e) => e.slot === slot);
     }
   } else {
-    // Pick first unoccupied core slot for this patron, else passive
     entry =
       patronEntries.find(
         (e) =>
@@ -632,6 +979,7 @@ export function grantBoonDirect(
           !getBoonInSlot(state, e.slot) &&
           !hasBoon(state, e.id)
       ) ??
+      patronEntries.find((e) => e.slot !== 'duo' && !hasBoon(state, e.id)) ??
       patronEntries.find((e) => !hasBoon(state, e.id)) ??
       patronEntries[0];
   }
@@ -670,7 +1018,12 @@ export function grantBoonDirect(
   if (!state.run.seenPatrons.includes(patronId)) {
     state.run.seenPatrons.push(patronId);
   }
-  if (instance.id === 'veloce_greatest_reflex') {
+  if (
+    instance.id === 'veloce_greatest_reflex' ||
+    instance.id === 'veloce_greater_evasion' ||
+    instance.id === 'abyssos_vitality' ||
+    instance.id === 'abyssos_grasp'
+  ) {
     applyMetaToPlayer(state, { resetVitals: false });
   }
 
@@ -716,7 +1069,7 @@ export function grantHammerDirect(
 }
 
 // ============================================================================
-// Live Combat Boon Hook Runners (Voltaris, Tidebreaker, Aegira, Velouris)
+// Live Combat Boon & Duo Hook Runners (ALL 10 Patrons + ALL 14 Duo Boons!)
 // ============================================================================
 
 function distSq(a: Vec2, b: Vec2): number {
@@ -779,13 +1132,17 @@ export function deflectProjectilesInRadius(
       value: 'DEFLECT!',
       kind: 'deflect',
       colorHex: PATRON_CONSTANTS.aegira.colorHex,
-      life: 0,
+      life: 0.75,
       maxLife: 0.75,
     });
     deflectedCount += 1;
   }
 
   if (deflectedCount > 0) {
+    // Duo: Deadly Reversal (+20% Crit chance for 2.5s after deflecting)
+    if (hasBoon(state, 'duo_deadly_reversal')) {
+      getBoonRuntime(state).deadlyReversalTimer = 2.5;
+    }
     ctx.triggerHitstop(state, 0.028, 0.08);
     ctx.addCameraShake(state, 5, 0.12);
   }
@@ -844,7 +1201,6 @@ function triggerVoltarisChainLightning(
       patronId: 'voltaris',
     });
 
-    // Visual lightning arc projectile (short-lived, zero secondary damage)
     ctx.spawnProjectile(state, {
       owner: 'player',
       ownerId: 'player',
@@ -964,7 +1320,6 @@ function triggerTidebreakerSplash(
         patronId: 'tidebreaker',
       });
     } else {
-      // Apply knockback impulse & ruptured even on primary target
       const kbFactor = enemy.isBoss ? 0.15 : enemy.armor > 0 ? 0.4 : 1.0;
       enemy.vel.x += Math.cos(angle) * knockback * kbFactor;
       enemy.vel.y += Math.sin(angle) * knockback * kbFactor;
@@ -1012,6 +1367,166 @@ function triggerTidebreakerSplash(
   });
 }
 
+function spawnBladeRiftVortex(
+  state: SimState,
+  pos: Vec2,
+  damagePerTick: number,
+  baseDuration: number,
+  baseRadius: number
+): void {
+  const blackMetal = getBoonById(state, 'bellum_black_metal');
+  const huntingBlades = getBoonById(state, 'duo_hunting_blades');
+  const radius = Math.round(
+    baseRadius * (1 + (blackMetal ? blackMetal.scaledValue : 0))
+  );
+  const duration =
+    baseDuration +
+    (blackMetal ? 1.0 : 0) +
+    (huntingBlades ? huntingBlades.scaledValue : 0);
+
+  state.room.hazards.push({
+    id: `rift_${state.tick}_${state.room.hazards.length}`,
+    kind: 'rift_vortex',
+    pos: { x: pos.x, y: pos.y },
+    radius,
+    active: true,
+    armed: true,
+    timer: duration,
+    cooldown: 0.06,
+    damage: Math.max(8, Math.round(damagePerTick)),
+    owner: 'player',
+  });
+}
+
+function spawnFrostCrystalPylon(
+  state: SimState,
+  pos: Vec2,
+  damagePerTick: number,
+  baseDuration: number
+): void {
+  const glare = getBoonById(state, 'glaciera_glacial_glare');
+  const clarity = getBoonById(state, 'duo_crystal_clarity');
+  const duration = baseDuration + (glare ? glare.scaledValue : 0);
+  const dmg = Math.round(
+    damagePerTick * (1 + (clarity ? clarity.scaledValue : 0))
+  );
+
+  state.room.hazards.push({
+    id: `crystal_${state.tick}_${state.room.hazards.length}`,
+    kind: 'pylon',
+    pos: { x: pos.x, y: pos.y },
+    radius: 26,
+    active: true,
+    armed: true,
+    timer: duration,
+    cooldown: 0.2,
+    damage: Math.max(6, dmg),
+    owner: 'player',
+  });
+}
+
+function tryTriggerArcticBlast(
+  state: SimState,
+  enemy: EnemyState,
+  ctx: SimCombatContext
+): void {
+  const arctic = getBoonById(state, 'glaciera_arctic_blast');
+  if (!arctic) return;
+  const chillIdx = enemy.statuses.findIndex((s) => s.id === 'chill');
+  if (chillIdx < 0) return;
+  if (enemy.statuses[chillIdx].stacks < COMBAT_CONSTANTS.statusDefaults.chill.maxStacks) {
+    return;
+  }
+
+  enemy.statuses.splice(chillIdx, 1);
+  ctx.dealDamageToEnemy(state, enemy, {
+    baseDamage: arctic.scaledValue,
+    source: 'status',
+    canCrit: false,
+    canBackstab: false,
+    patronId: 'glaciera',
+  });
+  state.floatingNumbers.push({
+    id: `fl_arctic_${state.tick}_${state.floatingNumbers.length}`,
+    pos: { x: enemy.pos.x, y: enemy.pos.y - 34 },
+    vel: { x: 0, y: -70 },
+    value: 'SHATTER!',
+    kind: 'status',
+    colorHex: PATRON_CONSTANTS.glaciera.colorHex,
+    life: 0.85,
+    maxLife: 0.85,
+  });
+  ctx.addCameraShake(state, 5, 0.14);
+}
+
+function tryTriggerMercifulDoom(
+  state: SimState,
+  enemy: EnemyState,
+  ctx: SimCombatContext
+): void {
+  const merciful = getBoonById(state, 'duo_merciful_doom');
+  if (!merciful) return;
+  const doomIdx = enemy.statuses.findIndex((s) => s.id === 'doom');
+  if (doomIdx < 0) return;
+
+  const doomSt = enemy.statuses[doomIdx];
+  enemy.statuses.splice(doomIdx, 1);
+  const dmg = Math.round(
+    (doomSt.magnitude || COMBAT_CONSTANTS.statusDefaults.doom.baseDamage) +
+      merciful.scaledValue
+  );
+  ctx.dealDamageToEnemy(state, enemy, {
+    baseDamage: dmg,
+    source: 'status',
+    canCrit: false,
+    canBackstab: false,
+    patronId: 'bellum',
+  });
+  state.events.push({
+    type: 'status_triggered',
+    targetId: enemy.id,
+    statusId: 'doom',
+    pos: { x: enemy.pos.x, y: enemy.pos.y },
+    damage: dmg,
+  });
+}
+
+function fireSupportFireArrow(
+  state: SimState,
+  target: EnemyState,
+  damage: number,
+  ctx: SimCombatContext
+): void {
+  const angle = Math.atan2(
+    target.pos.y - state.player.pos.y,
+    target.pos.x - state.player.pos.x
+  );
+  ctx.spawnProjectile(state, {
+    owner: 'player',
+    ownerId: 'player',
+    kind: 'arrow',
+    pos: { x: state.player.pos.x, y: state.player.pos.y },
+    vel: { x: Math.cos(angle) * 1050, y: Math.sin(angle) * 1050 },
+    startPos: { x: state.player.pos.x, y: state.player.pos.y },
+    radius: 10,
+    angle,
+    damage: Math.round(damage),
+    range: 880,
+    maxLife: 1.1,
+    pierceLeft: 0,
+    bouncesLeft: 0,
+    deflectable: false,
+    deflected: false,
+    homingStrength: 7,
+    isLob: false,
+    lobHeight: 0,
+    lobDuration: 0,
+    lobElapsed: 0,
+    patronId: 'sylvara',
+    colorHex: PATRON_CONSTANTS.sylvara.colorHex,
+  });
+}
+
 export function handleBoonOnAttackHit(
   state: SimState,
   enemy: EnemyState,
@@ -1019,7 +1534,80 @@ export function handleBoonOnAttackHit(
   damage: number,
   ctx: SimCombatContext
 ): void {
+  const rt = getBoonRuntime(state);
   const boon = getBoonInSlot(state, source);
+
+  // Well of Ash temporary weapon buffs + Strong Drink permanent fountain bonus
+  let extraMult = 0;
+  for (const wb of rt.wellBuffs) {
+    if (
+      (source === 'attack' && wb.effectKind === 'attack_buff') ||
+      (source === 'special' && wb.effectKind === 'special_buff') ||
+      (source === 'cast' && wb.effectKind === 'cast_buff')
+    ) {
+      extraMult += wb.magnitude;
+    }
+  }
+  const strongDrink = getBoonById(state, 'bacchion_strong_drink');
+  if (strongDrink && rt.strongDrinkStacks > 0) {
+    extraMult += strongDrink.scaledValue * rt.strongDrinkStacks;
+  }
+  if (extraMult > 0 && damage > 0) {
+    ctx.dealDamageToEnemy(state, enemy, {
+      baseDamage: Math.max(2, Math.round(damage * extraMult)),
+      source: 'status',
+      canCrit: false,
+      canBackstab: false,
+    });
+  }
+
+  // Sylvara Support Fire: every attack/special/cast hit fires a homing arrow
+  const supportFire = getBoonById(state, 'sylvara_support_fire');
+  if (supportFire) {
+    fireSupportFireArrow(state, enemy, supportFire.scaledValue, ctx);
+  }
+
+  // Sylvara Hunter's Mark: mark a different nearby enemy for +30% Crit
+  if (hasBoon(state, 'sylvara_hunters_mark')) {
+    let markTarget: EnemyState | null = null;
+    let bestD = 380 * 380;
+    for (const other of state.enemies) {
+      if (other.id === enemy.id || !isLivingEnemy(other)) continue;
+      const dSq = distSq(enemy.pos, other.pos);
+      if (dSq < bestD) {
+        bestD = dSq;
+        markTarget = other;
+      }
+    }
+    ctx.applyStatus(state, markTarget ?? enemy, 'enemy', 'marked', 1, 'sylvara');
+  }
+
+  // Duo: Heart Rend / Splitting Headache / Pressure Points / Deadly Reversal crit-echo bursts
+  const pressure = getBoonById(state, 'sylvara_pressure_points');
+  const headache = getBoonById(state, 'duo_splitting_headache');
+  const heartRend = getBoonById(state, 'duo_heart_rend');
+  let bonusCritChance = pressure ? pressure.scaledValue : 0;
+  if (rt.deadlyReversalTimer > 0) {
+    bonusCritChance += getBoonById(state, 'duo_deadly_reversal')?.scaledValue ?? 0.2;
+  }
+  if (headache) {
+    const hang = enemy.statuses.find((s) => s.id === 'hangover');
+    if (hang) {
+      bonusCritChance += hang.stacks * headache.scaledValue;
+    }
+  }
+  if (bonusCritChance > 0 && damage > 0 && detNextFloat(state, ctx) < bonusCritChance) {
+    const isWeak = enemy.statuses.some((s) => s.id === 'weak');
+    const rendBonus = heartRend && isWeak ? heartRend.scaledValue : 0;
+    const critEcho = Math.max(8, Math.round(damage * (0.85 + rendBonus)));
+    ctx.dealDamageToEnemy(state, enemy, {
+      baseDamage: critEcho,
+      source: 'status',
+      canCrit: false,
+      canBackstab: false,
+      patronId: 'sylvara',
+    });
+  }
 
   // Sweet Surrender: Weak-afflicted foes take bonus damage
   const sweetSurrender = getBoonById(state, 'velouris_sweet_surrender');
@@ -1056,7 +1644,7 @@ export function handleBoonOnAttackHit(
     });
   }
 
-  // Duo: Lightning Phalanx / Parting Shot on Cast
+  // Cast Duo Triggers: Lightning Phalanx / Parting Shot / Blizzard Shot
   if (source === 'cast') {
     const phalanx = getBoonById(state, 'duo_lightning_phalanx');
     if (phalanx) {
@@ -1066,6 +1654,37 @@ export function handleBoonOnAttackHit(
     if (parting) {
       ctx.applyStatus(state, enemy, 'enemy', 'exposed', 1, 'aegira');
       ctx.applyStatus(state, enemy, 'enemy', 'weak', 1, 'velouris');
+    }
+    const blizzard = getBoonById(state, 'duo_blizzard_shot');
+    if (blizzard) {
+      for (let k = 0; k < 6; k++) {
+        const ang = (Math.PI * 2 * k) / 6;
+        ctx.spawnProjectile(state, {
+          owner: 'player',
+          ownerId: 'player',
+          kind: 'dart',
+          pos: { x: enemy.pos.x, y: enemy.pos.y },
+          vel: { x: Math.cos(ang) * 760, y: Math.sin(ang) * 760 },
+          startPos: { x: enemy.pos.x, y: enemy.pos.y },
+          radius: 11,
+          angle: ang,
+          damage: Math.round(blizzard.scaledValue),
+          range: 420,
+          maxLife: 0.65,
+          pierceLeft: 2,
+          bouncesLeft: 0,
+          deflectable: false,
+          deflected: false,
+          homingStrength: 0,
+          isLob: false,
+          lobHeight: 0,
+          lobDuration: 0,
+          lobElapsed: 0,
+          patronId: 'glaciera',
+          statusToApply: 'chill',
+          colorHex: PATRON_CONSTANTS.glaciera.colorHex,
+        });
+      }
     }
   }
 
@@ -1116,6 +1735,7 @@ export function handleBoonOnAttackHit(
       if (hasFlash) {
         ctx.applyStatus(state, enemy, 'enemy', 'exposed', 1, 'aegira');
       }
+      tryTriggerMercifulDoom(state, enemy, ctx);
       const radius = source === 'special' ? 310 : source === 'cast' ? 230 : 210;
       deflectProjectilesInRadius(state, state.player.pos, radius, hasFlash, ctx);
       if (source === 'cast') {
@@ -1142,15 +1762,85 @@ export function handleBoonOnAttackHit(
       break;
     }
     case 'bellum': {
-      ctx.applyStatus(state, enemy, 'enemy', 'doom', 1, 'bellum');
+      if (source === 'cast') {
+        spawnBladeRiftVortex(
+          state,
+          enemy.pos,
+          boon.scaledValue,
+          boon.secondaryValue ?? 4.0,
+          98
+        );
+      } else {
+        ctx.applyStatus(state, enemy, 'enemy', 'doom', 1, 'bellum');
+        const doomSt = enemy.statuses.find((s) => s.id === 'doom');
+        if (doomSt) {
+          const dire = getBoonById(state, 'bellum_dire_misfortune');
+          const impending = getBoonById(state, 'bellum_impending_doom');
+          const baseDoom =
+            boon.scaledValue +
+            (dire ? Math.max(0, doomSt.stacks - 1) * dire.scaledValue : 0);
+          doomSt.magnitude = Math.round(
+            baseDoom * (1 + (impending ? impending.scaledValue : 0))
+          );
+          if (impending && doomSt.stacks === 1) {
+            doomSt.remaining = COMBAT_CONSTANTS.statusDefaults.doom.delay + 0.5;
+          }
+        }
+      }
       break;
     }
     case 'bacchion': {
-      ctx.applyStatus(state, enemy, 'enemy', 'hangover', 1, 'bacchion');
+      if (source === 'cast') {
+        // Festive Fog blast + stun + Ice Wine synergy
+        const iceWine = getBoonById(state, 'duo_ice_wine');
+        const fogRadius = boon.secondaryValue ?? 210;
+        const fogDmg = Math.round(
+          boon.scaledValue * (1 + (iceWine ? iceWine.scaledValue : 0))
+        );
+        for (const other of state.enemies) {
+          if (!isLivingEnemy(other)) continue;
+          if (distSq(enemy.pos, other.pos) <= fogRadius * fogRadius) {
+            if (other.id !== enemy.id) {
+              ctx.dealDamageToEnemy(state, other, {
+                baseDamage: fogDmg,
+                source: 'status',
+                canCrit: false,
+                canBackstab: false,
+                statusId: iceWine ? 'chill' : 'hangover',
+                patronId: 'bacchion',
+              });
+            } else if (iceWine) {
+              ctx.applyStatus(state, other, 'enemy', 'chill', 2, 'glaciera');
+            }
+            if (!other.isBoss) {
+              other.stunTimer = Math.max(other.stunTimer, 0.9);
+            }
+          }
+        }
+        ctx.addCameraShake(state, 6, 0.16);
+      } else {
+        ctx.applyStatus(state, enemy, 'enemy', 'hangover', 1, 'bacchion');
+        const hang = enemy.statuses.find((s) => s.id === 'hangover');
+        if (hang) {
+          hang.magnitude = Math.max(hang.magnitude, boon.scaledValue);
+        }
+      }
       break;
     }
     case 'glaciera': {
+      if (source === 'cast') {
+        spawnFrostCrystalPylon(
+          state,
+          {
+            x: (state.player.pos.x + enemy.pos.x) * 0.5,
+            y: (state.player.pos.y + enemy.pos.y) * 0.5,
+          },
+          boon.scaledValue,
+          boon.secondaryValue ?? 4.5
+        );
+      }
       ctx.applyStatus(state, enemy, 'enemy', 'chill', 1, 'glaciera');
+      tryTriggerArcticBlast(state, enemy, ctx);
       break;
     }
     default:
@@ -1165,12 +1855,33 @@ export function handleBoonOnDash(
   perfect: boolean,
   ctx: SimCombatContext
 ): void {
-  // Ruthless Reflex (Mirror side B): Near-miss perfect dash grants +50% damage buff for 2s
+  // Chaos Curse: take_damage_on_dash
+  for (const c of state.player.chaosCurses) {
+    if (c.curseKind === 'take_damage_on_dash') {
+      ctx.dealDamageToPlayer(state, Math.max(1, c.curseMagnitude), {
+        source: 'chaos',
+        ignoreIframes: true,
+        canDodge: false,
+      });
+    }
+  }
+
+  // Ruthless Reflex (Mirror side B): Near-miss perfect dash grants +50% buff
   if (perfect) {
     const reflex = getEffectiveMirrorUpgrade(state.meta, state.run.vows, 'greater_reflex');
     if (reflex.side === 'b' && reflex.rank > 0) {
       state.player.eruptBuffTimer = Math.max(state.player.eruptBuffTimer, 2.0);
     }
+  }
+
+  // Veloce Hyper Sprint: post-dash speed + brief Sturdy surge
+  const hyperSprint = getBoonById(state, 'veloce_hyper_sprint');
+  if (hyperSprint) {
+    getBoonRuntime(state).hyperSprintTimer = hyperSprint.scaledValue;
+    state.player.eruptBuffTimer = Math.max(
+      state.player.eruptBuffTimer,
+      hyperSprint.scaledValue
+    );
   }
 
   const dashBoon = getBoonInSlot(state, 'dash');
@@ -1220,6 +1931,7 @@ export function handleBoonOnDash(
             statusId: hasFlash ? 'exposed' : undefined,
             patronId: 'aegira',
           });
+          tryTriggerMercifulDoom(state, enemy, ctx);
         }
       }
       break;
@@ -1242,32 +1954,51 @@ export function handleBoonOnDash(
       }
       break;
     }
+    case 'sylvara': {
+      // Hunter Dash empowers the upcoming Dash-Strike!
+      state.player.empoweredAttacks = Math.max(state.player.empoweredAttacks, 1);
+      break;
+    }
     case 'bellum': {
-      ctx.spawnProjectile(state, {
-        owner: 'player',
-        ownerId: 'player',
-        kind: 'blade_rift',
-        pos: { x: startPos.x, y: startPos.y },
-        vel: { x: 0, y: 0 },
-        startPos: { x: startPos.x, y: startPos.y },
-        radius: 65,
-        angle: state.player.facingAngle,
-        damage: dashBoon.scaledValue,
-        range: 100,
-        maxLife: 0.9,
-        pierceLeft: 99,
-        bouncesLeft: 0,
-        deflectable: false,
-        deflected: false,
-        homingStrength: 0,
-        isLob: false,
-        lobHeight: 0,
-        lobDuration: 0,
-        lobElapsed: 0,
-        aoeRadius: 95,
-        patronId: 'bellum',
-        colorHex: PATRON_CONSTANTS.bellum.colorHex,
-      });
+      spawnBladeRiftVortex(
+        state,
+        startPos,
+        dashBoon.scaledValue,
+        dashBoon.secondaryValue ?? 1.4,
+        84
+      );
+      break;
+    }
+    case 'bacchion': {
+      const radius = dashBoon.secondaryValue ?? 195;
+      const rSq = radius * radius;
+      for (const enemy of state.enemies) {
+        if (!isLivingEnemy(enemy)) continue;
+        if (distSq(startPos, enemy.pos) <= rSq) {
+          ctx.applyStatus(state, enemy, 'enemy', 'hangover', 1, 'bacchion');
+          const h = enemy.statuses.find((s) => s.id === 'hangover');
+          if (h) h.magnitude = Math.max(h.magnitude, dashBoon.scaledValue);
+        }
+      }
+      break;
+    }
+    case 'glaciera': {
+      const radius = dashBoon.secondaryValue ?? 225;
+      const rSq = radius * radius;
+      for (const enemy of state.enemies) {
+        if (!isLivingEnemy(enemy)) continue;
+        if (distSq(endPos, enemy.pos) <= rSq) {
+          ctx.dealDamageToEnemy(state, enemy, {
+            baseDamage: dashBoon.scaledValue,
+            source: 'dash',
+            canCrit: false,
+            canBackstab: false,
+            statusId: 'chill',
+            patronId: 'glaciera',
+          });
+          tryTriggerArcticBlast(state, enemy, ctx);
+        }
+      }
       break;
     }
     default:
@@ -1283,9 +2014,9 @@ export function handleBoonOnGodCall(
 ): void {
   const callBoon = getBoonInSlot(state, 'call');
   const activePatron: PatronId = callBoon?.patronId ?? patronId;
-  const rt = getGodCallRuntime(state);
-  rt.greater = greater;
-  rt.pulseAccumulator = 0;
+  const rt = getBoonRuntime(state);
+  rt.greaterCall = greater;
+  rt.callPulseAcc = 0;
 
   let duration = greater ? 5.0 : 1.5;
 
@@ -1335,7 +2066,6 @@ export function handleBoonOnGodCall(
   } else if (activePatron === 'velouris') {
     duration = greater ? 1.2 : 0.6;
     const living = state.enemies.filter(isLivingEnemy);
-    // Target nearest enemy (prefer boss if present)
     let target: EnemyState | null = null;
     let bestScore = Infinity;
     for (const e of living) {
@@ -1390,11 +2120,83 @@ export function handleBoonOnGodCall(
         colorHex: PATRON_CONSTANTS.velouris.colorHex,
       });
     }
+  } else if (activePatron === 'sylvara') {
+    duration = 1.0;
+    const arrowCount = greater ? 12 : 5;
+    const arrowDmg = callBoon?.scaledValue ?? 95;
+    const living = state.enemies.filter(isLivingEnemy);
+    for (let i = 0; i < arrowCount; i++) {
+      const target = living.length > 0 ? living[i % living.length] : null;
+      const ang = target
+        ? Math.atan2(target.pos.y - state.player.pos.y, target.pos.x - state.player.pos.x) +
+          (i - arrowCount * 0.5) * 0.12
+        : state.player.facingAngle + (i - arrowCount * 0.5) * 0.25;
+      ctx.spawnProjectile(state, {
+        owner: 'player',
+        ownerId: 'player',
+        kind: 'arrow',
+        pos: { x: state.player.pos.x, y: state.player.pos.y },
+        vel: { x: Math.cos(ang) * 1300, y: Math.sin(ang) * 1300 },
+        startPos: { x: state.player.pos.x, y: state.player.pos.y },
+        radius: 13,
+        angle: ang,
+        damage: Math.round(arrowDmg),
+        range: 1100,
+        maxLife: 1.5,
+        pierceLeft: 1,
+        bouncesLeft: 0,
+        deflectable: false,
+        deflected: false,
+        homingStrength: 10,
+        isLob: false,
+        lobHeight: 0,
+        lobDuration: 0,
+        lobElapsed: 0,
+        critBonus: 0.35,
+        patronId: 'sylvara',
+        statusToApply: 'marked',
+        colorHex: PATRON_CONSTANTS.sylvara.colorHex,
+      });
+    }
+  } else if (activePatron === 'bellum') {
+    duration = greater ? 5.0 : 1.5;
+    state.player.iframeTimer = Math.max(state.player.iframeTimer, duration);
+    spawnBladeRiftVortex(
+      state,
+      state.player.pos,
+      callBoon?.scaledValue ?? 46,
+      duration,
+      greater ? 175 : 135
+    );
+  } else if (activePatron === 'bacchion') {
+    duration = greater ? 6.0 : 2.0;
+    for (const enemy of state.enemies) {
+      if (!isLivingEnemy(enemy)) continue;
+      if (distSq(state.player.pos, enemy.pos) <= 340 * 340) {
+        ctx.applyStatus(state, enemy, 'enemy', 'hangover', 2, 'bacchion');
+      }
+    }
+  } else if (activePatron === 'glaciera') {
+    duration = greater ? 5.5 : 1.8;
+    for (const enemy of state.enemies) {
+      if (!isLivingEnemy(enemy)) continue;
+      if (distSq(state.player.pos, enemy.pos) <= 340 * 340) {
+        ctx.dealDamageToEnemy(state, enemy, {
+          baseDamage: (callBoon?.scaledValue ?? 18) * 2,
+          source: 'call',
+          canCrit: false,
+          canBackstab: false,
+          statusId: 'chill',
+          statusStacks: 2,
+          patronId: 'glaciera',
+        });
+      }
+    }
   }
 
   state.player.godCallPatron = activePatron;
   state.player.godCallActiveTimer = Math.max(state.player.godCallActiveTimer, duration);
-  rt.lastSeenTimer = state.player.godCallActiveTimer;
+  rt.lastSeenCallTimer = state.player.godCallActiveTimer;
 
   if (greater) {
     state.player.greaterCallSlowTimer = Math.max(
@@ -1425,9 +2227,105 @@ export function tickBoons(
   dt: number,
   ctx: SimCombatContext
 ): void {
+  const rt = getBoonRuntime(state);
+
+  if (rt.deadlyReversalTimer > 0) {
+    rt.deadlyReversalTimer = Math.max(0, rt.deadlyReversalTimer - dt);
+  }
+  if (rt.hyperSprintTimer > 0) {
+    rt.hyperSprintTimer = Math.max(0, rt.hyperSprintTimer - dt);
+    state.player.vel.x *= 1 + Math.min(0.25, dt * 4);
+    state.player.vel.y *= 1 + Math.min(0.25, dt * 4);
+  }
+
+  const inActiveCombat = !state.room.cleared && state.room.combatStarted;
+  const livingEnemies = state.enemies.filter(isLivingEnemy);
+
+  // Duo: Hunting Blades — steer active Bellum Blade Rifts toward nearest foe
+  if (hasBoon(state, 'duo_hunting_blades') && livingEnemies.length > 0) {
+    for (const h of state.room.hazards) {
+      if (h.kind !== 'rift_vortex' || h.owner !== 'player' || !h.active) continue;
+      let nearest = livingEnemies[0];
+      let bestSq = distSq(h.pos, nearest.pos);
+      for (let i = 1; i < livingEnemies.length; i++) {
+        const dSq = distSq(h.pos, livingEnemies[i].pos);
+        if (dSq < bestSq) {
+          bestSq = dSq;
+          nearest = livingEnemies[i];
+        }
+      }
+      if (bestSq > 16) {
+        const d = Math.sqrt(bestSq);
+        h.pos.x += ((nearest.pos.x - h.pos.x) / d) * 240 * dt;
+        h.pos.y += ((nearest.pos.y - h.pos.y) / d) * 240 * dt;
+      }
+    }
+  }
+
+  // Glaciera Crystal Beam Pylons (tick player-owned 'pylon' hazards)
+  for (let i = state.room.hazards.length - 1; i >= 0; i--) {
+    const h = state.room.hazards[i];
+    if (h.kind !== 'pylon' || h.owner !== 'player') continue;
+    h.timer -= dt;
+    h.cooldown -= dt;
+    if (h.cooldown <= 0 && livingEnemies.length > 0) {
+      h.cooldown = 0.2;
+      let nearest = livingEnemies[0];
+      let bestSq = distSq(h.pos, nearest.pos);
+      for (let j = 1; j < livingEnemies.length; j++) {
+        const dSq = distSq(h.pos, livingEnemies[j].pos);
+        if (dSq < bestSq) {
+          bestSq = dSq;
+          nearest = livingEnemies[j];
+        }
+      }
+      if (bestSq <= 540 * 540) {
+        const ang = Math.atan2(nearest.pos.y - h.pos.y, nearest.pos.x - h.pos.x);
+        ctx.dealDamageToEnemy(state, nearest, {
+          baseDamage: h.damage,
+          source: 'status',
+          angle: ang,
+          canCrit: false,
+          canBackstab: false,
+          statusId: 'chill',
+          patronId: 'glaciera',
+        });
+        tryTriggerArcticBlast(state, nearest, ctx);
+        ctx.spawnProjectile(state, {
+          owner: 'player',
+          ownerId: 'player',
+          kind: 'beam',
+          pos: { x: h.pos.x, y: h.pos.y },
+          vel: { x: Math.cos(ang) * 1400, y: Math.sin(ang) * 1400 },
+          startPos: { x: h.pos.x, y: h.pos.y },
+          radius: 8,
+          angle: ang,
+          damage: 0,
+          range: Math.sqrt(bestSq),
+          maxLife: 0.14,
+          pierceLeft: 99,
+          bouncesLeft: 0,
+          deflectable: false,
+          deflected: false,
+          homingStrength: 0,
+          isLob: false,
+          lobHeight: 0,
+          lobDuration: 0,
+          lobElapsed: 0,
+          targetPos: { x: nearest.pos.x, y: nearest.pos.y },
+          patronId: 'glaciera',
+          colorHex: PATRON_CONSTANTS.glaciera.colorHex,
+        });
+      }
+    }
+    if (h.timer <= 0) {
+      state.room.hazards.splice(i, 1);
+    }
+  }
+
   // Duo: Smoldering Air auto-charges God Gauge up to 25% during combat
   const smoldering = getBoonById(state, 'duo_smoldering_air');
-  if (smoldering && !state.room.cleared && state.room.combatStarted) {
+  if (smoldering && inActiveCombat) {
     const cap = PLAYER_CONSTANTS.godGaugeMax / PLAYER_CONSTANTS.godGaugeBars;
     if (state.player.godGauge < cap) {
       state.player.godGauge = Math.min(
@@ -1437,29 +2335,87 @@ export function tickBoons(
     }
   }
 
+  // Duo: Lightning Rod — dropped floor Bloodstones zap nearby foes every 1.0s
+  const lightningRod = getBoonById(state, 'duo_lightning_rod');
+  if (lightningRod && state.room.bloodstones.length > 0 && livingEnemies.length > 0) {
+    rt.lightningRodAcc += dt;
+    if (rt.lightningRodAcc >= 1.0) {
+      rt.lightningRodAcc -= 1.0;
+      for (const bs of state.room.bloodstones) {
+        triggerVoltarisBoltStrike(
+          state,
+          bs.pos,
+          lightningRod.scaledValue,
+          200,
+          'status',
+          ctx
+        );
+      }
+    }
+  }
+
+  // Duo: Vengeful Mood — automatic thunder-slaughter pulse every 3.0s
+  const vengefulMood = getBoonById(state, 'duo_vengeful_mood');
+  if (vengefulMood && inActiveCombat && livingEnemies.length > 0) {
+    rt.vengefulMoodAcc += dt;
+    if (rt.vengefulMoodAcc >= 3.0) {
+      rt.vengefulMoodAcc -= 3.0;
+      triggerVoltarisBoltStrike(
+        state,
+        state.player.pos,
+        vengefulMood.scaledValue,
+        280,
+        'status',
+        ctx
+      );
+    }
+  }
+
+  // Glaciera Killing Freeze — decay damage when ALL living enemies are Chilled
+  const killingFreeze = getBoonById(state, 'glaciera_killing_freeze');
+  if (killingFreeze && livingEnemies.length > 0) {
+    const allChilled = livingEnemies.every((e) =>
+      e.statuses.some((s) => s.id === 'chill')
+    );
+    if (allChilled) {
+      rt.killingFreezeAcc += dt;
+      if (rt.killingFreezeAcc >= 0.5) {
+        rt.killingFreezeAcc -= 0.5;
+        const tickDmg = Math.max(4, Math.round(killingFreeze.scaledValue * 0.5));
+        for (const e of livingEnemies) {
+          ctx.dealDamageToEnemy(state, e, {
+            baseDamage: tickDmg,
+            source: 'status',
+            canCrit: false,
+            canBackstab: false,
+            patronId: 'glaciera',
+          });
+        }
+      }
+    }
+  }
+
+  // Active God Call periodic pulses
   const player = state.player;
   if (player.godCallActiveTimer <= 0 || !player.godCallPatron) {
     return;
   }
 
-  const rt = getGodCallRuntime(state);
-  // Avoid double-decrementing if simcore already ticked godCallActiveTimer
-  if (Math.abs(player.godCallActiveTimer - rt.lastSeenTimer) < 1e-6) {
+  if (Math.abs(player.godCallActiveTimer - rt.lastSeenCallTimer) < 1e-6) {
     player.godCallActiveTimer = Math.max(0, player.godCallActiveTimer - dt);
   }
-  rt.lastSeenTimer = player.godCallActiveTimer;
-  rt.pulseAccumulator += dt;
+  rt.lastSeenCallTimer = player.godCallActiveTimer;
+  rt.callPulseAcc += dt;
 
   const patron = player.godCallPatron;
   const callBoon = getBoonInSlot(state, 'call');
 
   if (patron === 'voltaris') {
-    const interval = rt.greater ? 0.18 : 0.24;
-    if (rt.pulseAccumulator >= interval) {
-      rt.pulseAccumulator -= interval;
-      const living = state.enemies.filter(isLivingEnemy);
-      if (living.length > 0) {
-        const target = detPick(state, living, ctx);
+    const interval = rt.greaterCall ? 0.18 : 0.24;
+    if (rt.callPulseAcc >= interval) {
+      rt.callPulseAcc -= interval;
+      if (livingEnemies.length > 0) {
+        const target = detPick(state, livingEnemies, ctx);
         triggerVoltarisBoltStrike(
           state,
           target.pos,
@@ -1472,8 +2428,8 @@ export function tickBoons(
     }
   } else if (patron === 'tidebreaker') {
     player.iframeTimer = Math.max(player.iframeTimer, 0.12);
-    if (rt.pulseAccumulator >= 0.24) {
-      rt.pulseAccumulator -= 0.24;
+    if (rt.callPulseAcc >= 0.24) {
+      rt.callPulseAcc -= 0.24;
       triggerTidebreakerSplash(
         state,
         player.pos,
@@ -1489,10 +2445,9 @@ export function tickBoons(
     player.iframeTimer = Math.max(player.iframeTimer, 0.12);
     const hasFlash = hasBoon(state, 'aegira_blinding_flash');
     deflectProjectilesInRadius(state, player.pos, 230, hasFlash, ctx);
-    if (rt.pulseAccumulator >= 0.35) {
-      rt.pulseAccumulator -= 0.35;
-      for (const enemy of state.enemies) {
-        if (!isLivingEnemy(enemy)) continue;
+    if (rt.callPulseAcc >= 0.35) {
+      rt.callPulseAcc -= 0.35;
+      for (const enemy of livingEnemies) {
         if (distSq(player.pos, enemy.pos) <= 210 * 210) {
           ctx.dealDamageToEnemy(state, enemy, {
             baseDamage: 45,
@@ -1502,6 +2457,51 @@ export function tickBoons(
             statusId: hasFlash ? 'exposed' : undefined,
             patronId: 'aegira',
           });
+        }
+      }
+    }
+  } else if (patron === 'bellum') {
+    player.iframeTimer = Math.max(player.iframeTimer, 0.12);
+    if (rt.callPulseAcc >= 0.16) {
+      rt.callPulseAcc -= 0.16;
+      const dmg = callBoon?.scaledValue ?? 46;
+      for (const enemy of livingEnemies) {
+        if (distSq(player.pos, enemy.pos) <= 170 * 170) {
+          ctx.dealDamageToEnemy(state, enemy, {
+            baseDamage: dmg,
+            source: 'call',
+            canCrit: false,
+            canBackstab: false,
+            patronId: 'bellum',
+          });
+        }
+      }
+    }
+  } else if (patron === 'bacchion') {
+    if (rt.callPulseAcc >= 0.35) {
+      rt.callPulseAcc -= 0.35;
+      for (const enemy of livingEnemies) {
+        if (distSq(player.pos, enemy.pos) <= 280 * 280) {
+          ctx.applyStatus(state, enemy, 'enemy', 'hangover', 1, 'bacchion');
+          const h = enemy.statuses.find((s) => s.id === 'hangover');
+          if (h) h.magnitude = Math.max(h.magnitude, callBoon?.scaledValue ?? 12);
+        }
+      }
+    }
+  } else if (patron === 'glaciera') {
+    if (rt.callPulseAcc >= 0.24) {
+      rt.callPulseAcc -= 0.24;
+      for (const enemy of livingEnemies) {
+        if (distSq(player.pos, enemy.pos) <= 300 * 300) {
+          ctx.dealDamageToEnemy(state, enemy, {
+            baseDamage: callBoon?.scaledValue ?? 18,
+            source: 'call',
+            canCrit: false,
+            canBackstab: false,
+            statusId: 'chill',
+            patronId: 'glaciera',
+          });
+          tryTriggerArcticBlast(state, enemy, ctx);
         }
       }
     }

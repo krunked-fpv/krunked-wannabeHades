@@ -20,7 +20,7 @@ import {
   getRoomTemplate,
   type RoomTemplateDef,
 } from '../data/biomes.js';
-import { WAVE1_PATRONS } from '../data/boons.js';
+import { STANDARD_PATRONS } from '../data/boons.js';
 import { getKeepsakeForcedPatron } from '../data/keepsakes.js';
 import {
   detNextFloat,
@@ -38,16 +38,23 @@ export interface PlannedSpawn {
   isMiniBoss?: boolean;
 }
 
+export interface RoomGenOptions {
+  styxWingsCleared?: number;
+  satyrSackFound?: boolean;
+  hasLoyaltyCard?: boolean;
+  templateIdOverride?: string;
+}
+
 // ============================================================================
-// Reward & Door Generation
+// Reward & Door Generation (ALL 10 Patrons, Trials, Chaos Gates, Styx 5-Wings!)
 // ============================================================================
 
-function pickPatronForReward(
+export function pickPatronForReward(
   state: SimState,
   exclude: ReadonlySet<PatronId>,
-  ctx?: RngProvider
+  ctx?: RngProvider,
+  allowVeloce = true
 ): PatronId {
-  // Respect patron keepsake on first available offer
   if (state.player.keepsakeId && !state.player.keepsakeUsed) {
     const forced = getKeepsakeForcedPatron(state.player.keepsakeId);
     if (forced && !exclude.has(forced)) {
@@ -55,8 +62,18 @@ function pickPatronForReward(
     }
   }
 
-  const available = WAVE1_PATRONS.filter((p) => !exclude.has(p));
-  const pool = available.length > 0 ? available : WAVE1_PATRONS;
+  // Veloce (Swiftness) appears as a bonus auxiliary Patron from depth >= 3
+  if (
+    allowVeloce &&
+    state.room.depth >= 3 &&
+    !exclude.has('veloce') &&
+    detNextFloat(state, ctx) < 0.14
+  ) {
+    return 'veloce';
+  }
+
+  const available = STANDARD_PATRONS.filter((p) => !exclude.has(p));
+  const pool = available.length > 0 ? available : STANDARD_PATRONS;
   return detPick(state, pool, ctx);
 }
 
@@ -66,37 +83,49 @@ export function buildRewardPreview(
   patronId?: PatronId,
   flags?: Partial<RewardPreview>
 ): RewardPreview {
+  const veiled = state.player.chaosCurses.some(
+    (c) => c.curseKind === 'hidden_door_rewards'
+  );
+  let preview: RewardPreview;
+
   if (kind === 'boon') {
     const pId = patronId ?? 'voltaris';
-    return {
+    preview = {
       kind: 'boon',
       patronId: pId,
       label: `${PATRON_CONSTANTS[pId].displayName} Boon`,
       ...flags,
     };
+  } else if (kind === 'pom') {
+    preview = { kind: 'pom', label: 'Pom of Power', ...flags };
+  } else if (kind === 'centaur_heart') {
+    preview = { kind: 'centaur_heart', label: 'Centaur Heart (+25 HP)', ...flags };
+  } else if (kind === 'hammer') {
+    preview = { kind: 'hammer', label: 'Forge Hammer', ...flags };
+  } else if (kind === 'gold') {
+    preview = { kind: 'gold', label: 'Vault of Gold', ...flags };
+  } else if (kind === 'darkness') {
+    preview = { kind: 'darkness', label: 'Darkness Trove', ...flags };
+  } else if (kind === 'fountain') {
+    preview = { kind: 'fountain', label: 'Sanctum Fountain', ...flags };
+  } else if (kind === 'shop_item') {
+    preview = { kind: 'shop_item', label: 'Boatman Shop', isShop: true, ...flags };
+  } else if (kind === 'chaos_gate') {
+    preview = {
+      kind: 'chaos_gate',
+      patronId: 'abyssos',
+      label: 'Void Chaos Gate (Abyssos)',
+      isChaos: true,
+      ...flags,
+    };
+  } else {
+    preview = { kind, label: kind.replace(/_/g, ' '), ...flags };
   }
-  if (kind === 'pom') {
-    return { kind: 'pom', label: 'Pom of Power', ...flags };
+
+  if (veiled && !preview.isBoss) {
+    preview.label = 'Veiled Chamber (Void Curse)';
   }
-  if (kind === 'centaur_heart') {
-    return { kind: 'centaur_heart', label: 'Centaur Heart (+25 HP)', ...flags };
-  }
-  if (kind === 'hammer') {
-    return { kind: 'hammer', label: 'Forge Hammer', ...flags };
-  }
-  if (kind === 'gold') {
-    return { kind: 'gold', label: 'Vault of Gold', ...flags };
-  }
-  if (kind === 'darkness') {
-    return { kind: 'darkness', label: 'Darkness Trove', ...flags };
-  }
-  if (kind === 'fountain') {
-    return { kind: 'fountain', label: 'Sanctum Fountain', ...flags };
-  }
-  if (kind === 'shop_item') {
-    return { kind: 'shop_item', label: 'Ferryman Shop', isShop: true, ...flags };
-  }
-  return { kind, label: kind.replace(/_/g, ' '), ...flags };
+  return preview;
 }
 
 export function generateExitDoors(
@@ -105,11 +134,12 @@ export function generateExitDoors(
   depth: number,
   encounterKind: EncounterKind,
   bounds: RoomState['bounds'],
-  ctx?: RngProvider
+  ctx?: RngProvider,
+  opts?: RoomGenOptions
 ): ArenaDoor[] {
   const table = getBiomeEncounterTable(biome);
 
-  // Courtyard has the single glowing Northern Escape Gate into Obsidian Pit Depth 1
+  // 1. Sanctum Courtyard -> Obsidian Pit Depth 1
   if (biome === 'sanctum_hub') {
     return [
       {
@@ -127,7 +157,78 @@ export function generateExitDoors(
     ];
   }
 
-  // Boss room cleared -> Biome Transition Portal (or Victory on Frozen Summit)
+  // 2. Crypt of Bile: Styx Hub with 5 Wing Doors + Locked/Unlocked Frozen Summit Gate!
+  if (biome === 'crypt_of_bile' && encounterKind === 'styx_hub') {
+    const wingsCleared = opts?.styxWingsCleared ?? 0;
+    const sackFound = Boolean(opts?.satyrSackFound);
+    const wingRewards: readonly RewardPreview[] = [
+      buildRewardPreview(state, 'boon', pickPatronForReward(state, new Set(), ctx, false)),
+      buildRewardPreview(state, 'pom'),
+      buildRewardPreview(state, 'centaur_heart'),
+      buildRewardPreview(state, 'gold'),
+      buildRewardPreview(state, 'boon', pickPatronForReward(state, new Set(), ctx, true)),
+    ];
+
+    const doors: ArenaDoor[] = [
+      {
+        id: 'door_styx_summit_gate',
+        pos: { x: 0, y: bounds.minY + 56 },
+        direction: 'portal',
+        locked: !sackFound,
+        targetBiome: 'frozen_summit',
+        reward: {
+          kind: 'titan_blood',
+          label: sackFound
+            ? 'Ascend to Frozen Summit (Sovereign Lord)'
+            : `Locked Summit Gate (Search Wings: ${wingsCleared}/5)`,
+          isBoss: true,
+        },
+      },
+    ];
+
+    const wingX = [-480, -250, 250, 480, 0];
+    const wingY = [
+      bounds.minY + 76,
+      bounds.minY + 72,
+      bounds.minY + 72,
+      bounds.minY + 76,
+      bounds.maxY - 76,
+    ];
+    for (let w = 0; w < 5; w++) {
+      const done = w < wingsCleared;
+      doors.push({
+        id: `door_styx_wing_${w + 1}`,
+        pos: { x: wingX[w], y: wingY[w] },
+        direction: w < 2 ? 'west' : w < 4 ? 'east' : 'south',
+        locked: done,
+        reward: {
+          ...wingRewards[w],
+          label: done
+            ? `Wing ${w + 1} Cleared`
+            : `Crypt Wing ${w + 1} — ${wingRewards[w].label}`,
+        },
+      });
+    }
+    return doors;
+  }
+
+  // 3. Crypt of Bile Wing Exit -> Return Portal to Styx Hub
+  if (biome === 'crypt_of_bile' && encounterKind === 'styx_wing') {
+    return [
+      {
+        id: `door_styx_return_${depth}`,
+        pos: { x: 0, y: bounds.minY + 58 },
+        direction: 'portal',
+        locked: true,
+        reward: {
+          kind: 'fountain',
+          label: 'Return to Crypt Hub',
+        },
+      },
+    ];
+  }
+
+  // 4. Boss room cleared -> Biome Transition Portal (or Victory on Frozen Summit)
   if (encounterKind === 'boss' || encounterKind === 'surface_boss') {
     if (!table.nextBiome) {
       return [];
@@ -150,9 +251,13 @@ export function generateExitDoors(
 
   const bossDepth = table.def.bossDepth;
 
-  // Next room is the Biome Boss!
+  // 5. Next room is the Biome Boss!
   if (depth + 1 >= bossDepth) {
     const bossDef = BOSS_CONSTANTS[table.bossId];
+    const bossLabel =
+      biome === 'verdant_colosseum'
+        ? 'Colosseum Champions (Boss Duo)'
+        : `${bossDef.displayName} (Boss)`;
     return [
       {
         id: `door_boss_${table.bossId}`,
@@ -161,14 +266,14 @@ export function generateExitDoors(
         locked: true,
         reward: {
           kind: 'titan_blood',
-          label: `${bossDef.displayName} (Boss)`,
+          label: bossLabel,
           isBoss: true,
         },
       },
     ];
   }
 
-  // Pre-boss chamber offers Shop + regular exit; otherwise 2 or 3 branching doors
+  // 6. Standard branching doors (2 or 3 doors + optional Chaos Gate!)
   const doorCount =
     depth === bossDepth - 2 ? 2 : detNextFloat(state, ctx) < 0.45 ? 3 : 2;
   const positions: readonly { pos: Vec2; dir: ArenaDoor['direction'] }[] =
@@ -199,15 +304,32 @@ export function generateExitDoors(
 
     if (depth === bossDepth - 2 && i === 0) {
       reward = buildRewardPreview(state, 'shop_item', undefined, { isShop: true });
-    } else if (depth === Math.floor(bossDepth / 2) && i === 0 && encounterKind !== 'miniboss') {
-      const p = pickPatronForReward(state, usedPatrons, ctx);
+    } else if (
+      depth === Math.floor(bossDepth / 2) &&
+      i === 0 &&
+      encounterKind !== 'miniboss'
+    ) {
+      const p = pickPatronForReward(state, usedPatrons, ctx, false);
       usedPatrons.add(p);
       reward = buildRewardPreview(state, 'boon', p, {
         isMiniBoss: true,
         label: `${PATRON_CONSTANTS[p].displayName} Boon (Mini-Boss)`,
       });
+    } else if (
+      i === 1 &&
+      depth >= 3 &&
+      depth <= bossDepth - 3 &&
+      encounterKind !== 'trial' &&
+      detNextFloat(state, ctx) < 0.16
+    ) {
+      // Dual-Patron Trial Room!
+      const p = pickPatronForReward(state, usedPatrons, ctx, false);
+      usedPatrons.add(p);
+      reward = buildRewardPreview(state, 'boon', p, {
+        isTrial: true,
+        label: 'Trial of the Patrons (2 Boons!)',
+      });
     } else if (i === 0) {
-      // Guarantee at least one exciting Boon / Pom / Hammer door
       const roll = detNextFloat(state, ctx);
       if (state.run.hammersCollected < 2 && depth >= 3 && roll < 0.22) {
         reward = buildRewardPreview(state, 'hammer');
@@ -224,12 +346,19 @@ export function generateExitDoors(
         const p = pickPatronForReward(state, usedPatrons, ctx);
         usedPatrons.add(p);
         reward = buildRewardPreview(state, 'boon', p);
-      } else if (roll < 0.56 && !usedKinds.has('centaur_heart')) {
+      } else if (roll < 0.54 && !usedKinds.has('centaur_heart')) {
         reward = buildRewardPreview(state, 'centaur_heart');
-      } else if (roll < 0.74 && !usedKinds.has('pom') && state.player.boons.length > 0) {
+      } else if (roll < 0.7 && !usedKinds.has('pom') && state.player.boons.length > 0) {
         reward = buildRewardPreview(state, 'pom');
-      } else if (roll < 0.88 && !usedKinds.has('gold')) {
+      } else if (roll < 0.84 && !usedKinds.has('gold')) {
         reward = buildRewardPreview(state, 'gold');
+      } else if (
+        roll < 0.92 &&
+        depth >= 4 &&
+        !usedKinds.has('fountain') &&
+        encounterKind !== 'fountain'
+      ) {
+        reward = buildRewardPreview(state, 'fountain');
       } else if (depth >= 4 && !usedKinds.has('shop_item') && encounterKind !== 'shop') {
         reward = buildRewardPreview(state, 'shop_item', undefined, { isShop: true });
       } else {
@@ -244,6 +373,31 @@ export function generateExitDoors(
       direction: positions[i].dir,
       locked: true,
       reward,
+    });
+  }
+
+  // Optional Void Chaos Gate portal in Biomes 1–3 (`chaosHpCost = 20 + depth * 0.2`)
+  if (
+    (biome === 'obsidian_pit' ||
+      biome === 'cinder_mire' ||
+      biome === 'verdant_colosseum') &&
+    encounterKind !== 'chaos' &&
+    depth >= 2 &&
+    depth <= bossDepth - 2 &&
+    detNextFloat(state, ctx) < 0.24
+  ) {
+    const hpCost = Math.round(20 + depth * 0.2);
+    doors.push({
+      id: `door_chaos_${biome}_${depth}`,
+      pos: { x: 0, y: Math.min(bounds.maxY - 140, 150) },
+      direction: 'portal',
+      locked: true,
+      isChaosGate: true,
+      chaosHpCost: hpCost,
+      reward: buildRewardPreview(state, 'chaos_gate', 'abyssos', {
+        isChaos: true,
+        label: `Chaos Gate (-${hpCost} HP) — Abyssos`,
+      }),
     });
   }
 
@@ -264,6 +418,12 @@ export function selectTemplateForEncounter(
   if (biome === 'sanctum_hub' || encounterKind === 'hub') {
     return getRoomTemplate('sanctum_courtyard');
   }
+  if (encounterKind === 'chaos') {
+    return getRoomTemplate('chaos_sanctuary');
+  }
+  if (encounterKind === 'styx_hub') {
+    return getRoomTemplate('crypt_styx_hub');
+  }
   if (encounterKind === 'boss' || encounterKind === 'surface_boss') {
     return getRoomTemplate(table.bossTemplate);
   }
@@ -283,11 +443,11 @@ export function buildRoomState(
   depth: number,
   encounterKind: EncounterKind,
   roomIndex: number,
-  templateIdOverride?: string,
+  opts?: RoomGenOptions,
   ctx?: RngProvider
 ): { room: RoomState; template: RoomTemplateDef } {
-  const template = templateIdOverride
-    ? getRoomTemplate(templateIdOverride)
+  const template = opts?.templateIdOverride
+    ? getRoomTemplate(opts.templateIdOverride)
     : selectTemplateForEncounter(state, biome, encounterKind, ctx);
 
   const halfW = template.width * 0.5;
@@ -313,19 +473,21 @@ export function buildRoomState(
     maxHp: o.hp,
   }));
 
-  const heightenedMult =
-    (state.run.vows.heightened_security ?? 0) > 0 ? 5.0 : 1.0;
-
+  // Note: heightened_security (+400%) is applied 1x natively inside combat.ts dealDamageToPlayer()!
   const hazards: HazardState[] = template.hazards.map((h, idx) => ({
     id: `haz_${template.id}_${idx}`,
     kind: h.kind,
     pos: { x: h.x, y: h.y },
     radius: h.radius,
-    active: h.kind === 'lava_pool' || h.kind === 'poison_pool' || h.kind === 'curing_pool',
+    active:
+      h.kind === 'lava_pool' ||
+      h.kind === 'poison_pool' ||
+      h.kind === 'curing_pool' ||
+      h.kind === 'spike_trap',
     armed: false,
-    timer: idx * 0.7,
-    cooldown: h.cooldown ?? 3.2,
-    damage: Math.round(h.damage * heightenedMult),
+    timer: 0,
+    cooldown: h.cooldown ?? 0,
+    damage: h.damage,
     owner: 'environment',
   }));
 
@@ -333,11 +495,16 @@ export function buildRoomState(
     encounterKind === 'hub' ||
     encounterKind === 'shop' ||
     encounterKind === 'fountain' ||
-    encounterKind === 'story';
+    encounterKind === 'story' ||
+    encounterKind === 'chaos' ||
+    encounterKind === 'styx_hub' ||
+    encounterKind === 'trial'; // Trial starts peaceful until player picks Patron A or B!
 
   const table = getBiomeEncounterTable(biome);
   let totalWaves = 0;
-  if (!isPeaceful) {
+  if (encounterKind === 'trial') {
+    totalWaves = 2;
+  } else if (!isPeaceful) {
     if (encounterKind === 'boss' || encounterKind === 'surface_boss') {
       totalWaves = 1;
     } else if (encounterKind === 'miniboss') {
@@ -355,9 +522,10 @@ export function buildRoomState(
     depth,
     encounterKind,
     bounds,
-    ctx
+    ctx,
+    opts
   );
-  if (isPeaceful) {
+  if (isPeaceful && encounterKind !== 'styx_hub' && encounterKind !== 'trial') {
     for (const d of doors) {
       d.locked = false;
     }
@@ -380,7 +548,7 @@ export function buildRoomState(
     bounds,
     waveIndex: 0,
     totalWaves,
-    cleared: isPeaceful,
+    cleared: isPeaceful && encounterKind !== 'trial',
     combatStarted: !isPeaceful,
     encounterTimer: 0,
     noDamageTaken: true,
@@ -391,13 +559,15 @@ export function buildRoomState(
     bloodstones: [],
     telegraphs: [],
     zoom,
+    styxWingsCleared: opts?.styxWingsCleared,
+    satyrSackFound: opts?.satyrSackFound,
   };
 
   return { room, template };
 }
 
 // ============================================================================
-// Wave Roster & Shop Pickup Generators
+// Wave Roster & Boatman Shop Pickup Generators
 // ============================================================================
 
 export function planWaveSpawns(
@@ -486,7 +656,7 @@ export function planWaveSpawns(
     }
 
     const elite =
-      depth >= 2 &&
+      (depth >= 2 || biome !== 'obsidian_pit') &&
       (waveIndex > 0 || depth >= 4) &&
       detNextFloat(state, ctx) < eliteChance;
 
@@ -498,17 +668,22 @@ export function planWaveSpawns(
 
 export function buildShopPickups(
   state: SimState,
-  ctx?: RngProvider
+  ctx?: RngProvider,
+  opts?: { hasLoyaltyCard?: boolean; includeFerrymanBag?: boolean }
 ): PickupItem[] {
-  const priceMult = getShopPriceMultiplier(state.run.vows);
+  const priceMult = getShopPriceMultiplier(
+    state.run.vows,
+    Boolean(opts?.hasLoyaltyCard)
+  );
   const patron = pickPatronForReward(state, new Set(), ctx);
   const patronDef = PATRON_CONSTANTS[patron];
+  const idx = state.room.roomIndex;
 
-  return [
+  const items: PickupItem[] = [
     {
-      id: `shop_boon_${state.room.roomIndex}`,
+      id: `shop_boon_${idx}`,
       kind: 'boon',
-      pos: { x: -210, y: -40 },
+      pos: { x: -240, y: -45 },
       radius: 36,
       label: `${patronDef.displayName} Boon (${Math.round(150 * priceMult)}g)`,
       costGold: Math.round(150 * priceMult),
@@ -517,9 +692,9 @@ export function buildShopPickups(
       colorHex: patronDef.colorHex,
     },
     {
-      id: `shop_heart_${state.room.roomIndex}`,
+      id: `shop_heart_${idx}`,
       kind: 'centaur_heart',
-      pos: { x: 0, y: -40 },
+      pos: { x: -80, y: -45 },
       radius: 36,
       label: `Centaur Heart (${Math.round(125 * priceMult)}g)`,
       costGold: Math.round(125 * priceMult),
@@ -528,9 +703,19 @@ export function buildShopPickups(
       colorHex: '#ff4d6d',
     },
     {
-      id: `shop_food_${state.room.roomIndex}`,
+      id: `shop_pom_${idx}`,
+      kind: 'pom',
+      pos: { x: 80, y: -45 },
+      radius: 36,
+      label: `Pom of Power (${Math.round(100 * priceMult)}g)`,
+      costGold: Math.round(100 * priceMult),
+      collected: false,
+      colorHex: '#ff5266',
+    },
+    {
+      id: `shop_food_${idx}`,
       kind: 'heal_food',
-      pos: { x: 210, y: -40 },
+      pos: { x: 240, y: -45 },
       radius: 34,
       label: `Ambrosial Roast +40% HP (${Math.round(50 * priceMult)}g)`,
       costGold: Math.round(50 * priceMult),
@@ -539,4 +724,21 @@ export function buildShopPickups(
       colorHex: '#63d471',
     },
   ];
+
+  // Optional Borrow Gold Bag -> Triggers secret boss The Ferryman!
+  if (opts?.includeFerrymanBag) {
+    items.push({
+      id: `shop_ferryman_bag_${idx}`,
+      kind: 'shop_item',
+      pos: { x: 0, y: -190 },
+      radius: 38,
+      label: 'Borrow Gold Bag (+300g — Challenge The Ferryman!)',
+      costGold: 0,
+      amount: 300,
+      collected: false,
+      colorHex: '#ffd942',
+    });
+  }
+
+  return items;
 }
