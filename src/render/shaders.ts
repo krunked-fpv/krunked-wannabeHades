@@ -75,13 +75,13 @@ float pillarSilhouette(vec2 p, float freq, float seed) {
   float col = floor(p.x * freq);
   float fx = fract(p.x * freq);
   float h = hash21(vec2(col, seed));
-  float active = step(0.42, h);
+  float pillarPresent = step(0.42, h);
   float width = mix(0.22, 0.44, hash21(vec2(col + 17.0, seed)));
   float inPillar = smoothstep(0.02, 0.0, abs(fx - 0.5) - width * 0.5);
   // Broken stepped top silhouette
   float topY = mix(0.18, 0.72, h);
   float belowTop = smoothstep(topY + 0.04, topY, p.y);
-  return active * inPillar * belowTop;
+  return pillarPresent * inPillar * belowTop;
 }
 
 void main() {
@@ -306,16 +306,19 @@ uniform float uFinalKillPulse;
 vec3 applyJewelColorGrade(vec3 col) {
   float lum = clamp(dot(col, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
   // 3-way shadow / midtone / highlight Supergiant jewel-tone curve
-  float wShadow = pow(1.0 - lum, 2.0);
+  float wShadow = pow(1.0 - lum, 2.2);
   float wHigh = pow(lum, 2.0);
   float wMid = clamp(1.0 - wShadow - wHigh, 0.0, 1.0);
   vec3 tint = uShadowTint * wShadow + uMidtoneTint * wMid + uHighlightTint * wHigh;
   col *= tint;
 
-  // Filmic crisp saturation & gentle S-curve contrast keeping blacks jet-ink
+  // Deep Hades contrast curve: preserves jet-black ink shadows & jewel-tone richness
+  col = pow(max(col, vec3(0.0)), vec3(1.12));
+  // Subtle ACES-inspired highlight shoulder (prevents white blowout while keeping darks dark)
+  col = (col * (2.2 * col + 0.08)) / (col * (2.0 * col + 0.55) + 0.04);
+  // Rich jewel saturation boost
   float l2 = dot(col, vec3(0.2126, 0.7152, 0.0722));
-  col = mix(vec3(l2), col, 1.16);
-  col = col / (col + vec3(0.28)) * 1.24;
+  col = mix(vec3(l2), col, 1.24);
   return col;
 }
 
@@ -324,11 +327,11 @@ void main() {
   vec3 light = texture(uLightTex, vUv).rgb;
   vec3 bloom = texture(uBloomTex, vUv).rgb;
 
-  // Dynamic lightmap illumination + subtle additive warm glow lift
-  vec3 lit = scene * (vec3(0.84) + light * 0.68) + light * 0.14;
+  // Dramatic chiaroscuro lightmap illumination: dark moody chamber lit by braziers, embers & boons
+  vec3 lit = scene * (vec3(0.56) + light * 1.08) + light * 0.07;
   vec3 col = lit + bloom * uBloomStrength;
 
-  // Per-biome color grading LUT approximation
+  // Per-biome jewel-tone color grading
   col = applyJewelColorGrade(col);
 
   // Final-kill slow-mo dramatic contrast & gilded edge lift

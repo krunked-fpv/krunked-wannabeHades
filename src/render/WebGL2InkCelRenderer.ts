@@ -358,11 +358,109 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     });
   }
 
+  /**
+   * Probes WebGL2 availability, shader compilation, and FBO completeness on a detached
+   * 16x16 canvas FIRST so a failing driver/shader NEVER locks the live `#game-canvas`
+   * out of Canvas2D fallback!
+   */
+  private static probeWebGL2Support(): { ok: true } | { ok: false; reason: string } {
+    if (typeof document === 'undefined') {
+      return { ok: false, reason: 'document unavailable' };
+    }
+    const probeCanvas = document.createElement('canvas');
+    probeCanvas.width = 16;
+    probeCanvas.height = 16;
+    const gl = probeCanvas.getContext('webgl2', {
+      alpha: false,
+      antialias: false,
+      depth: false,
+      stencil: false,
+      premultipliedAlpha: false,
+    });
+    if (!gl) {
+      return { ok: false, reason: 'webgl2 context unavailable' };
+    }
+
+    const cleanup = () => {
+      try {
+        gl.getExtension('WEBGL_lose_context')?.loseContext();
+      } catch {
+        // Ignore loseContext cleanup errors
+      }
+    };
+
+    try {
+      const checkPair = (name: string, vsSrc: string, fsSrc: string) => {
+        const vs = gl.createShader(gl.VERTEX_SHADER);
+        const fs = gl.createShader(gl.FRAGMENT_SHADER);
+        if (!vs || !fs) throw new Error(`${name}: createShader failed`);
+        gl.shaderSource(vs, vsSrc);
+        gl.compileShader(vs);
+        if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
+          throw new Error(`${name} VS: ${gl.getShaderInfoLog(vs) ?? 'compile failed'}`);
+        }
+        gl.shaderSource(fs, fsSrc);
+        gl.compileShader(fs);
+        if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+          throw new Error(`${name} FS: ${gl.getShaderInfoLog(fs) ?? 'compile failed'}`);
+        }
+        const prog = gl.createProgram();
+        if (!prog) throw new Error(`${name}: createProgram failed`);
+        gl.attachShader(prog, vs);
+        gl.attachShader(prog, fs);
+        gl.linkProgram(prog);
+        gl.deleteShader(vs);
+        gl.deleteShader(fs);
+        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+          const log = gl.getProgramInfoLog(prog) ?? 'link failed';
+          gl.deleteProgram(prog);
+          throw new Error(`${name} link: ${log}`);
+        }
+        gl.deleteProgram(prog);
+      };
+
+      checkPair('abyss', FULLSCREEN_VERT, ABYSS_FRAG);
+      checkPair('batch', BATCH_VERT, BATCH_FRAG);
+      checkPair('light', LIGHT_VERT, LIGHT_FRAG);
+      checkPair('bloomExtract', FULLSCREEN_VERT, BLOOM_EXTRACT_FRAG);
+      checkPair('bloomBlur', FULLSCREEN_VERT, BLOOM_BLUR_FRAG);
+      checkPair('composite', FULLSCREEN_VERT, COMPOSITE_FRAG);
+
+      // Verify RGBA8 offscreen FBO completeness
+      const tex = gl.createTexture();
+      const fbo = gl.createFramebuffer();
+      if (!tex || !fbo) throw new Error('probe FBO allocation failed');
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 16, 16, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.deleteFramebuffer(fbo);
+      gl.deleteTexture(tex);
+      if (status !== gl.FRAMEBUFFER_COMPLETE) {
+        throw new Error(`FBO incomplete (0x${status.toString(16)})`);
+      }
+
+      cleanup();
+      return { ok: true };
+    } catch (err) {
+      cleanup();
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
   public static tryCreate(
     canvas: HTMLCanvasElement,
     atlas: BakedAtlas,
     fontAtlas: BakedFontAtlas
   ): WebGL2InkCelRenderer | null {
+    const probe = WebGL2InkCelRenderer.probeWebGL2Support();
+    if (!probe.ok) {
+      console.warn(`[WebGL2InkCelRenderer] Probe failed (${probe.reason}); falling back cleanly to Canvas2D.`);
+      return null;
+    }
+
     try {
       const gl = canvas.getContext('webgl2', {
         alpha: false,
@@ -372,9 +470,13 @@ export class WebGL2InkCelRenderer implements RenderBackend {
         premultipliedAlpha: false,
         powerPreference: 'high-performance',
       });
-      if (!gl) return null;
+      if (!gl) {
+        console.warn('[WebGL2InkCelRenderer] Failed to acquire webgl2 context on canvas; falling back to Canvas2D.');
+        return null;
+      }
       return new WebGL2InkCelRenderer(gl, atlas, fontAtlas);
-    } catch {
+    } catch (err) {
+      console.warn('[WebGL2InkCelRenderer] Init failed after probe; falling back to Canvas2D:', err);
       return null;
     }
   }
@@ -836,7 +938,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     this.lastBrazierBoundsKey = key;
     this.braziers.length = 0;
 
-    const inset = 62;
+    const inset = 64;
     this.braziers.push(
       { x: b.minX + inset, y: b.minY + inset },
       { x: b.maxX - inset, y: b.minY + inset },
@@ -846,11 +948,39 @@ export class WebGL2InkCelRenderer implements RenderBackend {
 
     const midX = (b.minX + b.maxX) * 0.5;
     const midY = (b.minY + b.maxY) * 0.5;
+    const isBlockedSpot = (x: number, y: number) => {
+      for (let i = 0; i < state.room.doors.length; i++) {
+        const d = state.room.doors[i];
+        if (Math.hypot(x - d.pos.x, y - d.pos.y) < 135) return true;
+      }
+      for (let i = 0; i < state.room.obstacles.length; i++) {
+        const o = state.room.obstacles[i];
+        if (Math.abs(x - o.pos.x) < o.halfW + 44 && Math.abs(y - o.pos.y) < o.halfH + 44) return true;
+      }
+      return false;
+    };
+
+    const tryAddBrazier = (x: number, y: number) => {
+      if (!isBlockedSpot(x, y)) this.braziers.push({ x, y });
+    };
+
+    // Flank each chamber exit door symmetrically with twin burning braziers!
+    for (let i = 0; i < state.room.doors.length; i++) {
+      const d = state.room.doors[i];
+      if (d.direction === 'north' || d.direction === 'south') {
+        const by = d.direction === 'north' ? b.minY + inset * 0.72 : b.maxY - inset * 0.72;
+        tryAddBrazier(d.pos.x - 132, by);
+        tryAddBrazier(d.pos.x + 132, by);
+      }
+    }
+
     if (b.maxX - b.minX > 900) {
-      this.braziers.push({ x: midX, y: b.minY + inset * 0.85 }, { x: midX, y: b.maxY - inset * 0.85 });
+      tryAddBrazier(midX, b.minY + inset * 0.85);
+      tryAddBrazier(midX, b.maxY - inset * 0.85);
     }
     if (b.maxY - b.minY > 750) {
-      this.braziers.push({ x: b.minX + inset * 0.85, y: midY }, { x: b.maxX - inset * 0.85, y: midY });
+      tryAddBrazier(b.minX + inset * 0.85, midY);
+      tryAddBrazier(b.maxX - inset * 0.85, midY);
     }
   }
 
@@ -1056,75 +1186,94 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       );
     }
 
-    // Solid dark obsidian under-slab behind diamond tiles (eliminates any subpixel seam gaps)
-    this.pushQuadSolid(x0, y0, x1, y0, x1, y1, x0, y1, 0.06, 0.08, 0.1, 1, 0);
+    // Flush chasm rim & cliff face BEFORE enabling hardware scissor clip for diamond flagstones
+    this.flushBatch();
 
-    // Staggered 2:1 Carved Isometric Stone Diamond Flagstones across room.bounds
-    const tileWorldW = 210;
-    const tileWorldH = 210; // projects to 210 * 0.56 = 117.6 screen px
-    const tileIds = getBiomeTileIds(state.room.biome);
-    const halfTileW = tileWorldW * 0.5;
-    const halfTileH = tileWorldH * 0.5;
-    const tileScaleX = (tileWorldW / 252) * cam.zoom;
-    const tileScaleY = ((tileWorldH * cam.isoScaleY) / 124) * cam.zoom;
+    // Hardware SCISSOR_TEST cleanly clips staggered diamond flagstones inside the beveled stone platform!
+    const gl = this.gl;
+    const scX = Math.max(0, Math.floor(x0 * this.dpr));
+    const scRight = Math.min(this.fbW, Math.ceil(x1 * this.dpr));
+    const scTop = Math.max(0, Math.floor(y0 * this.dpr));
+    const scBottom = Math.min(this.fbH, Math.ceil(y1 * this.dpr));
+    const scW = Math.max(0, scRight - scX);
+    const scH = Math.max(0, scBottom - scTop);
+    const scY = Math.max(0, this.fbH - scBottom);
 
-    const startRow = Math.floor(b.minY / halfTileH) - 1;
-    const endRow = Math.ceil(b.maxY / halfTileH) + 1;
-    const startCol = Math.floor(b.minX / tileWorldW) - 1;
-    const endCol = Math.ceil(b.maxX / tileWorldW) + 1;
+    if (scW > 0 && scH > 0) {
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(scX, scY, scW, scH);
 
-    for (let row = startRow; row <= endRow; row++) {
-      const wy = row * halfTileH;
-      const xShift = (row & 1) !== 0 ? halfTileW : 0;
-      for (let col = startCol; col <= endCol; col++) {
-        const wx = col * tileWorldW + xShift;
-        // Cull tiles far outside bounds
-        if (
-          wx + halfTileW < b.minX ||
-          wx - halfTileW > b.maxX ||
-          wy + halfTileH < b.minY ||
-          wy - halfTileH > b.maxY
-        ) {
-          continue;
+      // Solid deep obsidian under-slab behind diamond tiles (zero subpixel seam gaps)
+      this.pushQuadSolid(x0, y0, x1, y0, x1, y1, x0, y1, 0.05, 0.08, 0.09, 1, 0);
+
+      // Staggered 2:1 Carved Isometric Stone Diamond Flagstones across room.bounds
+      const tileWorldW = 210;
+      const tileWorldH = 210;
+      const tileIds = getBiomeTileIds(state.room.biome);
+      const halfTileW = tileWorldW * 0.5;
+      const halfTileH = tileWorldH * 0.5;
+      const tileScaleX = (tileWorldW / 252) * cam.zoom;
+      const tileScaleY = ((tileWorldH * cam.isoScaleY) / 124) * cam.zoom;
+
+      const startRow = Math.floor(b.minY / halfTileH) - 1;
+      const endRow = Math.ceil(b.maxY / halfTileH) + 1;
+      const startCol = Math.floor(b.minX / tileWorldW) - 1;
+      const endCol = Math.ceil(b.maxX / tileWorldW) + 1;
+
+      for (let row = startRow; row <= endRow; row++) {
+        const wy = row * halfTileH;
+        const xShift = (row & 1) !== 0 ? halfTileW : 0;
+        for (let col = startCol; col <= endCol; col++) {
+          const wx = col * tileWorldW + xShift;
+          if (
+            wx + halfTileW < b.minX ||
+            wx - halfTileW > b.maxX ||
+            wy + halfTileH < b.minY ||
+            wy - halfTileH > b.maxY
+          ) {
+            continue;
+          }
+          const hash = Math.abs((col * 73856093) ^ (row * 19349663)) % 13;
+          const tileId =
+            hash === 0
+              ? tileIds[3]
+              : hash < 3
+                ? tileIds[2]
+                : hash % 2 === 0
+                  ? tileIds[0]
+                  : tileIds[1];
+          const sx = this.wxToSx(wx, cam);
+          const sy = this.wyToSy(wy, 0, cam);
+          const shade = 0.86 + (hash % 4) * 0.04;
+          this.pushSprite(tileId, sx, sy, tileScaleX, tileScaleY, 0, shade, shade, shade, 1, 0, 0);
         }
-        const hash = Math.abs((col * 73856093) ^ (row * 19349663)) % 13;
-        const tileId =
-          hash === 0
-            ? tileIds[3]
-            : hash < 3
-              ? tileIds[2]
-              : hash % 2 === 0
-                ? tileIds[0]
-                : tileIds[1];
-        const sx = this.wxToSx(wx, cam);
-        const sy = this.wyToSy(wy, 0, cam);
-        // Subtle warm/cool tonal variation per flagstone
-        const shade = 0.92 + ((hash % 4) * 0.035);
-        this.pushSprite(tileId, sx, sy, tileScaleX, tileScaleY, 0, shade, shade, shade, 1, 0, 0);
       }
-    }
 
-    // Sanctum Courtyard Crimson-Gold Carpet Runner leading toward Northern Escape Door
-    if (state.room.biome === 'sanctum_hub') {
-      const midX = this.wxToSx((b.minX + b.maxX) * 0.5, cam);
-      const rugHalfW = 76 * cam.zoom;
-      this.pushQuadSolid(
-        midX - rugHalfW,
-        y0 + 18 * cam.zoom,
-        midX + rugHalfW,
-        y0 + 18 * cam.zoom,
-        midX + rugHalfW,
-        y1 - 24 * cam.zoom,
-        midX - rugHalfW,
-        y1 - 24 * cam.zoom,
-        0.54,
-        0.1,
-        0.16,
-        0.86,
-        0
-      );
-      this.pushLine(midX - rugHalfW + 6 * cam.zoom, y0 + 20 * cam.zoom, midX - rugHalfW + 6 * cam.zoom, y1 - 26 * cam.zoom, 4 * cam.zoom, 0.92, 0.72, 0.3, 0.95);
-      this.pushLine(midX + rugHalfW - 6 * cam.zoom, y0 + 20 * cam.zoom, midX + rugHalfW - 6 * cam.zoom, y1 - 26 * cam.zoom, 4 * cam.zoom, 0.92, 0.72, 0.3, 0.95);
+      // Sanctum Courtyard Crimson-Gold Carpet Runner leading toward Northern Escape Door
+      if (state.room.biome === 'sanctum_hub') {
+        const midX = this.wxToSx((b.minX + b.maxX) * 0.5, cam);
+        const rugHalfW = 76 * cam.zoom;
+        this.pushQuadSolid(
+          midX - rugHalfW,
+          y0 + 18 * cam.zoom,
+          midX + rugHalfW,
+          y0 + 18 * cam.zoom,
+          midX + rugHalfW,
+          y1 - 24 * cam.zoom,
+          midX - rugHalfW,
+          y1 - 24 * cam.zoom,
+          0.54,
+          0.1,
+          0.16,
+          0.86,
+          0
+        );
+        this.pushLine(midX - rugHalfW + 6 * cam.zoom, y0 + 20 * cam.zoom, midX - rugHalfW + 6 * cam.zoom, y1 - 26 * cam.zoom, 4 * cam.zoom, 0.92, 0.72, 0.3, 0.95);
+        this.pushLine(midX + rugHalfW - 6 * cam.zoom, y0 + 20 * cam.zoom, midX + rugHalfW - 6 * cam.zoom, y1 - 26 * cam.zoom, 4 * cam.zoom, 0.92, 0.72, 0.3, 0.95);
+      }
+
+      this.flushBatch();
+      gl.disable(gl.SCISSOR_TEST);
     }
 
     // Inlaid Gold & Jade Greek Meander Border Trim around all 4 chamber edges
@@ -1266,12 +1415,12 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       const prog = Math.max(0, Math.min(1, t.progress));
       const [cr, cg, cb] = hexToRgbaTuple(t.dangerColor || '#FF2E4C');
       const hotFlash = prog > 0.8 ? (prog - 0.8) / 0.2 : 0;
-      const r = cr + (1.0 - cr) * hotFlash * 0.8;
-      const g = cg + (0.94 - cg) * hotFlash * 0.8;
-      const b = cb + (0.55 - cb) * hotFlash * 0.6;
+      const r = cr + (1.0 - cr) * hotFlash * 0.55;
+      const g = cg + (0.76 - cg) * hotFlash * 0.65;
+      const b = cb * (1 - hotFlash * 0.55);
       const sx = this.wxToSx(t.pos.x, cam);
       const sy = this.wyToSy(t.pos.y, 0, cam);
-      const rimEmissive = 1.0 + hotFlash * 1.4 + 0.2 * Math.sin(timeSec * 24);
+      const rimEmissive = 0.55 + hotFlash * 0.55 + 0.12 * Math.sin(timeSec * 24);
 
       if (t.kind === 'circle' || t.kind === 'ring') {
         const rx = t.radius * cam.zoom;
