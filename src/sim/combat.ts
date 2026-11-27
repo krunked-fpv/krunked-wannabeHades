@@ -6,6 +6,7 @@ import {
   PATRON_CONSTANTS,
   PLAYER_CONSTANTS,
   SIM_CONSTANTS,
+  type AspectId,
   type BoonInstance,
   type BoonSlot,
   type EnemyState,
@@ -16,6 +17,7 @@ import {
   type SimState,
   type StatusEffectId,
   type Vec2,
+  type WeaponId,
 } from '../contracts/index.js';
 import { getAspectBonus, getAspectRank } from '../data/aspects.js';
 import { hasHammer } from '../data/hammers.js';
@@ -92,6 +94,179 @@ export interface SimGameplayHooks {
   onRerollBoon?(state: SimState, ctx: SimCombatContext): boolean;
   onRoomCleared?(state: SimState, ctx: SimCombatContext): void;
   onEnemyKilled?(state: SimState, enemy: EnemyState, ctx: SimCombatContext): void;
+}
+
+// ============================================================================
+// Deterministic Per-SimState Weapon/Aspect Runtime (WeakMap preserves SimState contract)
+// ============================================================================
+
+export interface WeaponRuntime {
+  lastWeaponId: WeaponId;
+  lastAspectId: AspectId;
+  cursedSlashApplied: boolean;
+  // Eternal Spear
+  spearHoldTimer: number;
+  spearSpinCharging: boolean;
+  spearSpecialHoldTimer: number;
+  spearSpecialCharging: boolean;
+  punishingSweep: Map<string, number>;
+  // Shield of Chaos
+  shieldHoldTimer: number;
+  shieldBullCharging: boolean;
+  abyssExtraShields: number;
+  blitzDiscPulseTimer: number;
+  // Heart-Seeking Bow
+  bowDashChargeActive: boolean;
+  bowTrackerTargetId: string | null;
+  bowTrackerTimer: number;
+  sharedSuffering: Map<string, number>;
+  // Cast-loading Aspects (bow_loaded & shield_behemoth)
+  loadedCasts: number;
+  // Twin Fists
+  fistsCutterHits: number;
+  magneticPullTargets: Map<string, number>;
+  // Adamant Rail
+  railBeamRamp: number;
+  railBeamTickTimer: number;
+  railBurstRemaining: number;
+  railBurstCooldown: number;
+}
+
+const weaponRuntimeMap = new WeakMap<SimState, WeaponRuntime>();
+let propagatingSharedSuffering = false;
+
+export const FROST_SPIN_WAVE_SENTINEL = 999;
+export const BLITZ_DISC_PIERCE_SENTINEL = 80;
+
+export function getWeaponRuntime(state: SimState): WeaponRuntime {
+  let rt = weaponRuntimeMap.get(state);
+  if (!rt) {
+    rt = {
+      lastWeaponId: state.player.weaponId,
+      lastAspectId: state.player.aspectId,
+      cursedSlashApplied: hasHammer(state.player, 'hammer_blade_cursed_slash'),
+      spearHoldTimer: 0,
+      spearSpinCharging: false,
+      spearSpecialHoldTimer: 0,
+      spearSpecialCharging: false,
+      punishingSweep: new Map(),
+      shieldHoldTimer: 0,
+      shieldBullCharging: false,
+      abyssExtraShields: 0,
+      blitzDiscPulseTimer: 0,
+      bowDashChargeActive: false,
+      bowTrackerTargetId: null,
+      bowTrackerTimer: 0,
+      sharedSuffering: new Map(),
+      loadedCasts: 0,
+      fistsCutterHits: 0,
+      magneticPullTargets: new Map(),
+      railBeamRamp: 0,
+      railBeamTickTimer: 0,
+      railBurstRemaining: 0,
+      railBurstCooldown: 0,
+    };
+    weaponRuntimeMap.set(state, rt);
+  }
+  return rt;
+}
+
+export function resetTransientWeaponRuntime(state: SimState): void {
+  const rt = getWeaponRuntime(state);
+  const player = state.player;
+  rt.lastWeaponId = player.weaponId;
+  rt.lastAspectId = player.aspectId;
+  rt.spearHoldTimer = 0;
+  rt.spearSpinCharging = false;
+  rt.spearSpecialHoldTimer = 0;
+  rt.spearSpecialCharging = false;
+  rt.shieldHoldTimer = 0;
+  rt.shieldBullCharging = false;
+  rt.abyssExtraShields = 0;
+  rt.blitzDiscPulseTimer = 0;
+  rt.bowDashChargeActive = false;
+  rt.loadedCasts = 0;
+  rt.railBeamRamp = 0;
+  rt.railBeamTickTimer = 0;
+  rt.railBurstRemaining = 0;
+  rt.railBurstCooldown = 0;
+  player.isBlocking = false;
+  player.spearOut = false;
+  player.shieldOut = false;
+  player.attackChargeTimer = 0;
+}
+
+export function tickWeaponRuntime(state: SimState, dt: number): void {
+  if (dt <= 0) return;
+  const rt = getWeaponRuntime(state);
+  const player = state.player;
+
+  // Detect live weapon / aspect swaps (e.g. Weapon Rack or DebugBridge.setWeapon)
+  if (rt.lastWeaponId !== player.weaponId || rt.lastAspectId !== player.aspectId) {
+    // Return any loaded casts to player before resetting
+    if (rt.loadedCasts > 0) {
+      player.castAmmo = Math.min(player.maxCastAmmo, player.castAmmo + rt.loadedCasts);
+    }
+    resetTransientWeaponRuntime(state);
+    if (player.weaponId === 'adamant_rail' && player.maxAmmo > 0 && player.ammo <= 0) {
+      player.ammo = player.maxAmmo;
+      player.reloadTimer = 0;
+    }
+  }
+
+  // Tick Punishing Sweep timers (spear_sovereign)
+  if (rt.punishingSweep.size > 0) {
+    for (const [id, rem] of rt.punishingSweep) {
+      const next = rem - dt;
+      if (next <= 0) {
+        rt.punishingSweep.delete(id);
+      } else {
+        rt.punishingSweep.set(id, next);
+      }
+    }
+  }
+
+  // Tick Shared Suffering timers (bow_celestial)
+  if (rt.sharedSuffering.size > 0) {
+    for (const [id, rem] of rt.sharedSuffering) {
+      const next = rem - dt;
+      if (next <= 0) {
+        rt.sharedSuffering.delete(id);
+      } else {
+        rt.sharedSuffering.set(id, next);
+      }
+    }
+  }
+
+  // Tick Magnetic Pull vulnerability timers (fists_magnet)
+  if (rt.magneticPullTargets.size > 0) {
+    for (const [id, rem] of rt.magneticPullTargets) {
+      const next = rem - dt;
+      if (next <= 0) {
+        rt.magneticPullTargets.delete(id);
+      } else {
+        rt.magneticPullTargets.set(id, next);
+      }
+    }
+  }
+
+  // Tick Bow Tracker target timer (bow_tracker)
+  if (rt.bowTrackerTimer > 0) {
+    rt.bowTrackerTimer = Math.max(0, rt.bowTrackerTimer - dt);
+    if (rt.bowTrackerTimer === 0) {
+      rt.bowTrackerTargetId = null;
+    }
+  }
+
+  // Ensure spearOut / shieldOut never stick if projectile vanished across room transition
+  if (player.spearOut) {
+    const hasSpear = state.projectiles.some((p) => p.owner === 'player' && p.kind === 'spear');
+    if (!hasSpear) player.spearOut = false;
+  }
+  if (player.shieldOut) {
+    const hasShield = state.projectiles.some((p) => p.owner === 'player' && p.kind === 'shield');
+    if (!hasShield) player.shieldOut = false;
+  }
 }
 
 export function getBoonInSlot(player: PlayerState, slot: BoonSlot): BoonInstance | undefined {
@@ -211,6 +386,45 @@ export function dropLodgedBloodstones(state: SimState, enemy: EnemyState): numbe
   return dropped;
 }
 
+export function detonateHellfireMine(
+  state: SimState,
+  hazardIndex: number,
+  ctx: SimCombatContext,
+  hooks?: SimGameplayHooks,
+): void {
+  const h = state.room.hazards[hazardIndex];
+  if (!h || h.kind !== 'pylon' || h.owner !== 'player') return;
+  const pos = { x: h.pos.x, y: h.pos.y };
+  state.room.hazards.splice(hazardIndex, 1);
+
+  const rank = getAspectRank(state.meta.aspectRanks, 'rail_beam');
+  const mult = 1 + getAspectBonus('rail_beam', rank);
+  const dmg = Math.round(120 * mult);
+  const blastRadius = 280;
+
+  addCameraShake(state, 10.0, 0.22);
+  triggerHitstop(state, 0.04);
+  spawnFloatingNumber(state, pos, 'HELLFIRE!', 'crit', '#FF7B29');
+
+  for (let i = 0; i < state.enemies.length; i++) {
+    const e = state.enemies[i];
+    if (e.hp <= 0 || e.aiState === 'dead') continue;
+    if (ellipseDistance(e.pos.x - pos.x, e.pos.y - pos.y) <= blastRadius + e.radius) {
+      dealDamageToEnemy(
+        state,
+        e,
+        {
+          baseDamage: dmg,
+          source: 'special',
+          knockback: 1400,
+        },
+        hooks,
+        ctx,
+      );
+    }
+  }
+}
+
 export function dealDamageToEnemy(
   state: SimState,
   enemy: EnemyState,
@@ -247,6 +461,7 @@ export function dealDamageToEnemy(
   }
 
   const player = state.player;
+  const rt = getWeaponRuntime(state);
   const hitAngle =
     opts.angle !== undefined
       ? opts.angle
@@ -399,7 +614,7 @@ export function dealDamageToEnemy(
     additiveBonus += COMBAT_CONSTANTS.statusDefaults.maim.incomingDamageBonus;
   }
 
-  // 8. Ruthless Reflex, Aspect of Strife / Vanguard, Maelstrom Cast bonus, Breaching Cross
+  // 8. Ruthless Reflex, Aspects (Strife/Vanguard/Sovereign/Maelstrom/Magnet) & Distance Hammers
   if (
     player.perfectDashTimer > 0 &&
     state.meta.mirrorActiveSide.greater_reflex === 'b' &&
@@ -411,16 +626,49 @@ export function dealDamageToEnemy(
     const rank = getAspectRank(state.meta.aspectRanks, 'rail_blast');
     additiveBonus += getAspectBonus('rail_blast', rank);
   }
+  if (player.eruptBuffTimer > 0 && hasHammer(player, 'hammer_shield_ferocious_guard')) {
+    additiveBonus += 0.2;
+  }
   if (opts.source === 'cast' && player.aspectId === 'blade_maelstrom') {
     const rank = getAspectRank(state.meta.aspectRanks, 'blade_maelstrom');
     additiveBonus += getAspectBonus('blade_maelstrom', rank);
   }
+  if (
+    rt.punishingSweep.has(enemy.id) &&
+    (opts.source === 'attack' || opts.source === 'special')
+  ) {
+    const rank = getAspectRank(state.meta.aspectRanks, 'spear_sovereign');
+    additiveBonus += getAspectBonus('spear_sovereign', rank);
+  }
+  if (
+    rt.magneticPullTargets.has(enemy.id) &&
+    (opts.source === 'attack' || opts.source === 'cast')
+  ) {
+    const rank = getAspectRank(state.meta.aspectRanks, 'fists_magnet');
+    additiveBonus += getAspectBonus('fists_magnet', rank);
+  }
   if (player.empoweredAttacks > 0 && (opts.source === 'attack' || opts.source === 'cast')) {
-    additiveBonus += 1.0;
-    player.empoweredAttacks -= 1;
+    if (player.aspectId === 'spear_vanguard') {
+      const rank = getAspectRank(state.meta.aspectRanks, 'spear_vanguard');
+      additiveBonus += getAspectBonus('spear_vanguard', rank);
+      player.empoweredAttacks -= 1;
+    } else if (player.aspectId !== 'rail_sniper') {
+      additiveBonus += 1.0;
+      player.empoweredAttacks -= 1;
+    }
   }
   if (opts.isDashStrike && enemy.armor > 0 && hasHammer(player, 'hammer_fists_breaching_cross')) {
     additiveBonus += 9.0; // +900% to Armor
+  }
+  if (opts.source === 'attack' && hasHammer(player, 'hammer_bow_point_blank_shot')) {
+    if (ellipseDistance(enemy.pos.x - player.pos.x, enemy.pos.y - player.pos.y) <= 280) {
+      additiveBonus += 1.5; // +150% to nearby foes
+    }
+  }
+  if (opts.source === 'attack' && hasHammer(player, 'hammer_spear_extending_jab')) {
+    if (ellipseDistance(enemy.pos.x - player.pos.x, enemy.pos.y - player.pos.y) >= 240) {
+      additiveBonus += 0.4; // +40% to distant foes
+    }
   }
 
   // 9. Multiplicative Critical Hit (3.0x)
@@ -502,9 +750,22 @@ export function dealDamageToEnemy(
     applyStatus(state, enemy, 'enemy', statusToApply, opts.statusStacks ?? 1, 'player', statusMag);
   }
 
-  // 13. Cursed Slash healing (+2 HP per attack hit)
-  if (opts.source === 'attack' && hasHammer(player, 'hammer_blade_cursed_slash')) {
-    healPlayer(state, 2);
+  // 13. Aspect & Hammer on-hit trackers
+  if (opts.source === 'attack') {
+    if (hasHammer(player, 'hammer_blade_cursed_slash')) {
+      healPlayer(state, 2);
+    }
+    if (player.aspectId === 'bow_tracker' && enemy.hp > 0) {
+      rt.bowTrackerTargetId = enemy.id;
+      rt.bowTrackerTimer = 4.0;
+    }
+    if (player.aspectId === 'fists_cutter') {
+      rt.fistsCutterHits = Math.min(12, rt.fistsCutterHits + 1);
+      player.consecutiveHits = rt.fistsCutterHits;
+    }
+  }
+  if (opts.source === 'special' && player.aspectId === 'bow_celestial' && enemy.hp > 0) {
+    rt.sharedSuffering.set(enemy.id, 7.0);
   }
 
   // 14. God Gauge fill on damage dealt (0.01 * dmgDealt)
@@ -518,7 +779,9 @@ export function dealDamageToEnemy(
   // 15. Telemetry, hitflash, floating numbers, hitstop, shake & events
   state.run.damageDealt += finalDamage;
   enemy.hitFlashTimer = 0.1;
-  player.consecutiveHits += 1;
+  if (player.aspectId !== 'fists_cutter') {
+    player.consecutiveHits += 1;
+  }
 
   const numKind: FloatingNumber['kind'] = isCrit
     ? 'crit'
@@ -572,12 +835,53 @@ export function dealDamageToEnemy(
     }
   }
 
+  // 15b. Aspect of the Celestial (bow_celestial): propagate Shared Suffering (up to 60% damage bond)
+  if (
+    !propagatingSharedSuffering &&
+    player.aspectId === 'bow_celestial' &&
+    opts.source === 'attack' &&
+    rt.sharedSuffering.size > 0
+  ) {
+    propagatingSharedSuffering = true;
+    try {
+      const rank = getAspectRank(state.meta.aspectRanks, 'bow_celestial');
+      const shareRatio = Math.min(0.6, Math.max(0.3, getAspectBonus('bow_celestial', rank)));
+      const sharedDmg = Math.max(1, Math.round(finalDamage * shareRatio));
+      for (let i = 0; i < state.enemies.length; i++) {
+        const linked = state.enemies[i];
+        if (linked.id === enemy.id || linked.hp <= 0 || linked.aiState === 'dead') continue;
+        if (!rt.sharedSuffering.has(linked.id)) continue;
+        dealDamageToEnemy(
+          state,
+          linked,
+          {
+            baseDamage: sharedDmg,
+            source: 'status',
+            canCrit: false,
+            canBackstab: false,
+          },
+          hooks,
+          ctx,
+        );
+      }
+    } finally {
+      propagatingSharedSuffering = false;
+    }
+  }
+
   // 16. Death & Final-Kill Slow-Mo (0.00001x for 0.6s, 0.1s lerp out)
   if (enemy.hp <= 0) {
     enemy.hp = 0;
     enemy.aiState = 'dead';
     state.run.kills += 1;
     dropLodgedBloodstones(state, enemy);
+    rt.punishingSweep.delete(enemy.id);
+    rt.sharedSuffering.delete(enemy.id);
+    rt.magneticPullTargets.delete(enemy.id);
+    if (rt.bowTrackerTargetId === enemy.id) {
+      rt.bowTrackerTargetId = null;
+      rt.bowTrackerTimer = 0;
+    }
 
     const hasMoreBossPhases = enemy.isBoss && enemy.phase < enemy.maxPhases;
     const finalInRoom =
@@ -642,13 +946,18 @@ export function dealDamageToPlayer(
     }
   }
 
-  // 2. Shield of Chaos frontal block
-  if (player.isBlocking && source === 'enemy' && opts?.fromPos) {
-    const incomingAngle = Math.atan2(opts.fromPos.y - player.pos.y, opts.fromPos.x - player.pos.x);
-    if (Math.abs(shortestAngleDelta(player.facingAngle, incomingAngle)) <= (75 * Math.PI) / 180) {
+  // 2. Shield of Chaos frontal block (negates frontal enemy melee hits & projectiles)
+  if (player.isBlocking && source === 'enemy') {
+    let blocked = true;
+    if (opts?.fromPos) {
+      const incomingAngle = Math.atan2(opts.fromPos.y - player.pos.y, opts.fromPos.x - player.pos.x);
+      blocked = Math.abs(shortestAngleDelta(player.facingAngle, incomingAngle)) <= (80 * Math.PI) / 180;
+    }
+    if (blocked) {
       spawnFloatingNumber(state, player.pos, 'BLOCKED', 'blocked', '#7CE8FF');
       if (hasHammer(player, 'hammer_shield_ferocious_guard')) {
         player.eruptBuffTimer = Math.max(player.eruptBuffTimer, 10.0);
+        spawnFloatingNumber(state, { x: player.pos.x, y: player.pos.y - 20 }, 'FEROCIOUS!', 'crit', '#FFD54F');
       }
       return 0;
     }
@@ -712,12 +1021,14 @@ export function dealDamageToPlayer(
     scaled *= 0.7; // Sturdy (-30%)
   }
 
-  // Consecrated Aura damage reduction (Aspect of the Paladin)
+  // Consecrated Aura (Hallowed Ground) damage reduction (Aspect of the Paladin)
   for (let i = 0; i < state.room.hazards.length; i++) {
     const h = state.room.hazards[i];
     if (h.kind === 'consecrated_aura' && h.active) {
       if (ellipseDistance(player.pos.x - h.pos.x, player.pos.y - h.pos.y) <= h.radius) {
-        scaled *= 0.6;
+        const rank = getAspectRank(state.meta.aspectRanks, 'blade_paladin');
+        const dr = Math.min(0.5, 0.2 + getAspectBonus('blade_paladin', rank) * 0.5);
+        scaled *= 1 - dr;
         break;
       }
     }
@@ -799,7 +1110,6 @@ export function dealDamageToPlayer(
       player.hp = Math.max(1, Math.round(player.maxHp * restoreRatio));
       player.iframeTimer = 2.0;
 
-      // Push nearby enemies back on Death Defiance revival
       for (let i = 0; i < state.enemies.length; i++) {
         const e = state.enemies[i];
         if (e.hp <= 0 || e.aiState === 'dead' || e.isBoss) continue;
@@ -893,7 +1203,6 @@ export function deflectProjectiles(
     const origSpeed = Math.max(360, Math.hypot(p.vel.x, p.vel.y));
     const newSpeed = origSpeed * speedMult;
 
-    // Aim reflected projectile toward nearest living enemy, or straight back
     let targetAngle = normalizeAngle(Math.atan2(-p.vel.y, -p.vel.x));
     let bestDist = Infinity;
     for (let j = 0; j < state.enemies.length; j++) {
@@ -945,17 +1254,26 @@ export function spawnProjectile(
   return full;
 }
 
+function dropCastAtPos(state: SimState, pos: Vec2, count: number, vel?: Vec2): void {
+  if (state.meta.mirrorActiveSide.infernal_soul === 'b') return;
+  for (let c = 0; c < count; c++) {
+    const a = nextFloat(state) * Math.PI * 2;
+    state.room.bloodstones.push({
+      id: `bs_${state.tick}_${nextInt(state, 0, 999999)}`,
+      pos: { x: pos.x, y: pos.y },
+      vel: vel
+        ? { x: vel.x + Math.cos(a) * 60, y: vel.y + Math.sin(a) * 60 * SIM_CONSTANTS.isoScaleY }
+        : { x: Math.cos(a) * 120, y: Math.sin(a) * 120 * SIM_CONSTANTS.isoScaleY },
+      life: 0,
+      magnetizing: false,
+    });
+  }
+}
+
 function dropCastFromProjectile(state: SimState, proj: ProjectileState): void {
   if (!proj.lodgesCast) return;
-  // Stygian Soul regenerates cast automatically rather than dropping Bloodstones
-  if (state.meta.mirrorActiveSide.infernal_soul === 'b') return;
-  state.room.bloodstones.push({
-    id: `bs_${state.tick}_${nextInt(state, 0, 999999)}`,
-    pos: { x: proj.pos.x, y: proj.pos.y },
-    vel: { x: -proj.vel.x * 0.12, y: -proj.vel.y * 0.12 },
-    life: 0,
-    magnetizing: false,
-  });
+  const count = proj.kind === 'arrow' && proj.lobHeight > 0 ? Math.round(proj.lobHeight) : 1;
+  dropCastAtPos(state, proj.pos, count, { x: -proj.vel.x * 0.12, y: -proj.vel.y * 0.12 });
 }
 
 export function tickProjectiles(
@@ -967,12 +1285,13 @@ export function tickProjectiles(
   if (dt <= 0) return;
 
   const player = state.player;
+  const rt = getWeaponRuntime(state);
 
   for (let i = state.projectiles.length - 1; i >= 0; i--) {
     const p = state.projectiles[i];
     p.life += dt;
 
-    // 1. Lobbed projectile (e.g., Adamant Rail Bombard Shell, mortar bombs)
+    // 1. Lobbed projectile (e.g., Adamant Rail Bombard Shell scaleY=0.6, mortar bombs)
     if (p.isLob && p.targetPos && p.lobDuration > 0) {
       p.lobElapsed += dt;
       const t = Math.min(1, p.lobElapsed / p.lobDuration);
@@ -981,11 +1300,12 @@ export function tickProjectiles(
 
       if (t >= 1) {
         const radius = p.aoeRadius ?? 220;
+        const aoeScaleY = p.kind === 'bomb' ? 0.6 : SIM_CONSTANTS.isoScaleY;
         if (p.owner === 'player') {
           for (let j = 0; j < state.enemies.length; j++) {
             const e = state.enemies[j];
             if (e.hp <= 0 || e.aiState === 'dead') continue;
-            if (ellipseDistance(e.pos.x - p.pos.x, e.pos.y - p.pos.y) <= radius + e.radius) {
+            if (ellipseDistance(e.pos.x - p.pos.x, e.pos.y - p.pos.y, aoeScaleY) <= radius + e.radius) {
               dealDamageToEnemy(
                 state,
                 e,
@@ -1005,20 +1325,21 @@ export function tickProjectiles(
           // Aspect of Strife (rail_blast): absorbing own special grants +75% dmg for 4s
           if (
             player.aspectId === 'rail_blast' &&
-            ellipseDistance(player.pos.x - p.pos.x, player.pos.y - p.pos.y) <= radius
+            ellipseDistance(player.pos.x - p.pos.x, player.pos.y - p.pos.y, aoeScaleY) <= radius
           ) {
             player.eruptBuffTimer = 4.0;
+            spawnFloatingNumber(state, player.pos, 'STRIFE +75%!', 'crit', '#FF7B29');
           }
           // Hazard Bomb self-damage
           if (
             hasHammer(player, 'hammer_rail_hazard_bomb') &&
-            ellipseDistance(player.pos.x - p.pos.x, player.pos.y - p.pos.y) <= radius
+            ellipseDistance(player.pos.x - p.pos.x, player.pos.y - p.pos.y, aoeScaleY) <= radius
           ) {
             dealDamageToPlayer(state, 15, { source: 'hazard' });
           }
           addCameraShake(state, 9.0, 0.2);
         } else {
-          if (ellipseDistance(player.pos.x - p.pos.x, player.pos.y - p.pos.y) <= radius) {
+          if (ellipseDistance(player.pos.x - p.pos.x, player.pos.y - p.pos.y, aoeScaleY) <= radius) {
             dealDamageToPlayer(state, p.damage, { source: 'enemy', fromPos: p.pos });
           }
         }
@@ -1027,20 +1348,58 @@ export function tickProjectiles(
       continue;
     }
 
-    // 2. Returning weapon projectiles (Spear recall / Shield Rebound return)
+    // 2. Blitz Disc (shield_thunder): lingering spinning disc pulsing damage every 0.2s
+    const isBlitzDisc =
+      p.owner === 'player' &&
+      p.kind === 'shield' &&
+      p.pierceLeft >= BLITZ_DISC_PIERCE_SENTINEL;
+
+    if (isBlitzDisc && !p.returning) {
+      rt.blitzDiscPulseTimer -= dt;
+      if (rt.blitzDiscPulseTimer <= 0) {
+        rt.blitzDiscPulseTimer = 0.2;
+        const pulseRadius = 115;
+        for (let j = 0; j < state.enemies.length; j++) {
+          const e = state.enemies[j];
+          if (e.hp <= 0 || e.aiState === 'dead') continue;
+          if (ellipseDistance(e.pos.x - p.pos.x, e.pos.y - p.pos.y) <= pulseRadius + e.radius) {
+            dealDamageToEnemy(
+              state,
+              e,
+              {
+                baseDamage: p.damage,
+                source: 'special',
+                knockback: 220,
+                patronId: p.patronId,
+                statusId: p.statusToApply,
+              },
+              hooks,
+              ctx,
+            );
+          }
+        }
+      }
+    }
+
+    // 3. Returning weapon projectiles (Spear recall / Shield Rebound or Blitz Disc return)
     if (p.returning && p.owner === 'player') {
       const dx = player.pos.x - p.pos.x;
       const dy = player.pos.y - p.pos.y;
       const d = Math.hypot(dx, dy);
-      if (d <= 48) {
+      if (d <= 52) {
         if (p.kind === 'spear') player.spearOut = false;
         if (p.kind === 'shield') {
-          player.shieldOut = false;
+          const otherShields = state.projectiles.filter(
+            (other) => other !== p && other.owner === 'player' && other.kind === 'shield',
+          ).length;
+          if (otherShields === 0) {
+            player.shieldOut = false;
+          }
           if (hasHammer(player, 'hammer_shield_explosive_return')) {
             for (let j = 0; j < state.enemies.length; j++) {
               const e = state.enemies[j];
               if (e.hp <= 0 || e.aiState === 'dead') continue;
-              if (ellipseDistance(e.pos.x - player.pos.x, e.pos.y - player.pos.y) <= 220) {
+              if (ellipseDistance(e.pos.x - player.pos.x, e.pos.y - player.pos.y) <= 220 + e.radius) {
                 dealDamageToEnemy(state, e, { baseDamage: 50, source: 'special', knockback: 900 }, hooks, ctx);
               }
             }
@@ -1049,28 +1408,41 @@ export function tickProjectiles(
         state.projectiles.splice(i, 1);
         continue;
       }
-      const speed = Math.max(1300, Math.hypot(p.vel.x, p.vel.y));
+      const speed = Math.max(1450, Math.hypot(p.vel.x, p.vel.y));
       p.vel.x = (dx / d) * speed;
       p.vel.y = (dy / d) * speed;
       p.angle = Math.atan2(dy, dx);
     }
 
-    // 3. Homing steering (Player homing arrows/casts or enemy seeking orbs)
+    // 4. Homing steering (including bow_tracker locked target!)
     if (p.homingStrength > 0 && !p.returning) {
       let tx = 0;
       let ty = 0;
       let found = false;
       if (p.owner === 'player') {
-        let bestDist = 520;
-        for (let j = 0; j < state.enemies.length; j++) {
-          const e = state.enemies[j];
-          if (e.hp <= 0 || e.aiState === 'dead' || p.hitIds.includes(e.id)) continue;
-          const d = Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y);
-          if (d < bestDist) {
-            bestDist = d;
-            tx = e.pos.x;
-            ty = e.pos.y;
+        // Aspect of the Tracker: Special arrows lock directly onto last Attack-struck target
+        if (p.kind === 'arrow' && player.aspectId === 'bow_tracker' && rt.bowTrackerTargetId) {
+          const tracked = state.enemies.find(
+            (e) => e.id === rt.bowTrackerTargetId && e.hp > 0 && e.aiState !== 'dead',
+          );
+          if (tracked) {
+            tx = tracked.pos.x;
+            ty = tracked.pos.y;
             found = true;
+          }
+        }
+        if (!found) {
+          let bestDist = 560;
+          for (let j = 0; j < state.enemies.length; j++) {
+            const e = state.enemies[j];
+            if (e.hp <= 0 || e.aiState === 'dead' || p.hitIds.includes(e.id)) continue;
+            const d = Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y);
+            if (d < bestDist) {
+              bestDist = d;
+              tx = e.pos.x;
+              ty = e.pos.y;
+              found = true;
+            }
           }
         }
       } else {
@@ -1090,7 +1462,7 @@ export function tickProjectiles(
       }
     }
 
-    // 4. Advance position (respect Consecrated Aura projectile slow for enemy projectiles)
+    // 5. Advance position (Consecrated Aura slows enemy projectiles by 55%)
     let projTimeMult = 1.0;
     if (p.owner === 'enemy') {
       for (let hIdx = 0; hIdx < state.room.hazards.length; hIdx++) {
@@ -1104,24 +1476,37 @@ export function tickProjectiles(
       }
     }
 
-    const stepX = p.vel.x * dt * projTimeMult;
-    const stepY = p.vel.y * dt * projTimeMult;
-    p.pos.x += stepX;
-    p.pos.y += stepY;
-    p.distanceTraveled += Math.hypot(stepX, stepY);
+    const curSpeed = Math.hypot(p.vel.x, p.vel.y);
+    const isLodgedSpear = p.owner === 'player' && p.kind === 'spear' && !p.returning && curSpeed < 1;
 
-    // 5. Obstacle / boundary hit check (skip for returning spear/shield)
-    if (!p.returning) {
+    if (!isLodgedSpear) {
+      const stepX = p.vel.x * dt * projTimeMult;
+      const stepY = p.vel.y * dt * projTimeMult;
+      p.pos.x += stepX;
+      p.pos.y += stepY;
+      p.distanceTraveled += Math.hypot(stepX, stepY);
+    }
+
+    // 6. Obstacle / boundary hit check (skip for returning spear/shield or lodged spear)
+    if (!p.returning && !isLodgedSpear) {
       const obsHit = checkProjectileObstacleHit(state, p.pos, p.radius);
       if (obsHit.hit) {
+        if (isBlitzDisc) {
+          // Blitz Disc stops and hovers spinning at barrier
+          p.vel.x = 0;
+          p.vel.y = 0;
+          continue;
+        }
         if (p.kind === 'shield' && p.owner === 'player') {
           p.returning = true;
           p.hitIds = [];
           continue;
         }
-        if (p.kind === 'spear' && p.owner === 'player') {
-          p.returning = true;
-          p.hitIds = [];
+        if (p.kind === 'spear' && p.owner === 'player' && !p.aoeRadius) {
+          // Eternal Spear lodges into wall/ground awaiting Special re-press Recall / Vanguard Rush!
+          p.vel.x = 0;
+          p.vel.y = 0;
+          p.maxLife = Math.max(p.maxLife, p.life + 8.0);
           continue;
         }
         if (p.bouncesLeft > 0) {
@@ -1138,12 +1523,36 @@ export function tickProjectiles(
       }
     }
 
-    // 6. Range / lifetime expiration
-    if (p.life >= p.maxLife || (!p.returning && p.distanceTraveled >= p.range)) {
-      if (p.owner === 'player' && (p.kind === 'shield' || p.kind === 'spear') && !p.returning) {
+    // 7. Range / lifetime expiration
+    if (!p.returning && p.distanceTraveled >= p.range) {
+      if (isBlitzDisc) {
+        // Blitz Disc hovers at max range until recalled or maxLife
+        p.vel.x = 0;
+        p.vel.y = 0;
+      } else if (p.owner === 'player' && p.kind === 'spear' && !p.aoeRadius) {
+        // Lodged Eternal Spear waits on ground for Re-Press Recall or Vanguard Rush!
+        p.vel.x = 0;
+        p.vel.y = 0;
+        if (p.maxLife < p.life + 6.0) {
+          p.maxLife = p.life + 8.0;
+        }
+      } else if (p.owner === 'player' && p.kind === 'shield') {
         p.returning = true;
         p.hitIds = [];
         p.maxLife += 2.0;
+        continue;
+      } else {
+        dropCastFromProjectile(state, p);
+        state.projectiles.splice(i, 1);
+        continue;
+      }
+    }
+
+    if (p.life >= p.maxLife) {
+      if (p.owner === 'player' && (p.kind === 'shield' || p.kind === 'spear') && !p.returning && !p.aoeRadius) {
+        p.returning = true;
+        p.hitIds = [];
+        p.maxLife = p.life + 2.5;
         continue;
       }
       if (p.kind === 'spear') player.spearOut = false;
@@ -1153,7 +1562,23 @@ export function tickProjectiles(
       continue;
     }
 
-    // 7. Entity collisions
+    // 8. Check if player projectile detonates a Hellfire Mine (rail_beam)
+    if (p.owner === 'player' && player.aspectId === 'rail_beam') {
+      for (let hIdx = state.room.hazards.length - 1; hIdx >= 0; hIdx--) {
+        const h = state.room.hazards[hIdx];
+        if (h.kind === 'pylon' && h.owner === 'player' && h.active) {
+          if (ellipseDistance(h.pos.x - p.pos.x, h.pos.y - p.pos.y) <= h.radius + p.radius) {
+            detonateHellfireMine(state, hIdx, ctx, hooks);
+          }
+        }
+      }
+    }
+
+    // 9. Entity collisions (skip lodged stationary spear & Blitz Disc which pulses on timer)
+    if (isLodgedSpear || (isBlitzDisc && !p.returning)) {
+      continue;
+    }
+
     let consumed = false;
     if (p.owner === 'player') {
       for (let j = 0; j < state.enemies.length; j++) {
@@ -1165,11 +1590,13 @@ export function tickProjectiles(
         p.hitIds.push(e.id);
         const dmgSource: DamageSource = p.deflected
           ? 'deflect'
-          : p.kind === 'cast'
+          : p.kind === 'cast' || p.ownerId === 'player_cast'
             ? 'cast'
-            : p.kind === 'spear' || p.kind === 'shield' || p.kind === 'bomb'
+            : p.ownerId === 'player_special' || p.kind === 'spear' || p.kind === 'shield' || p.kind === 'bomb'
               ? 'special'
               : 'attack';
+
+        const isFrostSpinWave = p.kind === 'wave' && p.lobHeight === FROST_SPIN_WAVE_SENTINEL;
 
         const dealt = dealDamageToEnemy(
           state,
@@ -1178,17 +1605,67 @@ export function tickProjectiles(
             baseDamage: p.damage,
             source: dmgSource,
             angle: p.angle,
-            knockback: p.kind === 'cast' ? 500 : 350,
+            knockback: p.kind === 'cast' ? 500 : p.kind === 'wave' ? 950 : 350,
             bonusCritChance: p.critBonus,
             patronId: p.patronId,
-            statusId: p.statusToApply,
+            statusId: isFrostSpinWave ? 'chill' : p.statusToApply,
           },
           hooks,
           ctx,
         );
 
-        // Lodge Bloodstone on Cast hit (enabling Boiling Blood for 16s!)
-        if (p.lodgesCast && state.meta.mirrorActiveSide.infernal_soul !== 'b') {
+        // Aspect of the Frost Dragon (spear_dragon): Frost Spin Wave heals on hit!
+        if (isFrostSpinWave && dealt > 0) {
+          healPlayer(state, 1);
+        }
+
+        // Aspect of the Vessel (bow_loaded): Detonate all loaded Bloodstones on arrow hit!
+        if (p.kind === 'arrow' && p.lodgesCast && p.lobHeight > 0) {
+          const loadedCount = Math.round(p.lobHeight);
+          p.lodgesCast = false;
+          p.lobHeight = 0;
+          const castBoon = getBoonInSlot(player, 'cast');
+          const rank = getAspectRank(state.meta.aspectRanks, 'bow_loaded');
+          const vesselMult = 1 + getAspectBonus('bow_loaded', rank);
+          const baseCast =
+            castBoon && castBoon.scaledValue >= 10
+              ? castBoon.scaledValue
+              : PLAYER_CONSTANTS.castDamage;
+          const totalCastDmg = Math.round(baseCast * loadedCount * vesselMult);
+          const detRadius = 185;
+
+          for (let k = 0; k < state.enemies.length; k++) {
+            const target = state.enemies[k];
+            if (target.hp <= 0 || target.aiState === 'dead') continue;
+            if (ellipseDistance(target.pos.x - p.pos.x, target.pos.y - p.pos.y) <= detRadius + target.radius) {
+              dealDamageToEnemy(
+                state,
+                target,
+                {
+                  baseDamage: totalCastDmg,
+                  source: 'cast',
+                  knockback: 650,
+                  patronId: castBoon?.patronId,
+                  statusId: castBoon?.statusEffect,
+                },
+                hooks,
+                ctx,
+              );
+            }
+          }
+          addCameraShake(state, 8.0, 0.16);
+          if (state.meta.mirrorActiveSide.infernal_soul !== 'b') {
+            if (e.hp > 0) {
+              for (let lc = 0; lc < loadedCount; lc++) {
+                e.lodgedCasts += 1;
+                e.lodgedCastTimers.push(PLAYER_CONSTANTS.castLodgeDuration);
+              }
+            } else {
+              dropCastAtPos(state, p.pos, loadedCount);
+            }
+          }
+        } else if (p.lodgesCast && state.meta.mirrorActiveSide.infernal_soul !== 'b') {
+          // Standard Bloodstone Cast lodging (16s)
           if (e.hp > 0) {
             e.lodgedCasts += 1;
             e.lodgedCastTimers.push(PLAYER_CONSTANTS.castLodgeDuration);
@@ -1197,7 +1674,7 @@ export function tickProjectiles(
           }
         }
 
-        // Splash AoE (Flood Shot / Phalanx Shot / Explosive Shot)
+        // Splash AoE (Flood Shot / Phalanx Shot / Explosive Shot / Exploding Launcher / Rocket Bomb)
         if (p.aoeRadius && p.aoeRadius > 0) {
           for (let k = 0; k < state.enemies.length; k++) {
             const other = state.enemies[k];
@@ -1362,7 +1839,6 @@ export function tickBloodstones(state: SimState, dt: number): void {
       bs.vel.x *= damping;
       bs.vel.y *= damping;
 
-      // Keep inside room bounds
       bs.pos.x = Math.max(state.room.bounds.minX + 24, Math.min(state.room.bounds.maxX - 24, bs.pos.x));
       bs.pos.y = Math.max(state.room.bounds.minY + 24, Math.min(state.room.bounds.maxY - 24, bs.pos.y));
     }
@@ -1371,7 +1847,8 @@ export function tickBloodstones(state: SimState, dt: number): void {
 
 /**
  * Tick arena hazards: lava pools (grace 0.35s, 5 dmg / 0.4s), poison pools, curing pools,
- * spike traps (damages both enemies and player!), consecrated aura, and blade rifts.
+ * spike traps (suppressed inside Hallowed Ground!), consecrated aura, Hellfire Mines (pylon),
+ * and blade rifts.
  */
 export function tickHazards(
   state: SimState,
@@ -1384,6 +1861,9 @@ export function tickHazards(
   const player = state.player;
   let touchingLava = false;
   let touchingPoison = false;
+
+  // Gather active Hallowed Ground zones (blade_paladin) so traps inside them are disabled
+  const auras = state.room.hazards.filter((hz) => hz.kind === 'consecrated_aura' && hz.active);
 
   for (let i = state.room.hazards.length - 1; i >= 0; i--) {
     const h = state.room.hazards[i];
@@ -1419,12 +1899,19 @@ export function tickHazards(
         break;
       }
       case 'spike_trap': {
+        // Aspect of the Paladin Hallowed Ground disables traps inside its radius!
+        const suppressed = auras.some(
+          (a) => ellipseDistance(h.pos.x - a.pos.x, h.pos.y - a.pos.y) <= a.radius,
+        );
+        if (suppressed) {
+          h.armed = false;
+          break;
+        }
         if (h.cooldown > 0) {
           h.cooldown = Math.max(0, h.cooldown - dt);
         } else if (h.armed) {
           h.timer -= dt;
           if (h.timer <= 0) {
-            // Detonate spikes against both player AND enemies!
             h.armed = false;
             h.cooldown = 1.6;
             const dmg = h.damage > 0 ? h.damage : 25;
@@ -1450,7 +1937,6 @@ export function tickHazards(
             addCameraShake(state, 5.0, 0.12);
           }
         } else {
-          // Arm trap if player or enemy steps on pressure plate
           let triggered =
             player.dashTimer <= 0 &&
             ellipseDistance(player.pos.x - h.pos.x, player.pos.y - h.pos.y) <= h.radius;
@@ -1485,8 +1971,49 @@ export function tickHazards(
       }
       case 'consecrated_aura': {
         h.timer -= dt;
+        // Dampen enemy movement inside Hallowed Ground
+        for (let j = 0; j < state.enemies.length; j++) {
+          const e = state.enemies[j];
+          if (e.hp <= 0 || e.aiState === 'dead') continue;
+          if (ellipseDistance(e.pos.x - h.pos.x, e.pos.y - h.pos.y) <= h.radius) {
+            e.vel.x *= Math.exp(-3.5 * dt);
+            e.vel.y *= Math.exp(-3.5 * dt);
+          }
+        }
         if (h.timer <= 0) {
           state.room.hazards.splice(i, 1);
+        }
+        break;
+      }
+      case 'pylon': {
+        // Aspect of the Hellfire (rail_beam) pulsing mines!
+        if (h.owner === 'player') {
+          h.timer -= dt;
+          h.cooldown -= dt;
+          if (h.cooldown <= 0) {
+            h.cooldown = 0.6;
+            const pulseDmg = h.damage > 0 ? h.damage : 20;
+            for (let j = 0; j < state.enemies.length; j++) {
+              const e = state.enemies[j];
+              if (e.hp <= 0 || e.aiState === 'dead') continue;
+              if (ellipseDistance(e.pos.x - h.pos.x, e.pos.y - h.pos.y) <= 155 + e.radius) {
+                dealDamageToEnemy(
+                  state,
+                  e,
+                  {
+                    baseDamage: pulseDmg,
+                    source: 'special',
+                    knockback: 180,
+                  },
+                  hooks,
+                  ctx,
+                );
+              }
+            }
+          }
+          if (h.timer <= 0) {
+            state.room.hazards.splice(i, 1);
+          }
         }
         break;
       }
