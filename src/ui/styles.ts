@@ -227,7 +227,7 @@ export const MYTHIC_UI_CSS = `
 
 .kh-boss-hp-track {
   position: relative;
-  height: 14px;
+  height: 16px;
   border-radius: 2px;
   background: rgba(24, 9, 14, 0.92);
   border: 1.5px solid rgba(217, 159, 76, 0.7);
@@ -246,6 +246,7 @@ export const MYTHIC_UI_CSS = `
   top: 0;
   bottom: 0;
   width: 2px;
+  z-index: 1;
   background: rgba(255, 232, 168, 0.85);
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.95);
   pointer-events: none;
@@ -254,6 +255,7 @@ export const MYTHIC_UI_CSS = `
 .kh-boss-hp-text {
   position: absolute;
   inset: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -262,6 +264,19 @@ export const MYTHIC_UI_CSS = `
   letter-spacing: 0.06em;
   color: #fff6ea;
   text-shadow: 0 1px 3px #000;
+  pointer-events: none;
+}
+
+.kh-boss-hp-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  height: 14px;
+  border-radius: 2px;
+  background: rgba(11, 8, 18, 0.9);
+  border: 1px solid rgba(217, 159, 76, 0.45);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.78);
+  line-height: 1;
 }
 
 /* Top-Right Chamber / Biome / Currencies / FPS Readout */
@@ -350,7 +365,7 @@ export const MYTHIC_UI_CSS = `
   font-size: 11px;
 }
 
-/* Bottom-Left Ornate Hero HUD */
+/* Bottom-Left Ornate Hero HUD (moves cleanly to Top-Left when touch controls are active) */
 .kh-hud-bottomleft {
   position: fixed;
   left: max(16px, calc(env(safe-area-inset-left, 0px) + 12px));
@@ -359,6 +374,18 @@ export const MYTHIC_UI_CSS = `
   flex-direction: column;
   gap: 7px;
   width: min(350px, 46vw);
+}
+
+.kh-hud.kh-touch-active .kh-hud-bottomleft {
+  top: max(12px, calc(env(safe-area-inset-top, 0px) + 8px));
+  bottom: auto;
+  left: max(14px, calc(env(safe-area-inset-left, 0px) + 10px));
+  flex-direction: column-reverse;
+  width: min(320px, 38vw);
+}
+
+.kh-hud.kh-touch-active .kh-boss-stack {
+  width: min(440px, 40vw);
 }
 
 .kh-boon-strip {
@@ -761,7 +788,7 @@ export const MYTHIC_UI_CSS = `
   flex-direction: column;
   justify-content: center;
   flex: 1;
-  max-width: 520px;
+  max-width: min(820px, 92vw);
   gap: 16px;
 }
 
@@ -779,11 +806,14 @@ export const MYTHIC_UI_CSS = `
 
 .kh-title-heading {
   margin: 0;
+  padding-right: 0.1em;
+  width: fit-content;
+  max-width: 100%;
   font-family: var(--kh-font-display);
-  font-size: clamp(28px, 4.6vw, 56px);
+  font-size: clamp(26px, 4.3vw, 54px);
   font-weight: 800;
-  line-height: 1.04;
-  letter-spacing: 0.08em;
+  line-height: 1.06;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   background: linear-gradient(180deg, #fff5dc 0%, #f1c46d 56%, #c87b33 100%);
   -webkit-background-clip: text;
@@ -806,7 +836,7 @@ export const MYTHIC_UI_CSS = `
   display: flex;
   flex-direction: column;
   gap: 9px;
-  width: min(360px, 84vw);
+  width: min(490px, 90vw);
   margin-top: 6px;
 }
 
@@ -818,8 +848,17 @@ export const MYTHIC_UI_CSS = `
 
 .kh-title-pack-row {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.kh-title-pack-row .kh-btn {
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
 }
 
 .kh-title-footer {
@@ -1484,6 +1523,13 @@ export const MYTHIC_UI_CSS = `
   }
   .kh-hud-bottomleft {
     width: min(290px, 44vw);
+  }
+  .kh-hud.kh-touch-active .kh-hud-bottomleft {
+    width: min(264px, 34vw);
+    gap: 4px;
+  }
+  .kh-hud.kh-touch-active .kh-boss-stack {
+    width: min(260px, 31vw);
   }
   .kh-hero-frame {
     padding: 7px 9px;

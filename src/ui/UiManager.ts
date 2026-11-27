@@ -4,6 +4,7 @@ import type {
   PatronId,
   RenderSettings,
   ScreenId,
+  SimEvent,
   SimState,
 } from '../contracts/index.js';
 import type { MenuNavInput } from '../input/InputManager.js';
@@ -62,13 +63,14 @@ export class UiManager {
     activeSource: InputSource,
     renderStats: HudRenderStats,
     menuNav: MenuNavInput,
-    hash: string
+    hash: string,
+    drainedEvents?: readonly SimEvent[]
   ): void {
     if (menuNav.toggleDebug) {
       this.debugDrawer.toggle();
     }
 
-    this.hud.update(state, screen, activeSource, renderStats);
+    this.hud.update(state, screen, activeSource, renderStats, drainedEvents);
     this.titleScreen.update(screen === 'title', state.meta, activeSource, menuNav);
     this.boonModal.update(
       screen === 'boon_select',

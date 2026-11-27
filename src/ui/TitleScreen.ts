@@ -79,17 +79,12 @@ export class TitleScreen {
     btnPackMode.className = 'kh-btn';
     this.packModeTextEl = document.createElement('span');
     this.packModeTextEl.textContent = 'ART PACK: BUILT-IN';
-    const packToggleHint = document.createElement('span');
-    packToggleHint.style.fontSize = '11px';
-    packToggleHint.style.opacity = '0.75';
-    packToggleHint.textContent = 'TOGGLE';
-    btnPackMode.append(this.packModeTextEl, packToggleHint);
+    btnPackMode.appendChild(this.packModeTextEl);
 
     const btnLoadPack = document.createElement('button');
     btnLoadPack.type = 'button';
     btnLoadPack.className = 'kh-btn';
     btnLoadPack.textContent = 'LOAD CUSTOM PACK';
-    btnLoadPack.style.whiteSpace = 'nowrap';
 
     packRow.append(btnPackMode, btnLoadPack);
     menu.append(btnCourtyard, btnStartRun, btnOptions, packRow);
