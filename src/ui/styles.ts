@@ -290,8 +290,9 @@ export const MYTHIC_UI_CSS = `
   gap: 6px;
 }
 
-.kh-hud-topright.kh-touch-offset {
-  right: max(76px, calc(env(safe-area-inset-right, 0px) + 72px));
+.kh-hud-topright.kh-touch-offset,
+.kh-hud.kh-touch-active .kh-hud-topright {
+  right: max(92px, calc(env(safe-area-inset-right, 0px) + 88px));
 }
 
 .kh-chamber-pill {
@@ -720,32 +721,42 @@ export const MYTHIC_UI_CSS = `
   white-space: nowrap;
 }
 
-/* Event Toast Banner */
+/* Event Toast Banner — sits cleanly top-center above playfield (drops below boss bar only when boss active) */
 .kh-toast-container {
   position: fixed;
-  top: max(92px, 13vh);
+  top: max(14px, calc(env(safe-area-inset-top, 0px) + 10px));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   pointer-events: none;
+  z-index: 14;
+}
+
+.kh-hud.kh-has-boss .kh-toast-container {
+  top: max(92px, calc(env(safe-area-inset-top, 0px) + 86px));
 }
 
 .kh-toast {
-  padding: 7px 20px;
+  padding: 6px 16px;
   border-radius: 3px;
-  background: linear-gradient(90deg, rgba(12, 9, 18, 0.2) 0%, rgba(20, 14, 30, 0.92) 22%, rgba(20, 14, 30, 0.92) 78%, rgba(12, 9, 18, 0.2) 100%);
-  border-top: 1px solid rgba(245, 203, 112, 0.62);
-  border-bottom: 1px solid rgba(245, 203, 112, 0.62);
+  background: rgba(10, 8, 18, 0.9);
+  border: 1px solid rgba(245, 203, 112, 0.62);
+  border-left: 3px solid currentColor;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.78);
   font-family: var(--kh-font-display);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  text-shadow: 0 2px 6px #000;
-  animation: kh-toast-in 0.2s ease-out;
+  text-shadow: 0 1px 4px #000;
+  white-space: nowrap;
+  max-width: min(460px, 60vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: kh-toast-in 0.14s ease-out;
 }
 
 @keyframes kh-low-hp-pulse {
@@ -754,8 +765,8 @@ export const MYTHIC_UI_CSS = `
 }
 
 @keyframes kh-toast-in {
-  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0.94; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ============================================================================
@@ -1530,6 +1541,19 @@ export const MYTHIC_UI_CSS = `
   }
   .kh-hud.kh-touch-active .kh-boss-stack {
     width: min(260px, 31vw);
+  }
+  .kh-toast-container {
+    top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
+    max-width: 31vw;
+  }
+  .kh-hud.kh-has-boss .kh-toast-container {
+    top: max(70px, calc(env(safe-area-inset-top, 0px) + 66px));
+  }
+  .kh-toast {
+    padding: 4px 10px;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    max-width: 31vw;
   }
   .kh-hero-frame {
     padding: 7px 9px;

@@ -573,6 +573,7 @@ export class HudOverlay {
 
   private updateBossBars(enemies: readonly EnemyState[]): void {
     const bosses = enemies.filter((e) => e.isBoss && e.aiState !== 'dead' && e.hp > 0);
+    this.root.classList.toggle('kh-has-boss', bosses.length > 0);
     if (bosses.length === 0) {
       if (this.lastBossSignature !== '') {
         this.lastBossSignature = '';
@@ -803,7 +804,9 @@ export class HudOverlay {
   }
 
   private pushToast(text: string, colorHex: string, now: number): void {
-    if (this.activeToasts.length >= 3) {
+    const isCompactViewport = typeof window !== 'undefined' && window.innerHeight <= 500;
+    const maxToasts = isCompactViewport ? 1 : 2;
+    while (this.activeToasts.length >= maxToasts) {
       const oldest = this.activeToasts.shift();
       oldest?.el.remove();
     }

@@ -293,19 +293,21 @@ const TOUCH_OVERLAY_CSS = `
   display: none;
 }
 
-/* Subtle top-right Pause pill */
+/* Subtle top-right Pause pill (fixed 48x48 circular target clear of room banner) */
 .kh-touch-pause-pill {
   position: fixed;
   top: max(12px, calc(env(safe-area-inset-top, 0px) + 8px));
-  right: max(14px, calc(env(safe-area-inset-right, 0px) + 10px));
+  right: max(14px, calc(env(safe-area-inset-right, 0px) + 12px));
+  width: 48px;
+  height: 48px;
   min-width: 48px;
   min-height: 48px;
-  padding: 0 14px;
-  border-radius: 24px;
-  gap: 6px;
+  padding: 0;
+  border-radius: 50%;
   flex-direction: row;
   font-size: 11px;
-  opacity: 0.34;
+  background: rgba(16, 13, 24, 0.36);
+  opacity: 0.42;
 }
 
 @keyframes kh-touch-gold-pulse {
