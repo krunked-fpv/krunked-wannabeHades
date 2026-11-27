@@ -87,7 +87,9 @@ export const ROOM_TEMPLATES: Record<string, RoomTemplateDef> = {
       { kind: 'pillar', x: 390, y: -210, halfW: 44, halfH: 34, radius: 42 },
       { kind: 'pillar', x: -390, y: 210, halfW: 44, halfH: 34, radius: 42 },
       { kind: 'pillar', x: 390, y: 210, halfW: 44, halfH: 34, radius: 42 },
-      { kind: 'statue', x: 0, y: -260, halfW: 52, halfH: 38, radius: 46 },
+      // Symmetrical obsidian statues flanking the crimson runner carpet (Escape Door archway unobstructed)
+      { kind: 'statue', x: -185, y: -315, halfW: 44, halfH: 34, radius: 40 },
+      { kind: 'statue', x: 185, y: -315, halfW: 44, halfH: 34, radius: 40 },
       { kind: 'destructible_urn', x: -520, y: -90, halfW: 22, halfH: 20, radius: 22, hp: 10 },
       { kind: 'destructible_urn', x: -540, y: 20, halfW: 22, halfH: 20, radius: 22, hp: 10 },
       { kind: 'destructible_urn', x: 520, y: -80, halfW: 22, halfH: 20, radius: 22, hp: 10 },
