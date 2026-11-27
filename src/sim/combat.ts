@@ -393,7 +393,7 @@ export function detonateHellfireMine(
   hooks?: SimGameplayHooks,
 ): void {
   const h = state.room.hazards[hazardIndex];
-  if (!h || h.kind !== 'pylon' || h.owner !== 'player') return;
+  if (!h || h.kind !== 'pylon' || h.owner !== 'player' || !h.id.startsWith('mine_')) return;
   const pos = { x: h.pos.x, y: h.pos.y };
   state.room.hazards.splice(hazardIndex, 1);
 
@@ -1566,7 +1566,7 @@ export function tickProjectiles(
     if (p.owner === 'player' && player.aspectId === 'rail_beam') {
       for (let hIdx = state.room.hazards.length - 1; hIdx >= 0; hIdx--) {
         const h = state.room.hazards[hIdx];
-        if (h.kind === 'pylon' && h.owner === 'player' && h.active) {
+        if (h.kind === 'pylon' && h.owner === 'player' && h.active && h.id.startsWith('mine_')) {
           if (ellipseDistance(h.pos.x - p.pos.x, h.pos.y - p.pos.y) <= h.radius + p.radius) {
             detonateHellfireMine(state, hIdx, ctx, hooks);
           }
@@ -1986,8 +1986,8 @@ export function tickHazards(
         break;
       }
       case 'pylon': {
-        // Aspect of the Hellfire (rail_beam) pulsing mines!
-        if (h.owner === 'player') {
+        // Aspect of the Hellfire (rail_beam) pulsing mines (strictly mine_* so glaciera crystal_* beams stay isolated)
+        if (h.owner === 'player' && h.id.startsWith('mine_')) {
           h.timer -= dt;
           h.cooldown -= dt;
           if (h.cooldown <= 0) {
