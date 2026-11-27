@@ -1855,16 +1855,7 @@ export function handleBoonOnDash(
   perfect: boolean,
   ctx: SimCombatContext
 ): void {
-  // Chaos Curse: take_damage_on_dash
-  for (const c of state.player.chaosCurses) {
-    if (c.curseKind === 'take_damage_on_dash') {
-      ctx.dealDamageToPlayer(state, Math.max(1, c.curseMagnitude), {
-        source: 'chaos',
-        ignoreIframes: true,
-        canDodge: false,
-      });
-    }
-  }
+  // Note: Chaos Curse take_damage_on_dash is owned solely 1x by src/sim/physics.ts.
 
   // Ruthless Reflex (Mirror side B): Near-miss perfect dash grants +50% buff
   if (perfect) {
@@ -2262,10 +2253,16 @@ export function tickBoons(
     }
   }
 
-  // Glaciera Crystal Beam Pylons (tick player-owned 'pylon' hazards)
+  // Glaciera Crystal Beam Pylons (strictly crystal_* IDs so rail_beam mine_* pylons stay isolated)
   for (let i = state.room.hazards.length - 1; i >= 0; i--) {
     const h = state.room.hazards[i];
-    if (h.kind !== 'pylon' || h.owner !== 'player') continue;
+    if (
+      h.kind !== 'pylon' ||
+      h.owner !== 'player' ||
+      !h.id.startsWith('crystal_')
+    ) {
+      continue;
+    }
     h.timer -= dt;
     h.cooldown -= dt;
     if (h.cooldown <= 0 && livingEnemies.length > 0) {
