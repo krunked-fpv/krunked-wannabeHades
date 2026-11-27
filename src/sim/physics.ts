@@ -15,6 +15,7 @@ import {
   dealDamageToPlayer,
   deflectProjectiles,
   getBoonInSlot,
+  getWeaponRuntime,
   spawnFloatingNumber,
   type SimCombatContext,
   type SimGameplayHooks,
@@ -362,10 +363,16 @@ export function stepPlayerPhysics(
     player.dashTimer <= 0
   ) {
     // Dash immediately cancels attack recovery & windup (authentic Hades feel!)
+    const rt = getWeaponRuntime(state);
     player.attackTimer = 0;
     player.attackChargeTimer = 0;
     player.attackBufferTimer = 0;
     player.isBlocking = false;
+    rt.spearSpinCharging = false;
+    rt.spearHoldTimer = 0;
+    rt.shieldBullCharging = false;
+    rt.shieldHoldTimer = 0;
+    rt.bowDashChargeActive = false;
 
     const dirX = hasMoveInput ? moveX / Math.min(1, moveMag) : Math.cos(player.facingAngle);
     const dirY = hasMoveInput ? moveY / Math.min(1, moveMag) : Math.sin(player.facingAngle);

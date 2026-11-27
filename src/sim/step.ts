@@ -23,10 +23,12 @@ import {
   tickBloodstones,
   tickHazards,
   tickProjectiles,
+  tickWeaponRuntime,
   triggerHitstop,
   type SimCombatContext,
   type SimGameplayHooks,
 } from './combat.js';
+import { getAspectBonus, getAspectRank } from '../data/aspects.js';
 import { angleToFacingIdx } from './isometric.js';
 import { stepPlayerPhysics } from './physics.js';
 import { nextFloat, nextInt, seedRng } from './prng.js';
@@ -217,7 +219,11 @@ export function createDefaultSimState(seed: number, meta?: MetaSaveState): SimSt
     startingGold += KEEPSAKES.coin_pouch.valuesByRank[rIdx];
   }
 
-  const maxAmmo = weaponDef.clipSize ?? 0;
+  let maxAmmo = weaponDef.clipSize ?? 0;
+  if (weaponId === 'adamant_rail' && aspectId === 'rail_scion') {
+    const rank = getAspectRank(resolvedMeta.aspectRanks, 'rail_scion');
+    maxAmmo += Math.round(getAspectBonus('rail_scion', rank));
+  }
   const fatedRank = resolvedMeta.mirrorRanks.fated_authority ?? 0;
   const boonRerolls = resolvedMeta.mirrorActiveSide.fated_authority === 'b' ? fatedRank : 0;
   const doorRerolls = resolvedMeta.mirrorActiveSide.fated_authority === 'a' ? fatedRank : 0;
@@ -509,7 +515,8 @@ export function stepSim(
       hooks.onInteract(state, SHARED_COMBAT_CONTEXT);
     }
 
-    // 5. Player Physics, Aim & Blink Dash
+    // 5. Player Physics, Aim & Blink Dash + Weapon Aspect Timers
+    tickWeaponRuntime(state, dt);
     stepPlayerPhysics(state, input, dt, SHARED_COMBAT_CONTEXT, hooks);
 
     // 6. Player Weapons, Combo, Dash-Strike, Special, Cast, Reload & God Call
