@@ -16,11 +16,18 @@ import {
   type SimState,
 } from '../contracts/index.js';
 import type { MenuNavInput } from '../input/InputManager.js';
+import {
+  attachCornerFiligrees,
+  svgObolCoin,
+  svgPatronSigil,
+  svgWeaponSilhouette,
+} from './svgArt.js';
 
 export interface ShopAndCodexCallbacks {
   onBuyShopItem?(pickupId: string): void;
   onBorrowGoldBag?(): void;
   onCloseModal(): void;
+  readonly onUiHover?: () => void;
 }
 
 type CodexTab = 'build' | 'bestiary' | 'archive';
@@ -97,8 +104,9 @@ export class ShopAndCodexModal {
 
     // ==================== 1. BOATMAN SHOP / WELL OF ASH ====================
     this.shopShell = document.createElement('div');
-    this.shopShell.className = 'kh-meta-shell kh-hidden';
+    this.shopShell.className = 'kh-meta-shell kh-ornate-frame kh-theme-shop kh-hidden';
     this.shopShell.setAttribute('data-screen', 'shop_menu');
+    attachCornerFiligrees(this.shopShell);
 
     const shopHeader = document.createElement('div');
     shopHeader.className = 'kh-meta-header';
@@ -113,7 +121,7 @@ export class ShopAndCodexModal {
     shopTitleGroup.append(this.shopTitleEl, this.shopSubEl);
 
     this.shopGoldBadge = document.createElement('div');
-    this.shopGoldBadge.className = 'kh-meta-pill kh-meta-pill-heat';
+    this.shopGoldBadge.className = 'kh-meta-pill kh-meta-pill-gold';
     shopHeader.append(shopTitleGroup, this.shopGoldBadge);
 
     const shopMeander = document.createElement('div');
@@ -131,17 +139,19 @@ export class ShopAndCodexModal {
     this.shopHintEl.className = 'kh-meta-hint';
     const shopCloseBtn = document.createElement('button');
     shopCloseBtn.type = 'button';
-    shopCloseBtn.className = 'kh-btn kh-btn-primary';
+    shopCloseBtn.className = 'kh-btn kh-btn-primary kh-btn-notched';
     shopCloseBtn.textContent = 'LEAVE SHOP';
     shopCloseBtn.addEventListener('click', () => this.callbacks.onCloseModal());
+    shopCloseBtn.addEventListener('pointerenter', () => this.callbacks.onUiHover?.());
     shopFooter.append(this.shopHintEl, shopCloseBtn);
 
     this.shopShell.append(shopHeader, shopMeander, shopScroll, shopFooter);
 
     // ==================== 2. SANCTUM CODEX (LB / TAB) ====================
     this.codexShell = document.createElement('div');
-    this.codexShell.className = 'kh-meta-shell kh-hidden';
+    this.codexShell.className = 'kh-meta-shell kh-ornate-frame kh-theme-codex kh-hidden';
     this.codexShell.setAttribute('data-screen', 'codex_menu');
+    attachCornerFiligrees(this.codexShell);
 
     const codexHeader = document.createElement('div');
     codexHeader.className = 'kh-meta-header';
@@ -180,6 +190,7 @@ export class ShopAndCodexModal {
         this.activeCodexTab = tab.id;
         this.lastRenderKey = '';
       });
+      btn.addEventListener('pointerenter', () => this.callbacks.onUiHover?.());
       this.codexTabButtons.push(btn);
       codexTabStrip.appendChild(btn);
     });
@@ -187,9 +198,7 @@ export class ShopAndCodexModal {
     const codexScroll = document.createElement('div');
     codexScroll.className = 'kh-meta-scroll';
     this.codexBodyEl = document.createElement('div');
-    this.codexBodyEl.style.display = 'flex';
-    this.codexBodyEl.style.flexDirection = 'column';
-    this.codexBodyEl.style.gap = '10px';
+    this.codexBodyEl.className = 'kh-codex-body';
     codexScroll.appendChild(this.codexBodyEl);
 
     const codexFooter = document.createElement('div');
@@ -198,9 +207,10 @@ export class ShopAndCodexModal {
     this.codexHintEl.className = 'kh-meta-hint';
     const codexCloseBtn = document.createElement('button');
     codexCloseBtn.type = 'button';
-    codexCloseBtn.className = 'kh-btn kh-btn-primary';
+    codexCloseBtn.className = 'kh-btn kh-btn-primary kh-btn-notched';
     codexCloseBtn.textContent = 'CLOSE CODEX';
     codexCloseBtn.addEventListener('click', () => this.callbacks.onCloseModal());
+    codexCloseBtn.addEventListener('pointerenter', () => this.callbacks.onUiHover?.());
     codexFooter.append(this.codexHintEl, codexCloseBtn);
 
     this.codexShell.append(codexHeader, codexMeander, codexTabStrip, codexScroll, codexFooter);
@@ -280,12 +290,15 @@ export class ShopAndCodexModal {
         this.shopFocusedIndex = 0;
         this.applyShopFocus();
       }
+      const prevIdx = this.shopFocusedIndex;
       if (menuNav.left || menuNav.up) {
         this.shopFocusedIndex = (this.shopFocusedIndex - 1 + total) % total;
-        this.applyShopFocus();
       } else if (menuNav.right || menuNav.down) {
         this.shopFocusedIndex = (this.shopFocusedIndex + 1) % total;
+      }
+      if (this.shopFocusedIndex !== prevIdx) {
         this.applyShopFocus();
+        this.callbacks.onUiHover?.();
       }
       if (menuNav.confirm) {
         this.shopActions[this.shopFocusedIndex]?.();
@@ -307,7 +320,7 @@ export class ShopAndCodexModal {
       feeRank > 0
         ? `Underworld Peddler · Convenience Fee active (+${feeRank * 40}% prices)`
         : 'Exchange Underworld Gold for Blessings, Vitality, & Supplies';
-    this.shopGoldBadge.textContent = `GOLD: ${Math.floor(state.player.gold)}`;
+    this.shopGoldBadge.innerHTML = `${svgObolCoin()}<span>GOLD: ${Math.floor(state.player.gold)}</span>`;
 
     this.shopGridEl.innerHTML = '';
     this.shopCardButtons = [];
@@ -315,10 +328,7 @@ export class ShopAndCodexModal {
 
     if (items.length === 0 && !showBorrowBag) {
       const empty = document.createElement('div');
-      empty.className = 'kh-codex-entry';
-      empty.style.gridColumn = '1 / -1';
-      empty.style.textAlign = 'center';
-      empty.style.padding = '22px';
+      empty.className = 'kh-codex-entry kh-codex-empty';
       empty.textContent = 'All wares in this chamber have been claimed.';
       this.shopGridEl.appendChild(empty);
       return;
@@ -334,30 +344,24 @@ export class ShopAndCodexModal {
       card.dataset.pickupId = item.id;
 
       const left = document.createElement('div');
-      left.style.display = 'flex';
-      left.style.flexDirection = 'column';
-      left.style.gap = '3px';
+      left.className = 'kh-shop-card-left';
 
       const nameRow = document.createElement('div');
-      nameRow.style.display = 'flex';
-      nameRow.style.alignItems = 'center';
-      nameRow.style.gap = '7px';
+      nameRow.className = 'kh-shop-name-row';
       if (item.patronId) {
-        const dot = document.createElement('span');
-        dot.className = 'kh-boon-dot';
-        dot.style.background = PATRON_CONSTANTS[item.patronId].colorHex;
-        nameRow.appendChild(dot);
+        const sig = document.createElement('span');
+        sig.className = 'kh-shop-sigil';
+        sig.style.color = PATRON_CONSTANTS[item.patronId].colorHex;
+        sig.innerHTML = svgPatronSigil(item.patronId, 20);
+        nameRow.appendChild(sig);
       }
       const title = document.createElement('span');
-      title.style.fontFamily = 'var(--kh-font-display)';
-      title.style.fontSize = '14px';
-      title.style.fontWeight = '700';
+      title.className = 'kh-shop-item-title';
       title.textContent = item.label;
       nameRow.appendChild(title);
 
       const kindSub = document.createElement('span');
-      kindSub.style.fontSize = '11px';
-      kindSub.style.color = '#bfb4a7';
+      kindSub.className = 'kh-shop-item-sub';
       kindSub.textContent = item.patronId
         ? `${PATRON_CONSTANTS[item.patronId].displayName} Offering`
         : item.kind.replace(/_/g, ' ').toUpperCase();
@@ -365,10 +369,9 @@ export class ShopAndCodexModal {
       left.append(nameRow, kindSub);
 
       const price = document.createElement('span');
-      price.className = 'kh-meta-pill';
-      price.style.color = canAfford ? '#ffd966' : '#ff7b82';
-      price.style.borderColor = canAfford ? 'rgba(245, 203, 112, 0.7)' : 'rgba(255, 92, 102, 0.65)';
-      price.textContent = item.costGold > 0 ? `${item.costGold} GOLD` : 'FREE';
+      price.className = canAfford ? 'kh-meta-pill kh-meta-pill-gold' : 'kh-meta-pill kh-meta-pill-crimson';
+      price.innerHTML =
+        item.costGold > 0 ? `${svgObolCoin()}<span>${item.costGold} GOLD</span>` : '<span>FREE</span>';
 
       card.append(left, price);
 
@@ -382,8 +385,11 @@ export class ShopAndCodexModal {
         buyAction();
       });
       card.addEventListener('pointerenter', () => {
-        this.shopFocusedIndex = idx;
-        this.applyShopFocus();
+        if (this.shopFocusedIndex !== idx) {
+          this.shopFocusedIndex = idx;
+          this.applyShopFocus();
+          this.callbacks.onUiHover?.();
+        }
       });
 
       this.shopGridEl.appendChild(card);
@@ -399,20 +405,14 @@ export class ShopAndCodexModal {
       borrowCard.dataset.action = 'borrow_gold_bag';
 
       const left = document.createElement('div');
-      left.style.display = 'flex';
-      left.style.flexDirection = 'column';
-      left.style.gap = '3px';
+      left.className = 'kh-shop-card-left';
 
       const title = document.createElement('span');
-      title.style.fontFamily = 'var(--kh-font-display)';
-      title.style.fontSize = '14px';
-      title.style.fontWeight = '800';
-      title.style.color = '#ffd27d';
+      title.className = 'kh-shop-borrow-title';
       title.textContent = 'BORROW GOLD BAG (+300 GOLD)';
 
       const warn = document.createElement('span');
-      warn.style.fontSize = '11px';
-      warn.style.color = '#ffadb4';
+      warn.className = 'kh-shop-borrow-warn';
       warn.textContent = 'WARNING: Disturbing the Boatman summons The Ferryman (Secret Boss)!';
 
       left.append(title, warn);
@@ -431,8 +431,11 @@ export class ShopAndCodexModal {
         borrowAction();
       });
       borrowCard.addEventListener('pointerenter', () => {
-        this.shopFocusedIndex = idx;
-        this.applyShopFocus();
+        if (this.shopFocusedIndex !== idx) {
+          this.shopFocusedIndex = idx;
+          this.applyShopFocus();
+          this.callbacks.onUiHover?.();
+        }
       });
 
       this.shopGridEl.appendChild(borrowCard);
@@ -467,10 +470,12 @@ export class ShopAndCodexModal {
       const next = (curIdx - 1 + CODEX_TABS.length) % CODEX_TABS.length;
       this.activeCodexTab = CODEX_TABS[next].id;
       this.lastRenderKey = '';
+      this.callbacks.onUiHover?.();
     } else if (menuNav.tabNext || menuNav.right) {
       const next = (curIdx + 1) % CODEX_TABS.length;
       this.activeCodexTab = CODEX_TABS[next].id;
       this.lastRenderKey = '';
+      this.callbacks.onUiHover?.();
     }
 
     const totalKills = Object.values(state.meta.codexKills).reduce((a, b) => a + (b ?? 0), 0);
@@ -506,25 +511,33 @@ export class ShopAndCodexModal {
 
     const armCard = document.createElement('div');
     armCard.className = 'kh-weapon-summary';
+
+    const armHead = document.createElement('div');
+    armHead.className = 'kh-weapon-banner-head';
+    const emblem = document.createElement('div');
+    emblem.className = 'kh-weapon-emblem-medallion';
+    emblem.innerHTML = svgWeaponSilhouette(state.player.weaponId, 28);
     const armText = document.createElement('div');
-    armText.innerHTML = `<strong style="font-family:var(--kh-font-display);color:#ffe8b8">${weapon.displayName}</strong> · ${aspect.displayName}`;
+    armText.className = 'kh-weapon-banner-text';
+    armText.innerHTML = `<span class="kh-weapon-banner-name">${weapon.displayName}</span><span class="kh-weapon-banner-sub">${aspect.displayName}</span>`;
+    armHead.append(emblem, armText);
+
     const hammerRow = document.createElement('div');
     hammerRow.className = 'kh-weapon-stat-chips';
     if (state.player.hammers.length === 0) {
       const none = document.createElement('span');
-      none.className = 'kh-boon-chip';
+      none.className = 'kh-stat-badge';
       none.textContent = 'NO FORGE HAMMERS ACTIVE';
       hammerRow.appendChild(none);
     } else {
       for (const hid of state.player.hammers) {
         const chip = document.createElement('span');
-        chip.className = 'kh-boon-chip';
-        chip.style.borderColor = '#ff9b42';
+        chip.className = 'kh-stat-badge kh-hammer-badge';
         chip.textContent = `⚒ ${HAMMER_DEFS[hid].displayName}`;
         hammerRow.appendChild(chip);
       }
     }
-    armCard.append(armText, hammerRow);
+    armCard.append(armHead, hammerRow);
     this.codexBodyEl.appendChild(armCard);
 
     // Active Boons Grid
@@ -538,8 +551,7 @@ export class ShopAndCodexModal {
 
     if (state.player.boons.length === 0) {
       const empty = document.createElement('div');
-      empty.className = 'kh-codex-entry';
-      empty.style.gridColumn = '1 / -1';
+      empty.className = 'kh-codex-entry kh-codex-empty';
       empty.textContent = 'No active Patron Boons yet in this run.';
       grid.appendChild(empty);
     } else {
@@ -549,24 +561,26 @@ export class ShopAndCodexModal {
         entry.className = 'kh-codex-entry';
         entry.style.borderLeft = `3px solid ${patron.colorHex}`;
 
-        const head = document.createElement('div');
-        head.style.fontFamily = 'var(--kh-font-display)';
-        head.style.fontSize = '12.5px';
-        head.style.fontWeight = '700';
+        const headRow = document.createElement('div');
+        headRow.className = 'kh-codex-entry-head';
+        const sig = document.createElement('span');
+        sig.style.color = patron.colorHex;
+        sig.innerHTML = svgPatronSigil(boon.patronId, 16);
+        const head = document.createElement('span');
+        head.className = 'kh-codex-entry-title';
         head.style.color = patron.colorHex;
         head.textContent = `${boon.name} (Lv.${boon.level})`;
+        headRow.append(sig, head);
 
         const sub = document.createElement('div');
-        sub.style.fontSize = '10px';
-        sub.style.color = '#f5cb70';
+        sub.className = 'kh-codex-entry-sub';
         sub.textContent = `${patron.displayName} · ${boon.slot.toUpperCase()} · ${boon.rarity.toUpperCase()}`;
 
         const desc = document.createElement('div');
-        desc.style.fontSize = '11px';
-        desc.style.color = '#d8cec2';
+        desc.className = 'kh-codex-entry-desc';
         desc.textContent = boon.description;
 
-        entry.append(head, sub, desc);
+        entry.append(headRow, sub, desc);
         grid.appendChild(entry);
       }
     }
@@ -586,17 +600,22 @@ export class ShopAndCodexModal {
       const entry = document.createElement('div');
       entry.className = 'kh-codex-entry';
       entry.style.borderLeft = `3px solid ${p.colorHex}`;
-      const name = document.createElement('div');
-      name.style.fontFamily = 'var(--kh-font-display)';
-      name.style.fontSize = '12px';
-      name.style.fontWeight = '700';
+
+      const headRow = document.createElement('div');
+      headRow.className = 'kh-codex-entry-head';
+      const sig = document.createElement('span');
+      sig.style.color = p.colorHex;
+      sig.innerHTML = svgPatronSigil(pid, 16);
+      const name = document.createElement('span');
+      name.className = 'kh-codex-entry-title';
       name.style.color = p.colorHex;
       name.textContent = p.displayName;
+      headRow.append(sig, name);
+
       const detail = document.createElement('div');
-      detail.style.fontSize = '11px';
-      detail.style.color = '#cfc5b8';
+      detail.className = 'kh-codex-entry-desc';
       detail.textContent = `${p.title}${p.primaryStatus ? ` · ${p.primaryStatus.toUpperCase()}` : ''} (${seenCount} seen)`;
-      entry.append(name, detail);
+      entry.append(headRow, detail);
       pGrid.appendChild(entry);
     }
     this.codexBodyEl.appendChild(pGrid);
@@ -612,28 +631,21 @@ export class ShopAndCodexModal {
 
     if (entries.length === 0) {
       const empty = document.createElement('div');
-      empty.className = 'kh-codex-entry';
-      empty.style.gridColumn = '1 / -1';
+      empty.className = 'kh-codex-entry kh-codex-empty';
       empty.textContent = 'Defeat underworld foes and wardens to populate the Foe Kill Log.';
       grid.appendChild(empty);
     } else {
       for (const [id, count] of entries) {
         const isBoss = id in BOSS_CONSTANTS;
         const card = document.createElement('div');
-        card.className = 'kh-codex-entry';
-        if (isBoss) {
-          card.style.borderColor = 'rgba(245, 203, 112, 0.72)';
-        }
+        card.className = isBoss ? 'kh-codex-entry kh-codex-boss' : 'kh-codex-entry';
         const name = document.createElement('div');
-        name.style.fontFamily = 'var(--kh-font-display)';
-        name.style.fontSize = '12.5px';
-        name.style.fontWeight = '700';
-        name.style.color = isBoss ? '#ffd978' : '#f4ece0';
+        name.className = 'kh-codex-entry-title';
+        name.style.color = isBoss ? '#fff0b8' : '#f7eedb';
         name.textContent = `${isBoss ? '♛ ' : ''}${formatArchetypeName(id as EnemyArchetypeId)}`;
 
         const kills = document.createElement('div');
-        kills.style.fontSize = '11.5px';
-        kills.style.color = '#7cf5be';
+        kills.className = 'kh-codex-kills';
         kills.textContent = `Vanquished: ${count}`;
 
         card.append(name, kills);
@@ -708,11 +720,10 @@ export class ShopAndCodexModal {
       this.codexBodyEl.appendChild(vowTitle);
 
       const vowStrip = document.createElement('div');
-      vowStrip.className = 'kh-boon-strip';
+      vowStrip.className = 'kh-weapon-stat-chips';
       for (const [vid, rank] of activeVows) {
         const chip = document.createElement('span');
-        chip.className = 'kh-boon-chip';
-        chip.style.borderColor = '#ff8b4d';
+        chip.className = 'kh-stat-badge kh-hammer-badge';
         chip.textContent = `${SHRINE_VOWS[vid as ShrineVowId].displayName} (${rank})`;
         vowStrip.appendChild(chip);
       }

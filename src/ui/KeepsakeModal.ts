@@ -6,10 +6,12 @@ import {
   type SimState,
 } from '../contracts/index.js';
 import type { MenuNavInput } from '../input/InputManager.js';
+import { attachCornerFiligrees, svgPatronSigil, svgRelicGem } from './svgArt.js';
 
 export interface KeepsakeModalCallbacks {
   onSelectKeepsake?(id: KeepsakeId | null): void;
   onCloseModal(): void;
+  readonly onUiHover?: () => void;
 }
 
 const KEEPSAKE_ORDER: readonly KeepsakeId[] = [
@@ -32,14 +34,14 @@ const KEEPSAKE_ORDER: readonly KeepsakeId[] = [
 ];
 
 const NON_PATRON_ACCENTS: Partial<Record<KeepsakeId, string>> = {
-  old_collar: '#e05858',
+  old_collar: '#f02e46',
   lucky_fang: '#f0e2bd',
-  bone_sandglass: '#b894ff',
-  coin_pouch: '#f5c742',
-  evergreen_acorn: '#63d471',
-  shattered_shackle: '#a4aec4',
+  bone_sandglass: '#b25cff',
+  coin_pouch: '#e5b952',
+  evergreen_acorn: '#44e68c',
+  shattered_shackle: '#a4b2c8',
   pierced_plume: '#ff823d',
-  obsidian_shawl: '#8872c8',
+  obsidian_shawl: '#8f74d4',
 };
 
 function renderRankStars(rank: number): string {
@@ -70,7 +72,8 @@ export class KeepsakeModal {
     this.backdrop.setAttribute('data-screen', 'keepsake_menu');
 
     const shell = document.createElement('div');
-    shell.className = 'kh-meta-shell';
+    shell.className = 'kh-meta-shell kh-ornate-frame kh-theme-keepsake';
+    attachCornerFiligrees(shell);
 
     // Header
     const header = document.createElement('div');
@@ -83,7 +86,7 @@ export class KeepsakeModal {
     title.textContent = 'KEEPSAKE CABINET';
     const sub = document.createElement('div');
     sub.className = 'kh-meta-sub';
-    sub.textContent = '16 Relics · Rank I–III · Equip One Relic Before Descending';
+    sub.textContent = 'Sixteen Sanctum Relics · Rank I–III · Equip One Before Descending';
     titleGroup.append(title, sub);
 
     const badges = document.createElement('div');
@@ -98,7 +101,7 @@ export class KeepsakeModal {
     const meander = document.createElement('div');
     meander.className = 'kh-meander-strip';
 
-    // Scrollable 16-Keepsake 4x4 Grid
+    // Scrollable 16-Keepsake 4x4 Velvet-Crimson & Gold Grid
     const scroll = document.createElement('div');
     scroll.className = 'kh-meta-scroll';
     this.gridEl = document.createElement('div');
@@ -112,20 +115,23 @@ export class KeepsakeModal {
     this.hintEl.className = 'kh-meta-hint';
 
     const actions = document.createElement('div');
-    actions.style.display = 'flex';
-    actions.style.gap = '8px';
+    actions.className = 'kh-footer-btn-group';
 
     this.unequipBtn = document.createElement('button');
     this.unequipBtn.type = 'button';
-    this.unequipBtn.className = 'kh-btn';
+    this.unequipBtn.className = 'kh-btn kh-btn-notched';
     this.unequipBtn.textContent = 'UNEQUIP';
     this.unequipBtn.addEventListener('click', () => this.callbacks.onSelectKeepsake?.(null));
+    this.unequipBtn.addEventListener('pointerenter', () => {
+      if (!this.unequipBtn.disabled) this.callbacks.onUiHover?.();
+    });
 
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
-    closeBtn.className = 'kh-btn kh-btn-primary';
+    closeBtn.className = 'kh-btn kh-btn-primary kh-btn-notched';
     closeBtn.textContent = 'CLOSE CABINET';
     closeBtn.addEventListener('click', () => this.callbacks.onCloseModal());
+    closeBtn.addEventListener('pointerenter', () => this.callbacks.onUiHover?.());
 
     actions.append(this.unequipBtn, closeBtn);
     footer.append(this.hintEl, actions);
@@ -173,18 +179,19 @@ export class KeepsakeModal {
 
     const cols = 4;
     const total = KEEPSAKE_ORDER.length;
+    const prevIdx = this.focusedIndex;
     if (menuNav.left) {
       this.focusedIndex = (this.focusedIndex - 1 + total) % total;
-      this.applyFocusStyles();
     } else if (menuNav.right) {
       this.focusedIndex = (this.focusedIndex + 1) % total;
-      this.applyFocusStyles();
     } else if (menuNav.up) {
       this.focusedIndex = (this.focusedIndex - cols + total) % total;
-      this.applyFocusStyles();
     } else if (menuNav.down) {
       this.focusedIndex = (this.focusedIndex + cols) % total;
+    }
+    if (this.focusedIndex !== prevIdx) {
       this.applyFocusStyles();
+      this.callbacks.onUiHover?.();
     }
 
     if (menuNav.confirm) {
@@ -227,7 +234,7 @@ export class KeepsakeModal {
       const rank = Math.max(1, Math.min(3, Math.floor(state.meta.keepsakeRanks[id] ?? 1)));
       const accent = def.forcedPatron
         ? PATRON_CONSTANTS[def.forcedPatron].colorHex
-        : (NON_PATRON_ACCENTS[id] ?? '#f5cb70');
+        : (NON_PATRON_ACCENTS[id] ?? '#e5b952');
 
       const card = document.createElement('button');
       card.type = 'button';
@@ -235,55 +242,39 @@ export class KeepsakeModal {
       if (isEquipped) card.classList.add('kh-equipped');
       if (!unlocked) card.classList.add('kh-locked');
       card.dataset.keepsakeId = id;
-      card.style.borderTop = `3px solid ${accent}`;
+      card.style.setProperty('--kh-relic-accent', accent);
 
       const top = document.createElement('div');
-      top.style.display = 'flex';
-      top.style.alignItems = 'center';
-      top.style.justifyContent = 'space-between';
-      top.style.gap = '6px';
+      top.className = 'kh-keepsake-top';
 
       const nameWrap = document.createElement('div');
-      nameWrap.style.display = 'flex';
-      nameWrap.style.alignItems = 'center';
-      nameWrap.style.gap = '6px';
-      nameWrap.style.minWidth = '0';
+      nameWrap.className = 'kh-keepsake-name-wrap';
 
-      const dot = document.createElement('span');
-      dot.className = 'kh-boon-dot';
-      dot.style.background = accent;
+      const gem = document.createElement('span');
+      gem.className = 'kh-keepsake-gem';
+      gem.style.color = unlocked ? accent : '#6e6258';
+      gem.innerHTML = def.forcedPatron
+        ? svgPatronSigil(def.forcedPatron, 22)
+        : svgRelicGem(accent, unlocked);
 
       const nameEl = document.createElement('span');
-      nameEl.style.fontFamily = 'var(--kh-font-display)';
-      nameEl.style.fontSize = '12px';
-      nameEl.style.fontWeight = '700';
-      nameEl.style.color = isEquipped ? '#fff6dc' : '#eae0d2';
+      nameEl.className = 'kh-keepsake-name';
       nameEl.textContent = def.displayName;
 
-      nameWrap.append(dot, nameEl);
+      nameWrap.append(gem, nameEl);
 
       const stars = document.createElement('span');
-      stars.style.fontSize = '11px';
-      stars.style.color = '#f5cb70';
-      stars.style.letterSpacing = '1px';
-      stars.style.flexShrink = '0';
+      stars.className = 'kh-keepsake-stars';
       stars.textContent = unlocked ? renderRankStars(rank) : 'LOCKED';
 
       top.append(nameWrap, stars);
 
       const desc = document.createElement('div');
-      desc.style.fontSize = '11px';
-      desc.style.lineHeight = '1.35';
-      desc.style.color = '#cfc5b8';
+      desc.className = 'kh-keepsake-desc';
       desc.textContent = def.description;
 
       const footer = document.createElement('div');
-      footer.style.display = 'flex';
-      footer.style.justifyContent = 'space-between';
-      footer.style.alignItems = 'center';
-      footer.style.fontSize = '10px';
-      footer.style.fontWeight = '700';
-      footer.style.letterSpacing = '0.07em';
+      footer.className = 'kh-keepsake-card-footer';
 
       const tag = document.createElement('span');
       tag.style.color = accent;
@@ -292,7 +283,8 @@ export class KeepsakeModal {
         : 'RELIC';
 
       const status = document.createElement('span');
-      status.style.color = isEquipped ? '#7cf5be' : unlocked ? '#b8aea2' : '#ff8c94';
+      status.className = 'kh-keepsake-status';
+      status.style.color = isEquipped ? '#66f2b4' : unlocked ? '#cbbca0' : '#ff7b8a';
       status.textContent = isEquipped ? '✓ EQUIPPED' : unlocked ? `RANK ${rank}` : 'NECTAR';
 
       footer.append(tag, status);
@@ -305,8 +297,11 @@ export class KeepsakeModal {
         }
       });
       card.addEventListener('pointerenter', () => {
-        this.focusedIndex = idx;
-        this.applyFocusStyles();
+        if (this.focusedIndex !== idx) {
+          this.focusedIndex = idx;
+          this.applyFocusStyles();
+          this.callbacks.onUiHover?.();
+        }
       });
 
       this.gridEl.appendChild(card);

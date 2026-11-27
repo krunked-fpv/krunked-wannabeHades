@@ -5,12 +5,14 @@ import {
   type SimState,
 } from '../contracts/index.js';
 import type { MenuNavInput } from '../input/InputManager.js';
+import { attachCornerFiligrees, svgDarknessFlame } from './svgArt.js';
 
 export interface MirrorModalCallbacks {
   onUpgradeMirror?(id: MirrorUpgradeId): void;
   onToggleMirrorSide?(id: MirrorUpgradeId): void;
   onRefundMirror?(): void;
   onCloseModal(): void;
+  readonly onUiHover?: () => void;
 }
 
 const MIRROR_ORDER: readonly MirrorUpgradeId[] = [
@@ -77,7 +79,8 @@ export class MirrorModal {
     this.backdrop.setAttribute('data-screen', 'mirror_menu');
 
     const shell = document.createElement('div');
-    shell.className = 'kh-meta-shell';
+    shell.className = 'kh-meta-shell kh-ornate-frame kh-theme-mirror';
+    attachCornerFiligrees(shell);
 
     // Header
     const header = document.createElement('div');
@@ -90,7 +93,7 @@ export class MirrorModal {
     title.textContent = 'MIRROR OF DUSK';
     const sub = document.createElement('div');
     sub.className = 'kh-meta-sub';
-    sub.textContent = '12 Nightly Pairs · Toggle Purple Side A ⇄ Gold Side B';
+    sub.textContent = 'Twelve Shadow Talents · Toggle Amethyst Side A ⇄ Crimson-Gold Side B';
     titleGroup.append(title, sub);
 
     const badges = document.createElement('div');
@@ -119,20 +122,21 @@ export class MirrorModal {
     this.hintEl.className = 'kh-meta-hint';
 
     const footerActions = document.createElement('div');
-    footerActions.style.display = 'flex';
-    footerActions.style.gap = '8px';
+    footerActions.className = 'kh-footer-btn-group';
 
     this.refundBtn = document.createElement('button');
     this.refundBtn.type = 'button';
-    this.refundBtn.className = 'kh-btn';
+    this.refundBtn.className = 'kh-btn kh-btn-notched';
     this.refundBtn.textContent = 'REFUND ALL DARKNESS';
     this.refundBtn.addEventListener('click', () => this.handleRefund());
+    this.refundBtn.addEventListener('pointerenter', () => this.callbacks.onUiHover?.());
 
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
-    closeBtn.className = 'kh-btn kh-btn-primary';
+    closeBtn.className = 'kh-btn kh-btn-primary kh-btn-notched';
     closeBtn.textContent = 'CLOSE MIRROR';
     closeBtn.addEventListener('click', () => this.callbacks.onCloseModal());
+    closeBtn.addEventListener('pointerenter', () => this.callbacks.onUiHover?.());
 
     footerActions.append(this.refundBtn, closeBtn);
     footer.append(this.hintEl, footerActions);
@@ -177,12 +181,15 @@ export class MirrorModal {
     }
 
     const len = MIRROR_ORDER.length;
+    const prevIdx = this.focusedIndex;
     if (menuNav.up) {
       this.focusedIndex = (this.focusedIndex - 1 + len) % len;
-      this.applyFocusStyles();
     } else if (menuNav.down) {
       this.focusedIndex = (this.focusedIndex + 1) % len;
+    }
+    if (this.focusedIndex !== prevIdx) {
       this.applyFocusStyles();
+      this.callbacks.onUiHover?.();
     }
 
     const focusedId = MIRROR_ORDER[this.focusedIndex];
@@ -226,7 +233,7 @@ export class MirrorModal {
   }
 
   private renderRows(state: SimState): void {
-    this.darknessBadge.textContent = `DARKNESS: ${Math.floor(state.meta.darkness)}`;
+    this.darknessBadge.innerHTML = `${svgDarknessFlame()}<span>DARKNESS: ${Math.floor(state.meta.darkness)}</span>`;
 
     const inspRank = Math.max(0, Math.floor(state.meta.shrineVows.routine_inspection ?? 0));
     this.inspectionBadge.classList.toggle('kh-hidden', inspRank <= 0);
@@ -252,7 +259,7 @@ export class MirrorModal {
       row.dataset.side = side;
       row.dataset.mirrorId = id;
 
-      // Side A <-> Side B toggle button
+      // Side A (Amethyst) <-> Side B (Crimson-Gold) Engraved Toggle Tablet
       const sideBtn = document.createElement('button');
       sideBtn.type = 'button';
       sideBtn.className = 'kh-mirror-side-btn';
@@ -263,67 +270,74 @@ export class MirrorModal {
         this.focusedIndex = idx;
         this.callbacks.onToggleMirrorSide?.(id);
       });
+      sideBtn.addEventListener('pointerenter', () => this.callbacks.onUiHover?.());
 
-      // Center details
+      // Center talent details + glowing rank pips
       const info = document.createElement('div');
-      info.style.display = 'flex';
-      info.style.flexDirection = 'column';
-      info.style.gap = '2px';
-      info.style.minWidth = '0';
+      info.className = 'kh-mirror-info';
 
       const titleLine = document.createElement('div');
-      titleLine.style.display = 'flex';
-      titleLine.style.alignItems = 'center';
-      titleLine.style.gap = '8px';
-      titleLine.style.flexWrap = 'wrap';
+      titleLine.className = 'kh-mirror-title-line';
 
       const nameEl = document.createElement('span');
-      nameEl.style.fontFamily = 'var(--kh-font-display)';
-      nameEl.style.fontSize = '13.5px';
-      nameEl.style.fontWeight = '700';
-      nameEl.style.color = side === 'a' ? '#e5c6ff' : '#ffe8a8';
+      nameEl.className = 'kh-mirror-name';
+      nameEl.dataset.side = side;
       nameEl.textContent = `${pair.row}. ${activeDef.name}`;
 
       const rankPill = document.createElement('span');
-      rankPill.className = 'kh-boon-slot-tag';
-      rankPill.style.color = '#7cf5be';
+      rankPill.className = 'kh-boon-slot-tag kh-tag-mirror-rank';
       rankPill.textContent = `RANK ${rank}/${activeDef.maxRank} (${formatMirrorBonus(id, side, rank)})`;
 
       titleLine.append(nameEl, rankPill);
 
       if (disabledRow) {
         const seal = document.createElement('span');
-        seal.className = 'kh-boon-slot-tag';
-        seal.style.color = '#ff808a';
+        seal.className = 'kh-boon-slot-tag kh-tag-hidden';
         seal.textContent = 'SEALED BY VOW';
         titleLine.appendChild(seal);
       }
 
+      // Rank Pips (capped visually cleanly for high maxRank talents)
+      const pipTrack = document.createElement('div');
+      pipTrack.className = 'kh-rank-pip-track kh-mirror-pips';
+      pipTrack.dataset.side = side;
+      pipTrack.setAttribute('aria-hidden', 'true');
+      const pipCount = Math.min(activeDef.maxRank, 10);
+      const filledPips =
+        activeDef.maxRank <= 10 ? rank : Math.round((rank / Math.max(1, activeDef.maxRank)) * pipCount);
+      for (let p = 1; p <= pipCount; p++) {
+        const pip = document.createElement('span');
+        pip.className = p <= filledPips ? 'kh-rank-pip kh-filled' : 'kh-rank-pip';
+        pipTrack.appendChild(pip);
+      }
+
       const desc = document.createElement('div');
-      desc.style.fontSize = '11.5px';
-      desc.style.color = '#d8cec2';
+      desc.className = 'kh-mirror-desc';
       desc.textContent = `${activeDef.description} (Alt: ${altDef.name})`;
 
-      info.append(titleLine, desc);
+      info.append(titleLine, pipTrack, desc);
 
       // Upgrade button
       const upBtn = document.createElement('button');
       upBtn.type = 'button';
-      upBtn.className = isMax ? 'kh-btn' : 'kh-btn kh-btn-primary';
-      upBtn.style.minWidth = '134px';
-      upBtn.style.fontSize = '11px';
-      upBtn.style.padding = '6px 12px';
+      upBtn.className = isMax ? 'kh-btn kh-btn-notched kh-mirror-up-btn' : 'kh-btn kh-btn-primary kh-btn-notched kh-mirror-up-btn';
       upBtn.disabled = isMax || state.meta.darkness < cost;
       upBtn.textContent = isMax ? 'MAX RANK' : `+1 (${cost} DARK)`;
       upBtn.addEventListener('click', () => {
         this.focusedIndex = idx;
         this.callbacks.onUpgradeMirror?.(id);
       });
+      upBtn.addEventListener('pointerenter', () => {
+        if (!upBtn.disabled) this.callbacks.onUiHover?.();
+      });
 
       row.append(sideBtn, info, upBtn);
       row.addEventListener('pointerenter', () => {
-        this.focusedIndex = idx;
-        this.applyFocusStyles();
+        if (this.focusedIndex !== idx) {
+          this.focusedIndex = idx;
+          this.applyFocusStyles();
+          this.callbacks.onUiHover?.();
+        }
       });
 
       this.listEl.appendChild(row);

@@ -10,7 +10,20 @@ import {
   type ScreenId,
   type SimEvent,
   type SimState,
+  type WeaponId,
 } from '../contracts/index.js';
+import {
+  svgBloodstoneSocket,
+  svgBossCrownOrnament,
+  svgDarknessFlame,
+  svgDashWing,
+  svgDeathDefianceSkull,
+  svgHeatFlame,
+  svgObolCoin,
+  svgPatronSigil,
+  svgWeaponSilhouette,
+  svgWingedHpFrame,
+} from './svgArt.js';
 
 export interface HudRenderStats {
   backend: string;
@@ -18,12 +31,6 @@ export interface HudRenderStats {
   drawCalls: number;
   particleCount: number;
 }
-
-const SKULL_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true"><path d="M12 2.5C7.3 2.5 4 5.9 4 10.3c0 2.6 1.2 4.7 3 6v3.2c0 .8.6 1.5 1.4 1.5h7.2c.8 0 1.4-.7 1.4-1.5v-3.2c1.8-1.3 3-3.4 3-6C20 5.9 16.7 2.5 12 2.5Z" fill="#f5cb70" stroke="#4a1019" stroke-width="1.4"/><circle cx="9.2" cy="10.4" r="1.7" fill="#4a1019"/><circle cx="14.8" cy="10.4" r="1.7" fill="#4a1019"/><path d="M10 17.5v3M12 17.5v3M14 17.5v3" stroke="#4a1019" stroke-width="1.3"/></svg>`;
-
-const COIN_SVG = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="#f3c44d" stroke="#7a4c11" stroke-width="1.2"/><circle cx="8" cy="8" r="3.6" stroke="#fff3be" stroke-width="1"/></svg>`;
-
-const DARKNESS_SVG = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" aria-hidden="true"><path d="M8 1.5C5.2 4.8 3.5 7.4 3.5 10a4.5 4.5 0 0 0 9 0c0-2.6-1.7-5.2-4.5-8.5Z" fill="#b46eff" stroke="#2c104d" stroke-width="1.1"/></svg>`;
 
 const SLOT_SHORT_LABEL: Record<string, string> = {
   attack: 'ATK',
@@ -38,17 +45,34 @@ const SLOT_SHORT_LABEL: Record<string, string> = {
 };
 
 const RARITY_COLOR: Record<string, string> = {
-  common: '#b69d81',
-  rare: '#3b96ff',
-  epic: '#ae5cff',
-  heroic: '#eb4754',
-  duo: '#3ee491',
-  legendary: '#ffb133',
+  common: '#b8ada0',
+  rare: '#3ea4ff',
+  epic: '#b25cff',
+  heroic: '#ff465a',
+  duo: '#c9f238',
+  legendary: '#ffae24',
 };
 
 interface ActiveToast {
   el: HTMLDivElement;
   expiresAt: number;
+}
+
+interface BossCardRefs {
+  card: HTMLDivElement;
+  nameEl: HTMLSpanElement;
+  subtitleEl: HTMLSpanElement | null;
+  phaseBadge: HTMLSpanElement;
+  armorTrack: HTMLDivElement;
+  armorFill: HTMLDivElement;
+  hpTrack: HTMLDivElement;
+  hpGhost: HTMLDivElement;
+  hpFill: HTMLDivElement;
+  hpInvuln: HTMLDivElement;
+  hpPill: HTMLSpanElement;
+  lastHpPct: number;
+  ghostPct: number;
+  ghostHoldUntil: number;
 }
 
 export function findNearestInteractableLabel(state: SimState): string | null {
@@ -112,10 +136,12 @@ export class HudOverlay {
 
   // Top-center boss stack
   private readonly bossStack: HTMLDivElement;
-  private lastBossSignature = '';
+  private readonly bossCards = new Map<string, BossCardRefs>();
+  private lastBossOrderKey = '';
 
   // Top-right chamber + currency + fps
   private readonly topRight: HTMLDivElement;
+  private readonly chamberPill: HTMLDivElement;
   private readonly biomeEl: HTMLSpanElement;
   private readonly depthEl: HTMLSpanElement;
   private readonly heatEl: HTMLSpanElement;
@@ -125,10 +151,12 @@ export class HudOverlay {
 
   // Bottom-left hero panel
   private readonly boonStrip: HTMLDivElement;
+  private readonly weaponIconEl: HTMLSpanElement;
   private readonly weaponTagEl: HTMLSpanElement;
   private readonly godModeBadgeEl: HTMLSpanElement;
   private readonly ddRowEl: HTMLDivElement;
   private readonly hpTrackEl: HTMLDivElement;
+  private readonly hpGhostEl: HTMLDivElement;
   private readonly hpFillEl: HTMLDivElement;
   private readonly hpTextMainEl: HTMLSpanElement;
   private readonly hpArmorEl: HTMLSpanElement;
@@ -138,6 +166,12 @@ export class HudOverlay {
   private readonly godGaugeWrapEl: HTMLDivElement;
   private readonly godGaugeStatusEl: HTMLSpanElement;
   private readonly godSegFills: HTMLDivElement[] = [];
+
+  // Delayed hero damage-drain ghost tracking
+  private lastHeroHpPct = 100;
+  private heroGhostPct = 100;
+  private heroGhostHoldUntil = 0;
+  private lastFrameNow = 0;
 
   // Bottom-right dynamic prompt strip
   private readonly promptStrip: HTMLDivElement;
@@ -156,9 +190,11 @@ export class HudOverlay {
   private readonly hubDock: HTMLElement;
   private readonly dockCodexKeyEl: HTMLSpanElement;
   private readonly onOpenScreen?: (screen: ScreenId) => void;
+  private readonly onUiHover?: () => void;
   private isHubActive = false;
 
   // Dirty-checking caches for zero-churn 120fps updates
+  private lastWeaponId: WeaponId | null = null;
   private lastBoonsKey = '';
   private lastDdKey = '';
   private lastBloodstoneKey = '';
@@ -191,8 +227,13 @@ export class HudOverlay {
     }
   };
 
-  constructor(uiRoot: HTMLElement, onOpenScreen?: (screen: ScreenId) => void) {
+  constructor(
+    uiRoot: HTMLElement,
+    onOpenScreen?: (screen: ScreenId) => void,
+    onUiHover?: () => void
+  ) {
     this.onOpenScreen = onOpenScreen;
+    this.onUiHover = onUiHover;
     this.root = document.createElement('div');
     this.root.className = 'kh-hud kh-hidden';
     this.root.setAttribute('data-hud-root', 'true');
@@ -205,30 +246,32 @@ export class HudOverlay {
     this.topRight = document.createElement('div');
     this.topRight.className = 'kh-hud-topright';
 
-    const chamberPill = document.createElement('div');
-    chamberPill.className = 'kh-chamber-pill';
+    this.chamberPill = document.createElement('div');
+    this.chamberPill.className = 'kh-chamber-pill';
     this.biomeEl = document.createElement('span');
     this.biomeEl.className = 'kh-biome-name';
     this.depthEl = document.createElement('span');
     this.depthEl.className = 'kh-chamber-depth';
     this.heatEl = document.createElement('span');
     this.heatEl.className = 'kh-heat-pill kh-hidden';
-    chamberPill.append(this.biomeEl, this.depthEl, this.heatEl);
+    this.chamberPill.append(this.biomeEl, this.depthEl, this.heatEl);
 
     const currencyRow = document.createElement('div');
     currencyRow.className = 'kh-currency-row';
 
     const goldChip = document.createElement('div');
     goldChip.className = 'kh-currency-chip kh-currency-gold';
-    goldChip.innerHTML = COIN_SVG;
+    goldChip.innerHTML = svgObolCoin();
     this.goldValEl = document.createElement('span');
+    this.goldValEl.className = 'kh-currency-num';
     this.goldValEl.textContent = '0';
     goldChip.appendChild(this.goldValEl);
 
     const darknessChip = document.createElement('div');
     darknessChip.className = 'kh-currency-chip kh-currency-darkness';
-    darknessChip.innerHTML = DARKNESS_SVG;
+    darknessChip.innerHTML = svgDarknessFlame();
     this.darknessValEl = document.createElement('span');
+    this.darknessValEl.className = 'kh-currency-num';
     this.darknessValEl.textContent = '0';
     darknessChip.appendChild(this.darknessValEl);
 
@@ -236,9 +279,9 @@ export class HudOverlay {
     this.fpsChip.className = 'kh-currency-chip kh-currency-fps kh-hidden';
 
     currencyRow.append(goldChip, darknessChip, this.fpsChip);
-    this.topRight.append(chamberPill, currencyRow);
+    this.topRight.append(this.chamberPill, currencyRow);
 
-    // Bottom-left Ornate Hero HUD
+    // Bottom-left Sculpted Filigree Hero HUD
     const bottomLeft = document.createElement('div');
     bottomLeft.className = 'kh-hud-bottomleft';
 
@@ -250,31 +293,52 @@ export class HudOverlay {
 
     const topRow = document.createElement('div');
     topRow.className = 'kh-hero-top-row';
+
+    const weaponGroup = document.createElement('div');
+    weaponGroup.className = 'kh-hero-weapon-group';
+    this.weaponIconEl = document.createElement('span');
+    this.weaponIconEl.className = 'kh-weapon-icon';
+    this.weaponIconEl.setAttribute('aria-hidden', 'true');
     this.weaponTagEl = document.createElement('span');
     this.weaponTagEl.className = 'kh-weapon-tag';
+    weaponGroup.append(this.weaponIconEl, this.weaponTagEl);
+
     const rightMeta = document.createElement('div');
-    rightMeta.style.display = 'flex';
-    rightMeta.style.alignItems = 'center';
-    rightMeta.style.gap = '6px';
+    rightMeta.className = 'kh-hero-right-meta';
     this.godModeBadgeEl = document.createElement('span');
     this.godModeBadgeEl.className = 'kh-godmode-badge kh-hidden';
     this.ddRowEl = document.createElement('div');
     this.ddRowEl.className = 'kh-dd-row';
     rightMeta.append(this.godModeBadgeEl, this.ddRowEl);
-    topRow.append(this.weaponTagEl, rightMeta);
+    topRow.append(weaponGroup, rightMeta);
+
+    // Winged Bronze-Filigree HP Bar with Delayed Damage-Drain Ghost Bar
+    const hpRow = document.createElement('div');
+    hpRow.className = 'kh-hp-winged-row';
+    const leftWing = document.createElement('span');
+    leftWing.className = 'kh-hp-wing kh-hp-wing-left';
+    leftWing.innerHTML = svgWingedHpFrame('left');
+    const rightWing = document.createElement('span');
+    rightWing.className = 'kh-hp-wing kh-hp-wing-right';
+    rightWing.innerHTML = svgWingedHpFrame('right');
 
     this.hpTrackEl = document.createElement('div');
     this.hpTrackEl.className = 'kh-hp-track';
+    this.hpGhostEl = document.createElement('div');
+    this.hpGhostEl.className = 'kh-hp-ghost';
+    this.hpGhostEl.style.width = '100%';
     this.hpFillEl = document.createElement('div');
     this.hpFillEl.className = 'kh-hp-fill';
     const hpText = document.createElement('div');
     hpText.className = 'kh-hp-text';
     this.hpTextMainEl = document.createElement('span');
     this.hpArmorEl = document.createElement('span');
-    this.hpArmorEl.style.color = '#ffe588';
+    this.hpArmorEl.className = 'kh-hp-armor-val';
     hpText.append(this.hpTextMainEl, this.hpArmorEl);
-    this.hpTrackEl.append(this.hpFillEl, hpText);
+    this.hpTrackEl.append(this.hpGhostEl, this.hpFillEl, hpText);
+    hpRow.append(leftWing, this.hpTrackEl, rightWing);
 
+    // Sub-row: Jeweled Bloodstone Sockets, Swept Bronze Dash Wings, Rail Ammo
     const resourcesRow = document.createElement('div');
     resourcesRow.className = 'kh-resources-row';
     this.bloodstoneGroupEl = document.createElement('div');
@@ -285,6 +349,7 @@ export class HudOverlay {
     this.railAmmoEl.className = 'kh-rail-ammo kh-hidden';
     resourcesRow.append(this.bloodstoneGroupEl, this.dashGroupEl, this.railAmmoEl);
 
+    // 4-Segment Gilded Patron Call Gauge
     this.godGaugeWrapEl = document.createElement('div');
     this.godGaugeWrapEl.className = 'kh-god-gauge-wrap';
     const gaugeHead = document.createElement('div');
@@ -307,7 +372,7 @@ export class HudOverlay {
     }
     this.godGaugeWrapEl.append(gaugeHead, segRow);
 
-    heroFrame.append(topRow, this.hpTrackEl, resourcesRow, this.godGaugeWrapEl);
+    heroFrame.append(topRow, hpRow, resourcesRow, this.godGaugeWrapEl);
     bottomLeft.append(this.boonStrip, heroFrame);
 
     // Bottom-right dynamic prompt strip
@@ -358,6 +423,7 @@ export class HudOverlay {
 
       btn.append(labelSpan, keySpan);
       btn.addEventListener('click', () => this.onOpenScreen?.(item.screen));
+      btn.addEventListener('pointerenter', () => this.onUiHover?.());
       this.hubDock.appendChild(btn);
     }
     this.dockCodexKeyEl = codexKeySpan as HTMLSpanElement;
@@ -388,11 +454,20 @@ export class HudOverlay {
     renderStats: HudRenderStats,
     drainedEvents?: readonly SimEvent[]
   ): void {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const dtSec = this.lastFrameNow > 0 ? Math.min(0.1, Math.max(0, (now - this.lastFrameNow) / 1000)) : 0.016;
+    this.lastFrameNow = now;
+
     const showHud =
       screen === 'hub' ||
       screen === 'playing' ||
       screen === 'pause' ||
       screen === 'boon_select';
+
+    const touchActive = activeSource === 'touch';
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.classList.toggle('kh-touch-active', touchActive && showHud);
+    }
 
     this.root.classList.toggle('kh-hidden', !showHud);
     this.isHubActive = screen === 'hub';
@@ -415,12 +490,13 @@ export class HudOverlay {
     const biome = BIOME_CONSTANTS[room.biome];
 
     // Relocate Hero HUD + Boons to top-left & shift top-right away from pause pill when touch is active
-    this.root.classList.toggle('kh-touch-active', activeSource === 'touch');
-    this.topRight.classList.toggle('kh-touch-offset', activeSource === 'touch');
+    this.root.classList.toggle('kh-touch-active', touchActive);
+    this.topRight.classList.toggle('kh-touch-offset', touchActive);
 
     // Top-right Biome & Chamber Depth
     this.biomeEl.textContent = biome.displayName;
     this.biomeEl.style.color = biome.accentHex;
+    this.chamberPill.style.borderRightColor = biome.accentHex;
     const depthLabel =
       room.biome === 'sanctum_hub'
         ? 'COURTYARD'
@@ -435,8 +511,9 @@ export class HudOverlay {
         state.run.tightDeadlineTimer !== null
           ? `HEAT ${state.run.heat} · ${this.formatTimer(state.run.tightDeadlineTimer)}`
           : `HEAT ${state.run.heat}`;
-      if (this.heatEl.textContent !== heatText) {
-        this.heatEl.textContent = heatText;
+      if (this.heatEl.dataset.heatText !== heatText) {
+        this.heatEl.dataset.heatText = heatText;
+        this.heatEl.innerHTML = `${svgHeatFlame()}<span>${heatText}</span>`;
       }
     } else {
       this.heatEl.classList.add('kh-hidden');
@@ -461,10 +538,11 @@ export class HudOverlay {
       }
     }
 
-    // Hero Weapon + God Mode + Death Defiances
-    const weaponName = WEAPON_CONSTANTS[player.weaponId].displayName;
-    if (this.weaponTagEl.textContent !== weaponName) {
-      this.weaponTagEl.textContent = weaponName;
+    // Hero Weapon SVG Silhouette + Name + God Mode + Death Defiances
+    if (this.lastWeaponId !== player.weaponId) {
+      this.lastWeaponId = player.weaponId;
+      this.weaponIconEl.innerHTML = svgWeaponSilhouette(player.weaponId, 16);
+      this.weaponTagEl.textContent = WEAPON_CONSTANTS[player.weaponId].displayName;
     }
 
     const showGod = state.run.godModeEnabled || state.meta.godModeEnabled;
@@ -478,11 +556,23 @@ export class HudOverlay {
 
     this.updateDeathDefiances(player.deathDefiances, player.maxDeathDefiances);
 
-    // HP Bar
+    // HP Bar + Delayed Damage-Drain Ghost Bar
     const maxHp = Math.max(1, Math.round(player.maxHp));
     const hp = Math.max(0, Math.ceil(player.hp));
     const hpPct = Math.max(0, Math.min(100, (player.hp / maxHp) * 100));
+    if (hpPct < this.lastHeroHpPct - 0.1) {
+      this.heroGhostPct = Math.max(this.heroGhostPct, this.lastHeroHpPct);
+      this.heroGhostHoldUntil = now + 340;
+    } else if (hpPct > this.heroGhostPct) {
+      this.heroGhostPct = hpPct;
+    }
+    this.lastHeroHpPct = hpPct;
+    if (this.heroGhostPct > hpPct && now >= this.heroGhostHoldUntil) {
+      this.heroGhostPct = Math.max(hpPct, this.heroGhostPct - dtSec * 42);
+    }
+
     this.hpFillEl.style.width = `${hpPct.toFixed(1)}%`;
+    this.hpGhostEl.style.width = `${this.heroGhostPct.toFixed(1)}%`;
     this.hpTrackEl.classList.toggle('kh-hp-low', hpPct > 0 && hpPct <= 25);
     const hpStr = `${hp} / ${maxHp}`;
     if (this.hpTextMainEl.textContent !== hpStr) {
@@ -493,8 +583,12 @@ export class HudOverlay {
       this.hpArmorEl.textContent = armorStr;
     }
 
-    // Bloodstone slots, Dash pips, Rail ammo
-    this.updateBloodstones(player.castAmmo, player.maxCastAmmo);
+    // Jeweled Bloodstone sockets, Swept Bronze Dash wings, Rail ammo
+    const lodgedCount = state.enemies.reduce(
+      (acc, enemy) => acc + (enemy.aiState !== 'dead' && enemy.hp > 0 ? enemy.lodgedCasts : 0),
+      0
+    );
+    this.updateBloodstones(player.castAmmo, player.maxCastAmmo, lodgedCount);
     this.updateDashPips(player.dashCharges, player.maxDashCharges);
 
     const isRail = player.weaponId === 'adamant_rail';
@@ -509,14 +603,14 @@ export class HudOverlay {
       }
     }
 
-    // 4-Segment God Gauge
+    // 4-Segment Gilded Patron Call Gauge
     this.updateGodGauge(player.godGauge, player.godCallPatron);
 
-    // Active Boons Strip
+    // Patron Boon Medallion Rail
     this.updateBoons(player.boons);
 
-    // Top-center Boss Health Bars
-    this.updateBossBars(state.enemies);
+    // Top-center Sculpted Boss Health Bars
+    this.updateBossBars(state.enemies, now, dtSec);
 
     // Contextual World Interact Banner
     const interactLabel = inLiveGameplay ? findNearestInteractableLabel(state) : null;
@@ -539,7 +633,11 @@ export class HudOverlay {
     if (typeof window !== 'undefined') {
       window.removeEventListener('keydown', this.onHubKeyDown);
     }
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.classList.remove('kh-touch-active');
+    }
     this.activeToasts = [];
+    this.bossCards.clear();
     this.root.remove();
   }
 
@@ -553,18 +651,20 @@ export class HudOverlay {
     this.lastDdKey = key;
     this.ddRowEl.innerHTML = '';
     for (let i = 0; i < clampedMax; i++) {
+      const ready = i < clampedCur;
       const span = document.createElement('span');
-      span.className = i < clampedCur ? 'kh-dd-skull' : 'kh-dd-skull kh-spent';
-      span.innerHTML = SKULL_SVG;
-      span.title = i < clampedCur ? 'Death Defiance Ready' : 'Death Defiance Spent';
+      span.className = ready ? 'kh-dd-skull' : 'kh-dd-skull kh-spent';
+      span.innerHTML = svgDeathDefianceSkull(ready);
+      span.title = ready ? 'Death Defiance Ready' : 'Death Defiance Spent';
       this.ddRowEl.appendChild(span);
     }
   }
 
-  private updateBloodstones(current: number, max: number): void {
+  private updateBloodstones(current: number, max: number, lodged: number): void {
     const clampedMax = Math.max(1, Math.min(8, Math.round(max)));
     const clampedCur = Math.max(0, Math.min(clampedMax, Math.round(current)));
-    const key = `${clampedCur}/${clampedMax}`;
+    const clampedLodged = Math.max(0, Math.min(clampedMax - clampedCur, Math.round(lodged)));
+    const key = `${clampedCur}/${clampedLodged}/${clampedMax}`;
     if (this.lastBloodstoneKey === key) {
       return;
     }
@@ -575,8 +675,11 @@ export class HudOverlay {
     lbl.textContent = 'Cast';
     this.bloodstoneGroupEl.appendChild(lbl);
     for (let i = 0; i < clampedMax; i++) {
+      const state: 'ready' | 'lodged' | 'spent' =
+        i < clampedCur ? 'ready' : i < clampedCur + clampedLodged ? 'lodged' : 'spent';
       const pip = document.createElement('span');
-      pip.className = i < clampedCur ? 'kh-bloodstone-pip' : 'kh-bloodstone-pip kh-empty';
+      pip.className = `kh-bloodstone-socket kh-bs-${state}`;
+      pip.innerHTML = svgBloodstoneSocket(state);
       this.bloodstoneGroupEl.appendChild(pip);
     }
   }
@@ -595,25 +698,28 @@ export class HudOverlay {
     lbl.textContent = 'Dash';
     this.dashGroupEl.appendChild(lbl);
     for (let i = 0; i < clampedMax; i++) {
+      const ready = i < clampedCur;
       const pip = document.createElement('span');
-      pip.className = i < clampedCur ? 'kh-dash-pip' : 'kh-dash-pip kh-empty';
+      pip.className = ready ? 'kh-dash-wing kh-ready' : 'kh-dash-wing kh-empty';
+      pip.innerHTML = svgDashWing(ready);
       this.dashGroupEl.appendChild(pip);
     }
   }
 
   private updateGodGauge(gauge: number, patronId: SimState['player']['godCallPatron']): void {
     const clamped = Math.max(0, Math.min(100, gauge));
-    const patronColor = patronId ? PATRON_CONSTANTS[patronId].colorHex : '#f5cb70';
+    const patronColor = patronId ? PATRON_CONSTANTS[patronId].colorHex : '#fff0b8';
     for (let i = 0; i < 4; i++) {
       const segMin = i * 25;
       const segPct = Math.max(0, Math.min(100, ((clamped - segMin) / 25) * 100));
       const fill = this.godSegFills[i];
       fill.style.width = `${segPct.toFixed(1)}%`;
-      fill.style.background = `linear-gradient(90deg, #d99f4c 0%, ${patronColor} 100%)`;
+      fill.style.background = `linear-gradient(90deg, #9e6e2e 0%, #e5b952 48%, ${patronColor} 100%)`;
     }
 
     const isMax = clamped >= 100;
     const isReady = clamped >= 25;
+    this.godGaugeWrapEl.classList.toggle('kh-call-ready', isReady && !isMax);
     this.godGaugeWrapEl.classList.toggle('kh-call-max', isMax);
     this.godGaugeStatusEl.classList.toggle('kh-ready', isReady);
     const statusText = isMax
@@ -637,38 +743,53 @@ export class HudOverlay {
     const visibleLimit = 7;
     const shown = boons.slice(0, visibleLimit);
     for (const boon of shown) {
-      const chip = document.createElement('div');
-      chip.className = 'kh-boon-chip';
-      chip.style.borderColor = RARITY_COLOR[boon.rarity] ?? '#b69d81';
-      chip.title = `${boon.name} (${PATRON_CONSTANTS[boon.patronId].displayName}) — ${boon.description}`;
-
-      const dot = document.createElement('span');
-      dot.className = 'kh-boon-dot';
-      dot.style.background = PATRON_CONSTANTS[boon.patronId].colorHex;
-
-      const label = document.createElement('span');
+      const patron = PATRON_CONSTANTS[boon.patronId];
+      const rarityColor = RARITY_COLOR[boon.rarity] ?? '#b8ada0';
       const slotCode = SLOT_SHORT_LABEL[boon.slot] ?? 'BON';
-      label.textContent = boon.level > 1 ? `${slotCode} Lv.${boon.level}` : slotCode;
 
-      chip.append(dot, label);
-      this.boonStrip.appendChild(chip);
+      const med = document.createElement('div');
+      med.className = 'kh-boon-medallion';
+      med.dataset.rarity = boon.rarity;
+      med.style.setProperty('--kh-medallion-ring', rarityColor);
+      med.style.setProperty('--kh-patron-color', patron.colorHex);
+      med.title = `${boon.name}${boon.level > 1 ? ` (Lv.${boon.level})` : ''} · ${patron.displayName} [${boon.rarity.toUpperCase()}] — ${boon.description}`;
+
+      const sigilWrap = document.createElement('span');
+      sigilWrap.className = 'kh-boon-medallion-sigil';
+      sigilWrap.innerHTML = svgPatronSigil(boon.patronId, 17);
+
+      const slotBadge = document.createElement('span');
+      slotBadge.className = 'kh-boon-medallion-slot';
+      slotBadge.textContent = slotCode;
+
+      med.append(sigilWrap, slotBadge);
+
+      if (boon.level > 1) {
+        const lvlBadge = document.createElement('span');
+        lvlBadge.className = 'kh-boon-medallion-lvl';
+        lvlBadge.textContent = `${boon.level}`;
+        med.appendChild(lvlBadge);
+      }
+
+      this.boonStrip.appendChild(med);
     }
 
     if (boons.length > visibleLimit) {
       const more = document.createElement('div');
-      more.className = 'kh-boon-chip';
+      more.className = 'kh-boon-medallion kh-boon-medallion-more';
       more.textContent = `+${boons.length - visibleLimit}`;
       this.boonStrip.appendChild(more);
     }
   }
 
-  private updateBossBars(enemies: readonly EnemyState[]): void {
-    const bosses = enemies.filter((e) => e.isBoss && e.aiState !== 'dead' && e.hp > 0);
+  private updateBossBars(enemies: readonly EnemyState[], now: number, dtSec: number): void {
+    const bosses = enemies.filter((e) => e.isBoss && e.aiState !== 'dead' && e.hp > 0).slice(0, 2);
     this.root.classList.toggle('kh-has-boss', bosses.length > 0);
     this.root.classList.toggle('kh-has-dual-boss', bosses.length >= 2);
     if (bosses.length === 0) {
-      if (this.lastBossSignature !== '') {
-        this.lastBossSignature = '';
+      if (this.lastBossOrderKey !== '') {
+        this.lastBossOrderKey = '';
+        this.bossCards.clear();
         this.bossStack.innerHTML = '';
         this.bossStack.classList.add('kh-hidden');
       }
@@ -676,87 +797,170 @@ export class HudOverlay {
     }
 
     this.bossStack.classList.remove('kh-hidden');
-    const sig = bosses
-      .map(
-        (b) =>
-          `${b.id}:${Math.ceil(b.hp)}/${Math.ceil(b.maxHp)}:${Math.ceil(b.armor)}/${Math.ceil(b.maxArmor)}:${b.phase}/${b.maxPhases}`
-      )
-      .join('|');
-    if (sig === this.lastBossSignature) {
-      return;
-    }
-    this.lastBossSignature = sig;
-    this.bossStack.innerHTML = '';
-
-    for (const boss of bosses.slice(0, 2)) {
-      const def = boss.bossId ? BOSS_CONSTANTS[boss.bossId] : undefined;
-      const card = document.createElement('div');
-      card.className = 'kh-boss-bar-card';
-
-      const head = document.createElement('div');
-      head.className = 'kh-boss-header';
-
-      const titleGroup = document.createElement('div');
-      titleGroup.className = 'kh-boss-title-group';
-      const nameEl = document.createElement('span');
-      nameEl.className = 'kh-boss-name';
-      nameEl.textContent = def?.displayName ?? boss.name;
-      titleGroup.appendChild(nameEl);
-
-      if (def?.title) {
-        const subEl = document.createElement('span');
-        subEl.className = 'kh-boss-subtitle';
-        subEl.textContent = def.title;
-        titleGroup.appendChild(subEl);
+    const orderKey = bosses.map((b) => b.id).join('|');
+    if (orderKey !== this.lastBossOrderKey) {
+      this.lastBossOrderKey = orderKey;
+      const activeIds = new Set(bosses.map((b) => b.id));
+      for (const [id, refs] of this.bossCards.entries()) {
+        if (!activeIds.has(id)) {
+          refs.card.remove();
+          this.bossCards.delete(id);
+        }
       }
+      for (const boss of bosses) {
+        if (!this.bossCards.has(boss.id)) {
+          const refs = this.createBossCard(boss);
+          this.bossCards.set(boss.id, refs);
+          this.bossStack.appendChild(refs.card);
+        }
+      }
+    }
 
-      const phaseBadge = document.createElement('span');
-      phaseBadge.className = 'kh-boss-phase-badge';
-      phaseBadge.textContent =
+    for (const boss of bosses) {
+      const refs = this.bossCards.get(boss.id);
+      if (!refs) continue;
+
+      const phaseText =
         boss.maxPhases > 1 ? `PHASE ${boss.phase} / ${boss.maxPhases}` : `${Math.ceil(boss.hp)} HP`;
-
-      head.append(titleGroup, phaseBadge);
-      card.appendChild(head);
-
-      // Golden Armor Bar if armored
-      if (boss.maxArmor > 0 && boss.armor > 0) {
-        const armorTrack = document.createElement('div');
-        armorTrack.className = 'kh-boss-armor-track';
-        const armorFill = document.createElement('div');
-        armorFill.className = 'kh-boss-armor-fill';
-        armorFill.style.width = `${Math.max(0, Math.min(100, (boss.armor / boss.maxArmor) * 100)).toFixed(1)}%`;
-        armorTrack.appendChild(armorFill);
-        card.appendChild(armorTrack);
+      if (refs.phaseBadge.textContent !== phaseText) {
+        refs.phaseBadge.textContent = phaseText;
       }
 
-      // Crimson Boss HP Bar with Phase Notches
-      const hpTrack = document.createElement('div');
-      hpTrack.className = 'kh-boss-hp-track';
-      const hpFill = document.createElement('div');
-      hpFill.className = 'kh-boss-hp-fill';
+      // Golden Armor Bar
+      const hasArmor = boss.maxArmor > 0 && boss.armor > 0;
+      refs.armorTrack.classList.toggle('kh-hidden', !hasArmor);
+      if (hasArmor) {
+        const armorPct = Math.max(0, Math.min(100, (boss.armor / boss.maxArmor) * 100));
+        refs.armorFill.style.width = `${armorPct.toFixed(1)}%`;
+      }
+
+      // Beveled Crimson Boss HP Bar + Delayed Ghost Drain Trail + Invulnerable Shimmer
       const hpPct = Math.max(0, Math.min(100, (boss.hp / Math.max(1, boss.maxHp)) * 100));
-      hpFill.style.width = `${hpPct.toFixed(1)}%`;
-      hpTrack.appendChild(hpFill);
-
-      const thresholds = def?.phaseThresholds ?? [];
-      for (const threshold of thresholds) {
-        const notch = document.createElement('div');
-        notch.className = 'kh-boss-notch';
-        notch.style.left = `${(threshold * 100).toFixed(1)}%`;
-        hpTrack.appendChild(notch);
+      if (hpPct < refs.lastHpPct - 0.1) {
+        refs.ghostPct = Math.max(refs.ghostPct, refs.lastHpPct);
+        refs.ghostHoldUntil = now + 350;
+      } else if (hpPct > refs.ghostPct) {
+        refs.ghostPct = hpPct;
+      }
+      refs.lastHpPct = hpPct;
+      if (refs.ghostPct > hpPct && now >= refs.ghostHoldUntil) {
+        refs.ghostPct = Math.max(hpPct, refs.ghostPct - dtSec * 36);
       }
 
-      const hpText = document.createElement('div');
-      hpText.className = 'kh-boss-hp-text';
-      const hpPill = document.createElement('span');
-      hpPill.className = 'kh-boss-hp-pill';
-      hpPill.textContent = `${Math.ceil(boss.hp)} / ${Math.ceil(boss.maxHp)}`;
-      hpText.appendChild(hpPill);
-      hpTrack.appendChild(hpText);
+      refs.hpFill.style.width = `${hpPct.toFixed(1)}%`;
+      refs.hpGhost.style.width = `${refs.ghostPct.toFixed(1)}%`;
 
-      card.appendChild(hpTrack);
-      this.bossStack.appendChild(card);
+      const isInvuln = boss.invulnerable || boss.invulnTimer > 0;
+      refs.card.classList.toggle('kh-boss-invulnerable', isInvuln);
+      refs.hpInvuln.classList.toggle('kh-hidden', !isInvuln);
+
+      const hpLabel = isInvuln
+        ? `SHIELDED · ${Math.ceil(boss.hp)} / ${Math.ceil(boss.maxHp)}`
+        : `${Math.ceil(boss.hp)} / ${Math.ceil(boss.maxHp)}`;
+      if (refs.hpPill.textContent !== hpLabel) {
+        refs.hpPill.textContent = hpLabel;
+      }
     }
+  }
+
+  private createBossCard(boss: EnemyState): BossCardRefs {
+    const def = boss.bossId ? BOSS_CONSTANTS[boss.bossId] : undefined;
+    const card = document.createElement('div');
+    card.className = 'kh-boss-bar-card';
+
+    const leftCrown = document.createElement('span');
+    leftCrown.className = 'kh-boss-crown kh-boss-crown-left';
+    leftCrown.innerHTML = svgBossCrownOrnament('left');
+
+    const rightCrown = document.createElement('span');
+    rightCrown.className = 'kh-boss-crown kh-boss-crown-right';
+    rightCrown.innerHTML = svgBossCrownOrnament('right');
+
+    const inner = document.createElement('div');
+    inner.className = 'kh-boss-card-inner';
+
+    const head = document.createElement('div');
+    head.className = 'kh-boss-header';
+
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'kh-boss-title-group';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'kh-boss-name';
+    nameEl.textContent = def?.displayName ?? boss.name;
+    titleGroup.appendChild(nameEl);
+
+    let subtitleEl: HTMLSpanElement | null = null;
+    if (def?.title) {
+      subtitleEl = document.createElement('span');
+      subtitleEl.className = 'kh-boss-subtitle';
+      subtitleEl.textContent = def.title;
+      titleGroup.appendChild(subtitleEl);
+    }
+
+    const phaseBadge = document.createElement('span');
+    phaseBadge.className = 'kh-boss-phase-badge';
+
+    head.append(titleGroup, phaseBadge);
+    inner.appendChild(head);
+
+    const armorTrack = document.createElement('div');
+    armorTrack.className = 'kh-boss-armor-track kh-hidden';
+    const armorFill = document.createElement('div');
+    armorFill.className = 'kh-boss-armor-fill';
+    armorTrack.appendChild(armorFill);
+    inner.appendChild(armorTrack);
+
+    const hpTrack = document.createElement('div');
+    hpTrack.className = 'kh-boss-hp-track';
+
+    const hpGhost = document.createElement('div');
+    hpGhost.className = 'kh-boss-hp-ghost';
+    const initPct = Math.max(0, Math.min(100, (boss.hp / Math.max(1, boss.maxHp)) * 100));
+    hpGhost.style.width = `${initPct.toFixed(1)}%`;
+
+    const hpFill = document.createElement('div');
+    hpFill.className = 'kh-boss-hp-fill';
+    hpFill.style.width = `${initPct.toFixed(1)}%`;
+
+    const hpInvuln = document.createElement('div');
+    hpInvuln.className = 'kh-boss-invuln-shimmer kh-hidden';
+
+    hpTrack.append(hpGhost, hpFill, hpInvuln);
+
+    const thresholds = def?.phaseThresholds ?? [];
+    for (const threshold of thresholds) {
+      const notch = document.createElement('div');
+      notch.className = 'kh-boss-notch';
+      notch.style.left = `${(threshold * 100).toFixed(1)}%`;
+      hpTrack.appendChild(notch);
+    }
+
+    const hpText = document.createElement('div');
+    hpText.className = 'kh-boss-hp-text';
+    const hpPill = document.createElement('span');
+    hpPill.className = 'kh-boss-hp-pill';
+    hpText.appendChild(hpPill);
+    hpTrack.appendChild(hpText);
+
+    inner.appendChild(hpTrack);
+    card.append(leftCrown, inner, rightCrown);
+
+    return {
+      card,
+      nameEl,
+      subtitleEl,
+      phaseBadge,
+      armorTrack,
+      armorFill,
+      hpTrack,
+      hpGhost,
+      hpFill,
+      hpInvuln,
+      hpPill,
+      lastHpPct: initPct,
+      ghostPct: initPct,
+      ghostHoldUntil: 0,
+    };
   }
 
   private updateInteractBanner(label: string | null, activeSource: InputSource): void {
@@ -787,7 +991,6 @@ export class HudOverlay {
     isRail: boolean,
     nearInteractable: boolean
   ): void {
-    // Hidden in touch mode so prompts never overlap translucent touch buttons
     if (!inLiveGameplay || activeSource === 'touch') {
       this.promptStrip.classList.add('kh-hidden');
       return;
@@ -851,7 +1054,6 @@ export class HudOverlay {
   ): void {
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
-    // Expire old toasts
     if (this.activeToasts.length > 0) {
       const remaining: ActiveToast[] = [];
       for (const toast of this.activeToasts) {
@@ -878,7 +1080,7 @@ export class HudOverlay {
 
     for (const ev of eventsToShow) {
       if (ev.type === 'ui_toast') {
-        this.pushToast(ev.text, ev.colorHex ?? '#f5cb70', now);
+        this.pushToast(ev.text, ev.colorHex ?? '#fff0b8', now);
       } else if (ev.type === 'room_cleared') {
         this.pushToast('CHAMBER CLEARED', '#7cf5be', now);
       } else if (ev.type === 'death_defiance') {
@@ -897,6 +1099,23 @@ export class HudOverlay {
     }
   }
 
+  private brightenReadableToastColor(hex: string): string {
+    const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+    if (!m) return hex;
+    const n = parseInt(m[1], 16);
+    const r = (n >> 16) & 255;
+    const g = (n >> 8) & 255;
+    const b = n & 255;
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    if (lum >= 0.42) return hex;
+    // Lift dark saturated Patron colors so text pops crisply over obsidian
+    const lift = 0.44;
+    const lr = Math.min(255, Math.round(r + (255 - r) * lift));
+    const lg = Math.min(255, Math.round(g + (255 - g) * lift));
+    const lb = Math.min(255, Math.round(b + (255 - b) * lift));
+    return `rgb(${lr}, ${lg}, ${lb})`;
+  }
+
   private pushToast(text: string, colorHex: string, now: number): void {
     const isCompactViewport = typeof window !== 'undefined' && window.innerHeight <= 500;
     const maxToasts = isCompactViewport ? 1 : 2;
@@ -907,7 +1126,8 @@ export class HudOverlay {
     const el = document.createElement('div');
     el.className = 'kh-toast';
     el.textContent = text;
-    el.style.color = colorHex;
+    el.style.color = this.brightenReadableToastColor(colorHex);
+    el.style.setProperty('--kh-toast-accent', colorHex);
     this.toastContainer.appendChild(el);
     this.activeToasts.push({ el, expiresAt: now + 2400 });
   }

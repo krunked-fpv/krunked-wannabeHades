@@ -6,31 +6,33 @@ import {
   type PatronId,
 } from '../contracts/index.js';
 import type { MenuNavInput } from '../input/InputManager.js';
+import { attachCornerFiligrees, svgPatronSigil, svgSourceEmblem } from './svgArt.js';
 
 export interface BoonSelectCallbacks {
   onSelectBoon(index: number): void;
   onRerollBoon(): void;
   getPortraitUrl(patronId: PatronId): string;
+  readonly onUiHover?: () => void;
 }
 
 const RARITY_DISPLAY: Record<BoonRarity, { label: string; color: string }> = {
-  common: { label: 'COMMON', color: '#c4ab8e' },
-  rare: { label: 'RARE', color: '#58a8ff' },
-  epic: { label: 'EPIC', color: '#c580ff' },
-  heroic: { label: 'HEROIC', color: '#ff6670' },
-  duo: { label: 'DUO', color: '#4ef2a0' },
-  legendary: { label: 'LEGENDARY', color: '#ffc247' },
+  common: { label: 'COMMON', color: '#b8ada0' },
+  rare: { label: 'RARE', color: '#3ea4ff' },
+  epic: { label: 'EPIC', color: '#b25cff' },
+  heroic: { label: 'HEROIC', color: '#ff465a' },
+  duo: { label: 'DUO', color: '#c9f238' },
+  legendary: { label: 'LEGENDARY', color: '#ffae24' },
 };
 
 const SOURCE_FALLBACK_META: Record<
   BoonOffer['source'],
-  { name: string; title: string; color: string; glyph: string }
+  { name: string; title: string; color: string }
 > = {
-  patron: { name: 'Divine Patron', title: 'Blessing of the Pantheon', color: '#f5cb70', glyph: '✦' },
-  hammer: { name: 'Forge Hammer', title: 'Infernal Arm Augmentation', color: '#ff9b42', glyph: '⚒' },
-  pom: { name: 'Pomegranate', title: 'Amplify Existing Boon', color: '#ff5268', glyph: '❖' },
-  chaos: { name: 'Abyssos', title: 'Primordial Void', color: '#8f52ff', glyph: '◈' },
-  well: { name: 'Well of Ash', title: 'Fleeting Underworld Ware', color: '#5ef2d6', glyph: '✧' },
+  patron: { name: 'Divine Patron', title: 'Blessing of the Pantheon', color: '#e5b952' },
+  hammer: { name: 'Forge Hammer', title: 'Infernal Arm Augmentation', color: '#ff9b42' },
+  pom: { name: 'Pomegranate', title: 'Amplify Existing Boon', color: '#ff465a' },
+  chaos: { name: 'Abyssos', title: 'Primordial Void', color: '#a060ff' },
+  well: { name: 'Well of Ash', title: 'Fleeting Underworld Ware', color: '#44e6b8' },
 };
 
 export class BoonSelectModal {
@@ -43,6 +45,7 @@ export class BoonSelectModal {
   private readonly emblemEl: HTMLDivElement;
   private readonly patronNameEl: HTMLHeadingElement;
   private readonly patronTitleEl: HTMLDivElement;
+  private readonly headerWatermarkEl: HTMLDivElement;
 
   private readonly offerTitleEl: HTMLHeadingElement;
   private readonly offerHintEl: HTMLSpanElement;
@@ -91,11 +94,13 @@ export class BoonSelectModal {
     this.backdrop.setAttribute('data-screen', 'boon_select');
 
     const shell = document.createElement('div');
-    shell.className = 'kh-boon-shell';
+    shell.className = 'kh-boon-shell kh-ornate-frame';
+    attachCornerFiligrees(shell);
 
-    // Left column: Large Patron Comic-Ink Portrait
+    // Left column: Tall Sculpted Patron Showcase Frame
     this.portraitCol = document.createElement('div');
     this.portraitCol.className = 'kh-boon-portrait-col';
+    attachCornerFiligrees(this.portraitCol);
 
     this.portraitFallback = document.createElement('div');
     this.portraitFallback.className = 'kh-boon-portrait-fallback';
@@ -125,17 +130,20 @@ export class BoonSelectModal {
 
     this.portraitCol.append(this.portraitFallback, this.portraitImg, patronPlate);
 
-    // Right column: Header + 3 ornate rarity-colored Boon cards + Fated Persuasion Reroll
+    // Right column: Header with Patron Sigil Watermark + 3 Staggered Rarity Cards + Reroll
     const cardsCol = document.createElement('div');
     cardsCol.className = 'kh-boon-cards-col';
 
     const head = document.createElement('div');
     head.className = 'kh-boon-offer-head';
+    this.headerWatermarkEl = document.createElement('div');
+    this.headerWatermarkEl.className = 'kh-boon-header-watermark';
+    this.headerWatermarkEl.setAttribute('aria-hidden', 'true');
     this.offerTitleEl = document.createElement('h3');
     this.offerTitleEl.className = 'kh-boon-offer-title';
     this.offerHintEl = document.createElement('span');
     this.offerHintEl.className = 'kh-boon-offer-hint';
-    head.append(this.offerTitleEl, this.offerHintEl);
+    head.append(this.headerWatermarkEl, this.offerTitleEl, this.offerHintEl);
 
     const meander = document.createElement('div');
     meander.className = 'kh-meander-strip';
@@ -148,7 +156,7 @@ export class BoonSelectModal {
 
     this.rerollBtn = document.createElement('button');
     this.rerollBtn.type = 'button';
-    this.rerollBtn.className = 'kh-btn';
+    this.rerollBtn.className = 'kh-btn kh-btn-notched';
     this.rerollBtn.addEventListener('click', () => {
       if (this.currentOffer && this.currentOffer.rerollsRemaining > 0) {
         this.callbacks.onRerollBoon();
@@ -156,8 +164,20 @@ export class BoonSelectModal {
     });
     this.rerollBtn.addEventListener('pointerenter', () => {
       if (this.currentOffer && this.currentOffer.rerollsRemaining > 0) {
-        this.focusedIndex = this.cardButtons.length;
-        this.applyFocusStyles();
+        if (this.focusedIndex !== this.cardButtons.length) {
+          this.focusedIndex = this.cardButtons.length;
+          this.applyFocusStyles();
+          this.callbacks.onUiHover?.();
+        }
+      }
+    });
+    this.rerollBtn.addEventListener('focus', () => {
+      if (this.currentOffer && this.currentOffer.rerollsRemaining > 0) {
+        if (this.focusedIndex !== this.cardButtons.length) {
+          this.focusedIndex = this.cardButtons.length;
+          this.applyFocusStyles();
+          this.callbacks.onUiHover?.();
+        }
       }
     });
 
@@ -185,6 +205,10 @@ export class BoonSelectModal {
       this.backdrop.classList.toggle('kh-hidden', !shouldShow);
       if (shouldShow) {
         this.focusedIndex = 0;
+        // Re-trigger showcase entrance motion cleanly
+        this.portraitCol.classList.remove('kh-portrait-enter');
+        void this.portraitCol.offsetWidth;
+        this.portraitCol.classList.add('kh-portrait-enter');
       }
     }
 
@@ -195,7 +219,6 @@ export class BoonSelectModal {
 
     this.currentOffer = offer;
 
-    // Update control hint based on active device
     const hintText =
       activeSource === 'gamepad'
         ? 'D-PAD / LS Choose · A Accept'
@@ -214,7 +237,6 @@ export class BoonSelectModal {
       this.renderOffer(offer);
     }
 
-    // D-Pad / Arrow + Confirm navigation (includes Reroll button if charges > 0)
     const canReroll = offer.rerollsRemaining > 0;
     const totalFocusable = this.cardButtons.length + (canReroll ? 1 : 0);
     if (totalFocusable > 0) {
@@ -222,12 +244,15 @@ export class BoonSelectModal {
         this.focusedIndex = 0;
         this.applyFocusStyles();
       }
+      const prevIdx = this.focusedIndex;
       if (menuNav.up || menuNav.left) {
         this.focusedIndex = (this.focusedIndex - 1 + totalFocusable) % totalFocusable;
-        this.applyFocusStyles();
       } else if (menuNav.down || menuNav.right) {
         this.focusedIndex = (this.focusedIndex + 1) % totalFocusable;
+      }
+      if (this.focusedIndex !== prevIdx) {
         this.applyFocusStyles();
+        this.callbacks.onUiHover?.();
       }
       if (menuNav.confirm) {
         if (this.focusedIndex < this.cardButtons.length) {
@@ -258,9 +283,19 @@ export class BoonSelectModal {
     this.offerTitleEl.textContent = offer.title || 'CHOOSE A BLESSING';
 
     this.portraitCol.style.borderColor = accentColor;
-    this.portraitCol.style.background = `radial-gradient(circle at 50% 35%, ${accentColor}33, rgba(10, 8, 16, 0.96) 76%)`;
+    this.portraitCol.style.setProperty('--kh-patron-accent', accentColor);
+    this.portraitCol.style.background = `radial-gradient(circle at 50% 32%, ${accentColor}3a, rgba(17, 11, 24, 0.96) 76%)`;
+    this.portraitCol.style.boxShadow = `inset 0 0 28px ${accentColor}2e, 0 12px 32px rgba(0, 0, 0, 0.72)`;
+
     this.emblemEl.style.color = accentColor;
-    this.emblemEl.textContent = patronDef ? patronDef.displayName.charAt(0).toUpperCase() : fallback.glyph;
+    this.emblemEl.innerHTML = patronId
+      ? svgPatronSigil(patronId, 52)
+      : svgSourceEmblem(offer.source, 52);
+
+    this.headerWatermarkEl.style.color = accentColor;
+    this.headerWatermarkEl.innerHTML = patronId
+      ? svgPatronSigil(patronId, 58)
+      : svgSourceEmblem(offer.source, 58);
 
     // Load comic-ink Patron portrait via callbacks.getPortraitUrl(patronId)
     if (patronId) {
@@ -279,18 +314,42 @@ export class BoonSelectModal {
       this.portraitFallback.classList.remove('kh-hidden');
     }
 
-    // Build ornate rarity-colored Boon cards
+    // Build 3 ornate staggered-entrance rarity-coded Boon cards
     this.cardsList.innerHTML = '';
     this.cardButtons = [];
 
     offer.options.forEach((opt, idx) => {
       const card = document.createElement('button');
       card.type = 'button';
-      card.className = 'kh-boon-card';
+      card.className = 'kh-boon-card kh-boon-card-enter';
       card.dataset.rarity = opt.rarity;
       card.dataset.boonIndex = String(idx);
+      card.style.setProperty('--kh-card-delay', `${idx * 65}ms`);
 
+      const optPatronId = opt.patronId ?? patronId;
+      const optAccent = optPatronId ? PATRON_CONSTANTS[optPatronId].colorHex : accentColor;
       const rarityInfo = RARITY_DISPLAY[opt.rarity] ?? RARITY_DISPLAY.common;
+
+      // Rarity foil shimmer sheen overlay
+      const shimmer = document.createElement('span');
+      shimmer.className = 'kh-boon-shimmer';
+      shimmer.setAttribute('aria-hidden', 'true');
+      card.appendChild(shimmer);
+
+      const layout = document.createElement('div');
+      layout.className = 'kh-boon-card-layout';
+
+      // Left sculpted Patron Sigil Medallion
+      const sigilBadge = document.createElement('div');
+      sigilBadge.className = 'kh-boon-card-sigil';
+      sigilBadge.style.color = optAccent;
+      sigilBadge.style.borderColor = rarityInfo.color;
+      sigilBadge.innerHTML = optPatronId
+        ? svgPatronSigil(optPatronId, 26)
+        : svgSourceEmblem(offer.source, 26);
+
+      const body = document.createElement('div');
+      body.className = 'kh-boon-card-body';
 
       const top = document.createElement('div');
       top.className = 'kh-boon-card-top';
@@ -319,7 +378,7 @@ export class BoonSelectModal {
       rarityPill.className = 'kh-boon-rarity-pill';
       rarityPill.textContent = rarityInfo.label;
       rarityPill.style.color = rarityInfo.color;
-      rarityPill.style.border = `1px solid ${rarityInfo.color}88`;
+      rarityPill.style.borderColor = `${rarityInfo.color}99`;
 
       badges.append(slotTag, rarityPill);
       top.append(titleRow, badges);
@@ -328,7 +387,7 @@ export class BoonSelectModal {
       desc.className = 'kh-boon-desc';
       desc.textContent = opt.description;
 
-      card.append(top, desc);
+      body.append(top, desc);
 
       if (opt.previewValue || opt.replacesBoonId || opt.curseDescription) {
         const metaRow = document.createElement('div');
@@ -356,13 +415,26 @@ export class BoonSelectModal {
           metaRow.appendChild(curse);
         }
 
-        card.appendChild(metaRow);
+        body.appendChild(metaRow);
       }
+
+      layout.append(sigilBadge, body);
+      card.appendChild(layout);
 
       card.addEventListener('click', () => this.callbacks.onSelectBoon(idx));
       card.addEventListener('pointerenter', () => {
-        this.focusedIndex = idx;
-        this.applyFocusStyles();
+        if (this.focusedIndex !== idx) {
+          this.focusedIndex = idx;
+          this.applyFocusStyles();
+          this.callbacks.onUiHover?.();
+        }
+      });
+      card.addEventListener('focus', () => {
+        if (this.focusedIndex !== idx) {
+          this.focusedIndex = idx;
+          this.applyFocusStyles();
+          this.callbacks.onUiHover?.();
+        }
       });
 
       this.cardsList.appendChild(card);

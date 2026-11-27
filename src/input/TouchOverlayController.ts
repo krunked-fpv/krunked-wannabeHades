@@ -58,7 +58,7 @@ const TOUCH_OVERLAY_CSS = `
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
-  font-family: 'Cinzel', Georgia, serif;
+  font-family: var(--kh-font-display, 'Cinzel', serif);
 }
 
 .kh-touch-layer.kh-touch-menu-inactive .kh-touch-stick-zone,
@@ -90,31 +90,32 @@ const TOUCH_OVERLAY_CSS = `
   margin-left: -63px;
   margin-top: -63px;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%, rgba(16, 13, 24, 0.12) 0%, rgba(16, 13, 24, 0.28) 78%, rgba(217, 159, 76, 0.18) 100%);
-  border: 2px solid rgba(217, 159, 76, 0.52);
+  background: radial-gradient(circle at 50% 45%, rgba(27, 18, 38, 0.24) 0%, rgba(17, 11, 24, 0.42) 72%, rgba(158, 110, 46, 0.28) 100%);
+  border: 2px solid rgba(229, 185, 82, 0.62);
   box-shadow:
-    0 0 0 1px rgba(8, 7, 13, 0.65),
-    inset 0 0 14px rgba(16, 13, 24, 0.45);
-  opacity: 0.3;
+    0 0 0 2px rgba(9, 6, 14, 0.78),
+    inset 0 1px 0 rgba(255, 240, 184, 0.24),
+    inset 0 0 16px rgba(9, 6, 14, 0.56);
+  opacity: 0.38;
   pointer-events: none;
-  transition: opacity 0.12s ease, border-color 0.12s ease;
+  transition: opacity 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
   will-change: transform, opacity;
 }
 
 .kh-touch-stick-base.kh-active {
-  opacity: 0.72;
-  border-color: rgba(245, 203, 112, 0.85);
+  opacity: 0.78;
+  border-color: var(--kh-gold-bright, #fff0b8);
   box-shadow:
-    0 0 0 1px rgba(8, 7, 13, 0.78),
-    0 0 18px rgba(217, 159, 76, 0.26),
-    inset 0 0 16px rgba(16, 13, 24, 0.5);
+    0 0 0 2px rgba(9, 6, 14, 0.85),
+    0 0 20px rgba(229, 185, 82, 0.34),
+    inset 0 0 18px rgba(9, 6, 14, 0.6);
 }
 
 .kh-touch-stick-ring-inner {
   position: absolute;
-  inset: 16px;
+  inset: 14px;
   border-radius: 50%;
-  border: 1px dashed rgba(217, 159, 76, 0.28);
+  border: 1.25px dashed rgba(229, 185, 82, 0.42);
   pointer-events: none;
 }
 
@@ -127,9 +128,11 @@ const TOUCH_OVERLAY_CSS = `
   margin-left: -26px;
   margin-top: -26px;
   border-radius: 50%;
-  background: radial-gradient(circle at 38% 34%, rgba(245, 203, 112, 0.52), rgba(24, 18, 34, 0.64) 72%);
-  border: 2px solid rgba(245, 203, 112, 0.78);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  background: radial-gradient(circle at 36% 32%, rgba(255, 240, 184, 0.62), rgba(92, 61, 24, 0.66) 45%, rgba(17, 11, 24, 0.82) 82%);
+  border: 2px solid var(--kh-gold, #e5b952);
+  box-shadow:
+    0 3px 12px rgba(0, 0, 0, 0.65),
+    inset 0 1px 2px rgba(255, 240, 184, 0.45);
   pointer-events: none;
   will-change: transform;
 }
@@ -145,6 +148,7 @@ const TOUCH_OVERLAY_CSS = `
   touch-action: none;
 }
 
+/* Sculpted Obsidian & Burnished Bronze Beveled Medallions */
 .kh-touch-btn {
   position: absolute;
   display: flex;
@@ -154,17 +158,20 @@ const TOUCH_OVERLAY_CSS = `
   min-width: 48px;
   min-height: 48px;
   border-radius: 50%;
-  background: rgba(16, 13, 24, 0.28);
-  border: 2px solid rgba(217, 159, 76, 0.62);
+  background: radial-gradient(circle at 38% 30%, rgba(39, 27, 54, 0.56) 0%, rgba(17, 11, 24, 0.66) 66%, rgba(9, 6, 14, 0.78) 100%);
+  border: 2px solid rgba(229, 185, 82, 0.74);
   box-shadow:
-    0 0 0 1.5px rgba(7, 6, 11, 0.72),
-    inset 0 1px 0 rgba(255, 232, 184, 0.16);
-  color: #f4e6c9;
-  font-family: 'Cinzel', Georgia, serif;
+    0 0 0 2px rgba(9, 6, 14, 0.82),
+    0 4px 12px rgba(0, 0, 0, 0.52),
+    inset 0 0 0 3px rgba(9, 6, 14, 0.48),
+    inset 0 0 0 4px rgba(229, 185, 82, 0.24),
+    inset 0 2px 4px rgba(255, 240, 184, 0.22);
+  color: var(--kh-text-primary, #f7eedb);
+  font-family: var(--kh-font-display, 'Cinzel', serif);
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-  opacity: 0.34;
+  letter-spacing: 0.07em;
+  text-shadow: 0 1px 4px rgba(9, 6, 14, 0.96);
+  opacity: 0.44;
   pointer-events: auto;
   touch-action: none;
   transition: opacity 0.09s ease, transform 0.09s ease, border-color 0.12s ease, box-shadow 0.12s ease;
@@ -178,34 +185,42 @@ const TOUCH_OVERLAY_CSS = `
 }
 
 .kh-touch-btn-sub {
-  font-family: system-ui, -apple-system, sans-serif;
-  font-size: 9px;
-  font-weight: 700;
-  opacity: 0.85;
+  font-family: var(--kh-font-num, 'Barlow Condensed', sans-serif);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--kh-gold-bright, #fff0b8);
+  opacity: 0.92;
   margin-top: 2px;
   line-height: 1;
   pointer-events: none;
 }
 
 .kh-touch-btn.kh-pressed {
-  opacity: 0.72 !important;
+  opacity: 0.82 !important;
   transform: scale(0.93);
-  background: rgba(34, 24, 48, 0.48);
-  border-color: #f6d07a;
+  background: radial-gradient(circle at 50% 45%, rgba(92, 61, 24, 0.62) 0%, rgba(27, 18, 38, 0.78) 100%);
+  border-color: var(--kh-gold-bright, #fff0b8);
   box-shadow:
-    0 0 0 1.5px rgba(7, 6, 11, 0.85),
-    0 0 18px rgba(246, 208, 122, 0.45),
-    inset 0 0 12px rgba(246, 208, 122, 0.2);
+    0 0 0 2px rgba(9, 6, 14, 0.9),
+    0 0 20px rgba(229, 185, 82, 0.55),
+    inset 0 0 14px rgba(255, 240, 184, 0.28);
 }
 
-/* Primary Attack — large ergonomic thumb anchor */
+/* Primary Attack — large crimson-bronze ergonomic thumb anchor */
 .kh-touch-btn[data-action="attack"] {
   right: 8px;
   bottom: 14px;
   width: 78px;
   height: 78px;
-  border-color: rgba(235, 92, 92, 0.74);
-  background: radial-gradient(circle at 50% 45%, rgba(164, 34, 44, 0.28), rgba(16, 13, 24, 0.32));
+  border-color: rgba(240, 46, 70, 0.86);
+  background: radial-gradient(circle at 42% 36%, rgba(184, 25, 50, 0.58) 0%, rgba(90, 11, 26, 0.64) 60%, rgba(17, 11, 24, 0.76) 100%);
+  box-shadow:
+    0 0 0 2px rgba(9, 6, 14, 0.86),
+    0 0 14px rgba(240, 46, 70, 0.28),
+    inset 0 0 0 3px rgba(9, 6, 14, 0.45),
+    inset 0 0 0 4px rgba(229, 185, 82, 0.34);
 }
 .kh-touch-btn[data-action="attack"] .kh-touch-btn-label {
   font-size: 13px;
@@ -217,8 +232,8 @@ const TOUCH_OVERLAY_CSS = `
   bottom: 6px;
   width: 64px;
   height: 64px;
-  border-color: rgba(94, 224, 242, 0.72);
-  background: radial-gradient(circle at 50% 45%, rgba(34, 124, 152, 0.24), rgba(16, 13, 24, 0.3));
+  border-color: rgba(94, 224, 242, 0.78);
+  background: radial-gradient(circle at 44% 38%, rgba(34, 124, 152, 0.42), rgba(17, 11, 24, 0.64));
 }
 .kh-touch-btn[data-action="dash"] .kh-touch-btn-label {
   font-size: 11px;
@@ -230,7 +245,7 @@ const TOUCH_OVERLAY_CSS = `
   bottom: 84px;
   width: 58px;
   height: 58px;
-  border-color: rgba(243, 184, 74, 0.72);
+  border-color: rgba(229, 185, 82, 0.82);
 }
 
 /* Cast — left arc */
@@ -239,29 +254,32 @@ const TOUCH_OVERLAY_CSS = `
   bottom: 52px;
   width: 56px;
   height: 56px;
-  border-color: rgba(218, 66, 98, 0.72);
+  border-color: rgba(240, 46, 70, 0.72);
 }
 
-/* Call — upper right above Attack, glows gold when godGauge >= 25 */
+/* Call — upper right above Attack, glows fiery gold when godGauge >= 25 */
 .kh-touch-btn[data-action="call"] {
   right: 14px;
   bottom: 106px;
   width: 56px;
   height: 56px;
-  border-color: rgba(217, 159, 76, 0.54);
-  opacity: 0.26;
+  border-color: rgba(158, 110, 46, 0.62);
+  opacity: 0.34;
 }
 .kh-touch-btn[data-action="call"].kh-call-ready {
-  opacity: 0.58;
-  border-color: #ffd96a;
-  color: #fff3c2;
-  background: radial-gradient(circle at 50% 45%, rgba(245, 192, 68, 0.34), rgba(16, 13, 24, 0.36));
+  opacity: 0.68;
+  border-color: var(--kh-gold, #e5b952);
+  color: var(--kh-gold-bright, #fff0b8);
+  background: radial-gradient(circle at 50% 42%, rgba(229, 185, 82, 0.48), rgba(92, 61, 24, 0.56) 62%, rgba(17, 11, 24, 0.74) 100%);
   animation: kh-touch-gold-pulse 1.35s ease-in-out infinite;
 }
 .kh-touch-btn[data-action="call"].kh-call-max {
-  opacity: 0.72;
-  border-color: #fff0a8;
-  box-shadow: 0 0 22px rgba(255, 215, 92, 0.65);
+  opacity: 0.82;
+  border-color: var(--kh-gold-bright, #fff0b8);
+  box-shadow:
+    0 0 0 2px rgba(9, 6, 14, 0.86),
+    0 0 24px rgba(255, 220, 108, 0.72),
+    inset 0 0 12px rgba(255, 240, 184, 0.35);
 }
 
 /* Contextual Interact — lights up near doors/boons/pickups */
@@ -270,15 +288,15 @@ const TOUCH_OVERLAY_CSS = `
   bottom: 128px;
   width: 54px;
   height: 54px;
-  border-color: rgba(96, 224, 168, 0.44);
-  opacity: 0.2;
+  border-color: rgba(68, 230, 184, 0.48);
+  opacity: 0.24;
 }
 .kh-touch-btn[data-action="interact"].kh-use-ready {
-  opacity: 0.64;
-  border-color: #5ef2b6;
-  color: #d8ffef;
-  background: radial-gradient(circle at 50% 45%, rgba(44, 178, 128, 0.34), rgba(16, 13, 24, 0.34));
-  box-shadow: 0 0 16px rgba(94, 242, 182, 0.42);
+  opacity: 0.72;
+  border-color: #44e6b8;
+  color: #e4fff6;
+  background: radial-gradient(circle at 50% 45%, rgba(44, 178, 138, 0.44), rgba(17, 11, 24, 0.64));
+  box-shadow: 0 0 0 2px rgba(9, 6, 14, 0.8), 0 0 16px rgba(68, 230, 184, 0.48);
 }
 
 /* Reload — shown ONLY when Adamant Rail equipped */
@@ -287,17 +305,17 @@ const TOUCH_OVERLAY_CSS = `
   bottom: 158px;
   width: 52px;
   height: 52px;
-  border-color: rgba(186, 168, 255, 0.7);
+  border-color: rgba(178, 92, 255, 0.76);
 }
 .kh-touch-btn[data-action="reload"].kh-hidden {
   display: none;
 }
 
-/* Subtle top-right Pause pill (fixed 48x48 circular target clear of room banner) */
+/* Top-right Pause medallion (fixed >=48px circular target clear of top-right banner) */
 .kh-touch-pause-pill {
   position: fixed;
-  top: max(12px, calc(env(safe-area-inset-top, 0px) + 8px));
-  right: max(14px, calc(env(safe-area-inset-right, 0px) + 12px));
+  top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
+  right: max(12px, calc(env(safe-area-inset-right, 0px) + 10px));
   width: 48px;
   height: 48px;
   min-width: 48px;
@@ -306,21 +324,26 @@ const TOUCH_OVERLAY_CSS = `
   border-radius: 50%;
   flex-direction: row;
   font-size: 11px;
-  background: rgba(16, 13, 24, 0.36);
-  opacity: 0.42;
+  opacity: 0.56;
 }
 
 @keyframes kh-touch-gold-pulse {
   0%, 100% {
-    box-shadow: 0 0 0 1.5px rgba(7, 6, 11, 0.72), 0 0 10px rgba(255, 210, 88, 0.35);
+    box-shadow: 0 0 0 2px rgba(9, 6, 14, 0.84), 0 0 12px rgba(229, 185, 82, 0.42);
   }
   50% {
-    box-shadow: 0 0 0 1.5px rgba(7, 6, 11, 0.72), 0 0 22px rgba(255, 218, 108, 0.75);
+    box-shadow: 0 0 0 2px rgba(9, 6, 14, 0.84), 0 0 24px rgba(255, 240, 184, 0.82);
   }
 }
 
-/* Compact Mobile Landscape (e.g. 844x390) */
+/* Compact Mobile Landscape (844x390) */
 @media (max-height: 500px) {
+  .kh-touch-pause-pill {
+    top: max(6px, env(safe-area-inset-top, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px));
+    width: 48px;
+    height: 48px;
+  }
   .kh-touch-stick-zone {
     top: max(142px, calc(env(safe-area-inset-top, 0px) + 134px));
   }
@@ -386,8 +409,86 @@ const TOUCH_OVERLAY_CSS = `
   }
 }
 
-/* Tesla & Large Wide Touchscreens (1440x900, 1920x1080) */
+/* Mobile Portrait (390x844 — clear separation between left thumbstick & right action arc, all targets >= 48px) */
+@media (max-width: 680px) {
+  .kh-touch-pause-pill {
+    top: max(8px, env(safe-area-inset-top, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px));
+    width: 48px;
+    height: 48px;
+  }
+  .kh-touch-stick-base {
+    width: 108px;
+    height: 108px;
+    margin-left: -54px;
+    margin-top: -54px;
+  }
+  .kh-touch-stick-knob {
+    width: 44px;
+    height: 44px;
+    margin-left: -22px;
+    margin-top: -22px;
+  }
+  .kh-touch-cluster {
+    right: max(10px, env(safe-area-inset-right, 0px));
+    bottom: max(16px, calc(env(safe-area-inset-bottom, 0px) + 12px));
+    width: 218px;
+    height: 232px;
+  }
+  .kh-touch-btn[data-action="attack"] {
+    width: 72px;
+    height: 72px;
+    right: 4px;
+    bottom: 12px;
+  }
+  .kh-touch-btn[data-action="dash"] {
+    width: 60px;
+    height: 60px;
+    right: 84px;
+    bottom: 6px;
+  }
+  .kh-touch-btn[data-action="special"] {
+    width: 54px;
+    height: 54px;
+    right: 76px;
+    bottom: 78px;
+  }
+  .kh-touch-btn[data-action="cast"] {
+    width: 52px;
+    height: 52px;
+    right: 146px;
+    bottom: 48px;
+  }
+  .kh-touch-btn[data-action="call"] {
+    width: 52px;
+    height: 52px;
+    right: 10px;
+    bottom: 98px;
+  }
+  .kh-touch-btn[data-action="interact"] {
+    width: 50px;
+    height: 50px;
+    right: 136px;
+    bottom: 118px;
+  }
+  .kh-touch-btn[data-action="reload"] {
+    width: 48px;
+    height: 48px;
+    right: 70px;
+    bottom: 146px;
+  }
+}
+
+/* Tesla & Large Wide Touchscreens (1280x720, 1440x900, 1920x1080 — all targets >= 52px) */
 @media (min-width: 1200px) and (min-height: 700px) {
+  .kh-touch-pause-pill {
+    top: max(10px, env(safe-area-inset-top, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    min-height: 52px;
+  }
   .kh-touch-stick-base {
     width: 148px;
     height: 148px;
@@ -777,7 +878,7 @@ export class TouchOverlayController {
     }
     const h = typeof window !== 'undefined' ? window.innerHeight : 720;
     const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
-    const x = w >= 1200 ? 132 : h <= 500 ? 94 : 108;
+    const x = w >= 1200 ? 132 : h <= 500 ? 94 : w <= 480 ? 74 : 108;
     const y = h - (w >= 1200 ? 140 : h <= 500 ? 96 : 118);
     this.stickOriginX = x;
     this.stickOriginY = y;
