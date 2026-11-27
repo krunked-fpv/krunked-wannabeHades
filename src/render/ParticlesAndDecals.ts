@@ -294,30 +294,30 @@ export class ParticlesAndDecals {
 
     switch (fx.kind) {
       case 'chromatic':
-        this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.011 * strength));
+        this.chromaticAmount = Math.min(0.0055, Math.max(this.chromaticAmount, 0.0046 * strength));
         break;
       case 'crit_burst':
-        this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.0075 * strength));
-        if (strength >= 0.6) {
-          startWave(0.011 * strength, 0.28);
+        this.chromaticAmount = Math.min(0.0055, Math.max(this.chromaticAmount, 0.0032 * strength));
+        if (strength >= 0.65) {
+          startWave(0.0085 * strength, 0.24);
         }
         break;
       case 'shockwave':
-        this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.006 * strength));
-        startWave(0.019 * strength, 0.36);
+        this.chromaticAmount = Math.min(0.0055, Math.max(this.chromaticAmount, 0.0028 * strength));
+        startWave(0.014 * strength, 0.32);
         break;
       case 'greater_call':
-        this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.012 * strength));
-        startWave(0.024 * strength, 0.46);
+        this.chromaticAmount = Math.min(0.0055, Math.max(this.chromaticAmount, 0.0048 * strength));
+        startWave(0.018 * strength, 0.38);
         break;
       case 'boss_phase':
-        this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.0125 * strength));
-        startWave(0.026 * strength, 0.5);
+        this.chromaticAmount = Math.min(0.0055, Math.max(this.chromaticAmount, 0.005 * strength));
+        startWave(0.019 * strength, 0.4);
         break;
       case 'death_defiance':
-        this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.014 * strength));
+        this.chromaticAmount = Math.min(0.0055, Math.max(this.chromaticAmount, 0.0055 * strength));
         this.deathDefiancePulse = Math.max(this.deathDefiancePulse, Math.min(1, strength));
-        startWave(0.028 * strength, 0.54);
+        startWave(0.022 * strength, 0.44);
         break;
     }
   }
@@ -1109,7 +1109,7 @@ export class ParticlesAndDecals {
         case 'damage': {
           if (ev.targetKind === 'player') {
             this.hitFlashPulse = Math.min(1, this.hitFlashPulse + 0.82);
-            this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.007));
+            this.chromaticAmount = Math.min(0.0055, Math.max(this.chromaticAmount, 0.0034));
             // Derive incoming hit angle from nearest living enemy
             let hitAngle = state.player.facingAngle + Math.PI;
             let bestD2 = Number.POSITIVE_INFINITY;
@@ -1139,7 +1139,7 @@ export class ParticlesAndDecals {
             this.spawnDirectionalImpactSparks(ev.pos.x, ev.pos.y, impactAngle, count, cr, cg, cb, ev.crit);
 
             if (ev.crit) {
-              this.chromaticAmount = Math.min(0.014, Math.max(this.chromaticAmount, 0.0052));
+              this.chromaticAmount = Math.min(0.0055, Math.max(this.chromaticAmount, 0.0026));
               this.spawnParticle(
                 'shockwave',
                 ev.pos.x,
@@ -1380,22 +1380,58 @@ export class ParticlesAndDecals {
         }
 
         case 'boss_phase': {
+          // Sleek biome/boss-themed crisp shockwave rings + radial spark streaks (never thick hot-pink donuts!)
+          let pr = 0.86;
+          let pg = 0.2;
+          let pb = 0.28;
+          let cr = 1.0;
+          let cg = 0.88;
+          let cb = 0.56;
+          let fxHex = '#E5B952';
+
+          if (ev.bossId === 'bone_leviathan' || state.room.biome === 'cinder_mire') {
+            pr = 1.0; pg = 0.42; pb = 0.08;
+            cr = 1.0; cg = 0.92; cb = 0.58;
+            fxHex = '#FF6A14';
+          } else if (
+            ev.bossId === 'colosseum_bull' ||
+            ev.bossId === 'colosseum_spearlord' ||
+            state.room.biome === 'verdant_colosseum'
+          ) {
+            pr = 0.95; pg = 0.74; pb = 0.2;
+            cr = 1.0; cg = 0.96; cb = 0.72;
+            fxHex = '#F2C95E';
+          } else if (ev.bossId === 'the_ferryman' || state.room.biome === 'crypt_of_bile') {
+            pr = 0.66; pg = 0.86; pb = 0.22;
+            cr = 0.95; cg = 0.92; cb = 0.52;
+            fxHex = '#C49B3E';
+          } else if (ev.bossId === 'sovereign_lord' || state.room.biome === 'frozen_summit') {
+            pr = 0.92; pg = 0.14; pb = 0.2;
+            cr = 1.0; cg = 0.86; cb = 0.52;
+            fxHex = '#D92234';
+          } else {
+            // Obsidian Pit Wardens: deep crimson-bronze & stygian jade edge
+            pr = 0.84; pg = 0.18; pb = 0.26;
+            cr = 0.96; cg = 0.84; cb = 0.54;
+            fxHex = '#D83244';
+          }
+
           this.spawnParticle(
             'shockwave',
             ev.pos.x,
             ev.pos.y,
-            10,
+            8,
             0,
             0,
             0,
-            36,
-            440,
-            1.0,
-            0.22,
-            0.34,
-            1,
-            0.55,
-            2.5
+            42,
+            360,
+            pr,
+            pg,
+            pb,
+            0.68,
+            0.36,
+            1.35
           );
           this.spawnSlashRibbon(
             'whip',
@@ -1403,25 +1439,49 @@ export class ParticlesAndDecals {
             ev.pos.y,
             0,
             Math.PI * 2,
-            260,
-            50,
-            0.96,
-            0.18,
-            0.36,
-            1.0,
-            0.9,
-            0.74,
-            0.46,
+            235,
+            18,
+            pr,
+            pg,
+            pb,
+            cr,
+            cg,
+            cb,
+            0.32,
             1
           );
-          this.spawnDecal('crater', ev.pos.x, ev.pos.y, 1.9, 1.9, this.randRange(0, 6.28), 1, 1, 1, 0.82, 22);
-          this.spawnDecal('scorch', ev.pos.x, ev.pos.y, 2.1, 2.1, 0, 1, 1, 1, 0.72, 22);
+          // Crisp radial directional spark-streak burst keeping boss silhouette 100% legible
+          for (let k = 0; k < 16; k++) {
+            const a = (k / 16) * Math.PI * 2 + this.randRange(-0.1, 0.1);
+            const spd = this.randRange(240, 480);
+            this.spawnParticle(
+              'spark_streak',
+              ev.pos.x + Math.cos(a) * 36,
+              ev.pos.y + Math.sin(a) * 24,
+              28,
+              Math.cos(a) * spd,
+              Math.sin(a) * spd,
+              this.randRange(25, 110),
+              this.randRange(26, 40),
+              4,
+              k % 2 === 0 ? cr : pr,
+              k % 2 === 0 ? cg : pg,
+              k % 2 === 0 ? cb : pb,
+              0.96,
+              0.26,
+              1.85,
+              a,
+              0
+            );
+          }
+          this.spawnDecal('crater', ev.pos.x, ev.pos.y, 1.75, 1.75, this.randRange(0, 6.28), 1, 1, 1, 0.78, 22);
+          this.spawnDecal('scorch', ev.pos.x, ev.pos.y, 1.95, 1.95, 0, 1, 1, 1, 0.66, 22);
           this.triggerScreenFx({
             kind: 'boss_phase',
-            intensity: 0.9,
+            intensity: 0.76,
             worldX: ev.pos.x,
             worldY: ev.pos.y,
-            colorHex: '#FF2E46',
+            colorHex: fxHex,
           });
           break;
         }
@@ -1599,7 +1659,7 @@ export class ParticlesAndDecals {
       state.run.finalKillSlowTimer > 0 ? 0.85 : 0,
       Math.max(0, this.finalKillPulse - safeDt * 1.8)
     );
-    this.chromaticAmount = Math.max(0, this.chromaticAmount - safeDt * 0.068);
+    this.chromaticAmount = Math.max(0, this.chromaticAmount - safeDt * 0.036);
 
     if (this.shockwaveActive) {
       this.shockwaveElapsed += safeDt;
