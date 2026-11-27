@@ -1063,7 +1063,7 @@ function executeWeaponSpecial(
       // Aspect of the Hellfire (rail_beam): deploy up to 3 pulsing Hellfire Mines!
       if (player.aspectId === 'rail_beam') {
         const existingMines = state.room.hazards.filter(
-          (hz) => hz.kind === 'pylon' && hz.owner === 'player',
+          (hz) => hz.kind === 'pylon' && hz.owner === 'player' && hz.id.startsWith('mine_'),
         );
         if (existingMines.length >= 3) {
           const oldestIdx = state.room.hazards.indexOf(existingMines[0]);
@@ -1518,7 +1518,7 @@ function fireRailBeamTick(
   // Check if beam strikes any player-owned Hellfire Mines (detonating them!)
   for (let hIdx = state.room.hazards.length - 1; hIdx >= 0; hIdx--) {
     const h = state.room.hazards[hIdx];
-    if (h.kind === 'pylon' && h.owner === 'player' && h.active) {
+    if (h.kind === 'pylon' && h.owner === 'player' && h.active && h.id.startsWith('mine_')) {
       if (isInEllipticalCone(h.pos.x - player.pos.x, h.pos.y - player.pos.y, angle, range, 18)) {
         detonateHellfireMine(state, hIdx, ctx, hooks);
       }
@@ -1596,6 +1596,21 @@ function syncWeaponMaxStats(state: SimState): void {
   }
 }
 
+function endDashEarlyToTouchdownVel(player: SimState['player']): void {
+  const wasDashing = player.dashTimer > 0;
+  player.dashTimer = 0;
+  player.dashStrikeWindowTimer = 0;
+  if (wasDashing) {
+    const maxTouchdown = PLAYER_CONSTANTS.speed * PLAYER_CONSTANTS.touchdownVelocityRetention;
+    const spd = Math.hypot(player.vel.x, player.vel.y);
+    if (spd > maxTouchdown && spd > 1e-5) {
+      const scale = maxTouchdown / spd;
+      player.vel.x *= scale;
+      player.vel.y *= scale;
+    }
+  }
+}
+
 // ============================================================================
 // Main Per-Tick Weapon Driver
 // ============================================================================
@@ -1618,11 +1633,11 @@ export function stepPlayerWeapons(
   const def = getWeaponDef(player.weaponId);
   const tuning = getWeaponTuning(player.weaponId);
 
-  // 1. Decay core timers
+  // 1. Decay core timers (guard combo window reset while actively winding up a swing!)
   if (player.attackTimer > 0) {
     player.attackTimer = Math.max(0, player.attackTimer - dt);
   }
-  if (player.attackRecoveryTimer > 0) {
+  if (player.attackRecoveryTimer > 0 && player.attackChargeTimer <= 0) {
     player.attackRecoveryTimer = Math.max(0, player.attackRecoveryTimer - dt);
     if (player.attackRecoveryTimer === 0) {
       player.attackComboStep = 0;
@@ -1787,8 +1802,7 @@ export function stepPlayerWeapons(
     if (isFlurryBow) {
       if (input.attack && player.attackTimer <= 0) {
         if (player.dashTimer > 0) {
-          player.dashTimer = 0;
-          player.dashStrikeWindowTimer = 0;
+          endDashEarlyToTouchdownVel(player);
         }
         player.facingAngle = normalizeAngle(aimAngle);
         player.facingIdx = angleToFacingIdx(player.facingAngle);
@@ -1800,8 +1814,7 @@ export function stepPlayerWeapons(
 
     // Starting Bow draw during Dash / Dash-Strike window activates 35% faster Dash-Strike charge!
     if (input.attackPressed && (player.dashTimer > 0 || player.dashStrikeWindowTimer > 0)) {
-      player.dashTimer = 0;
-      player.dashStrikeWindowTimer = 0;
+      endDashEarlyToTouchdownVel(player);
       rt.bowDashChargeActive = true;
       player.attackChargeTimer = SIM_CONSTANTS.fixedDt;
       player.facingAngle = normalizeAngle(aimAngle);
@@ -1886,8 +1899,7 @@ export function stepPlayerWeapons(
     if (player.aspectId === 'rail_beam') {
       if ((input.attack || input.attackPressed) && player.reloadTimer <= 0 && (player.ammo > 0 || infiniteAmmo)) {
         if (player.dashTimer > 0) {
-          player.dashTimer = 0;
-          player.dashStrikeWindowTimer = 0;
+          endDashEarlyToTouchdownVel(player);
         }
         player.facingAngle = rotateAngleToward(player.facingAngle, aimAngle, SIM_CONSTANTS.combatRotationSpeed, dt);
         player.facingIdx = angleToFacingIdx(player.facingAngle);
@@ -1928,8 +1940,7 @@ export function stepPlayerWeapons(
       player.reloadTimer <= 0
     ) {
       if (player.dashTimer > 0) {
-        player.dashTimer = 0;
-        player.dashStrikeWindowTimer = 0;
+        endDashEarlyToTouchdownVel(player);
       }
       if (player.ammo > 0 || infiniteAmmo) {
         player.facingAngle = normalizeAngle(aimAngle);
