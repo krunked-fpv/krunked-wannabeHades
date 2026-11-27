@@ -688,17 +688,7 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
     ctx.fillStyle = floorVig;
     ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
 
-    // Sanctum Courtyard Crimson-Gold Carpet Runner (drawn beneath Central Medallion inlay)
-    if (biome === 'sanctum_hub') {
-      const rugHalfW = 74 * z;
-      ctx.fillStyle = 'rgba(143, 21, 43, 0.88)';
-      ctx.fillRect(cxSx - rugHalfW, y0 + 10 * z, rugHalfW * 2, y1 - y0 - 34 * z);
-      ctx.strokeStyle = '#E6B84C';
-      ctx.lineWidth = 3.2 * z;
-      ctx.strokeRect(cxSx - rugHalfW + 6 * z, y0 + 10 * z, rugHalfW * 2 - 12 * z, y1 - y0 - 34 * z);
-    }
-
-    // Central Chamber Mosaic Medallion (above floor & carpet runner)
+    // Central Chamber Mosaic Medallion inlaid into the stone floor
     const medId = `prop_medallion_${shortName}`;
     if (this.hasSprite(medId)) {
       const sc = this.spriteScaleForHeight(medId, 210 * z);
@@ -723,6 +713,18 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
       ctx.lineWidth = 2.4 * z;
       ctx.stroke();
       ctx.restore();
+    }
+
+    // Sanctum Courtyard Crimson-Gold Velvet Carpet Runner laid ON TOP of stone floor & medallion!
+    if (biome === 'sanctum_hub') {
+      const rugHalfW = 74 * z;
+      ctx.fillStyle = 'rgba(9, 6, 14, 0.56)';
+      ctx.fillRect(cxSx - rugHalfW - 4 * z, y0 + 10 * z, rugHalfW * 2 + 9 * z, y1 - y0 - 30 * z);
+      ctx.fillStyle = 'rgba(143, 21, 43, 0.96)';
+      ctx.fillRect(cxSx - rugHalfW, y0 + 10 * z, rugHalfW * 2, y1 - y0 - 34 * z);
+      ctx.strokeStyle = '#E6B84C';
+      ctx.lineWidth = 3.2 * z;
+      ctx.strokeRect(cxSx - rugHalfW + 6 * z, y0 + 10 * z, rugHalfW * 2 - 12 * z, y1 - y0 - 34 * z);
     }
 
     // Northern wall contact AO strip
@@ -1185,21 +1187,110 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
           t.kind === 'line' && laneW <= 96
             ? this.clipRayToObstacles(obstacles, t.pos.x, t.pos.y, c, s, rawLen)
             : rawLen;
+        const hitPillar = len < rawLen - 0.5;
         const px = -s * hw;
         const py = c * hw;
+        const p0x = this.wxToSx(t.pos.x + px, cam);
+        const p0y = this.wyToSy(t.pos.y + py, 0, cam);
+        const p1x = this.wxToSx(t.pos.x - px, cam);
+        const p1y = this.wyToSy(t.pos.y - py, 0, cam);
+        const p2x = this.wxToSx(t.pos.x + c * len - px, cam);
+        const p2y = this.wyToSy(t.pos.y + s * len - py, 0, cam);
+        const p3x = this.wxToSx(t.pos.x + c * len + px, cam);
+        const p3y = this.wyToSy(t.pos.y + s * len + py, 0, cam);
+        const endSx = this.wxToSx(t.pos.x + c * len, cam);
+        const endSy = this.wyToSy(t.pos.y + s * len, 0, cam);
+
+        // 1. Dark #09060E backing + crimson danger lane + advancing fill
         ctx.beginPath();
-        ctx.moveTo(this.wxToSx(t.pos.x + px, cam), this.wyToSy(t.pos.y + py, 0, cam));
-        ctx.lineTo(this.wxToSx(t.pos.x - px, cam), this.wyToSy(t.pos.y - py, 0, cam));
-        ctx.lineTo(this.wxToSx(t.pos.x + c * len - px, cam), this.wyToSy(t.pos.y + s * len - py, 0, cam));
-        ctx.lineTo(this.wxToSx(t.pos.x + c * len + px, cam), this.wyToSy(t.pos.y + s * len + py, 0, cam));
+        ctx.moveTo(p0x, p0y);
+        ctx.lineTo(p1x, p1y);
+        ctx.lineTo(p2x, p2y);
+        ctx.lineTo(p3x, p3y);
         ctx.closePath();
-        ctx.fillStyle = 'rgba(255, 42, 72, 0.24)';
+        ctx.fillStyle = 'rgba(9, 6, 14, 0.4)';
         ctx.fill();
+        ctx.fillStyle = 'rgba(255, 36, 62, 0.24)';
+        ctx.fill();
+
+        const fLen = len * prog;
+        ctx.beginPath();
+        ctx.moveTo(p0x, p0y);
+        ctx.lineTo(p1x, p1y);
+        ctx.lineTo(this.wxToSx(t.pos.x + c * fLen - px, cam), this.wyToSy(t.pos.y + s * fLen - py, 0, cam));
+        ctx.lineTo(this.wxToSx(t.pos.x + c * fLen + px, cam), this.wyToSy(t.pos.y + s * fLen + py, 0, cam));
+        ctx.closePath();
+        ctx.fillStyle = prog > 0.8 ? 'rgba(255, 212, 76, 0.5)' : 'rgba(255, 38, 66, 0.44)';
+        ctx.fill();
+
+        // 2. Animated directional danger chevrons marching down the lane
+        const chevSpacing = 92;
+        const scroll = (timeSec * 220) % chevSpacing;
+        const chevSpread = Math.min(hw * 0.72, 22);
+        const chevBack = Math.min(26, chevSpread * 1.15);
+        ctx.lineCap = 'round';
+        for (let d = scroll + 26; d < len - 18; d += chevSpacing) {
+          const tipWx = t.pos.x + c * d;
+          const tipWy = t.pos.y + s * d;
+          const baseWx = tipWx - c * chevBack;
+          const baseWy = tipWy - s * chevBack;
+          const tx = this.wxToSx(tipWx, cam);
+          const ty = this.wyToSy(tipWy, 0, cam);
+          const lx = this.wxToSx(baseWx - s * chevSpread, cam);
+          const ly = this.wyToSy(baseWy + c * chevSpread, 0, cam);
+          const rx2 = this.wxToSx(baseWx + s * chevSpread, cam);
+          const ry2 = this.wyToSy(baseWy - c * chevSpread, 0, cam);
+          ctx.beginPath();
+          ctx.moveTo(lx, ly);
+          ctx.lineTo(tx, ty);
+          ctx.lineTo(rx2, ry2);
+          ctx.strokeStyle = INK_HEX;
+          ctx.lineWidth = 4.2 * z;
+          ctx.stroke();
+          ctx.strokeStyle = theme.telegraphAccent;
+          ctx.lineWidth = 2.1 * z;
+          ctx.stroke();
+        }
+
+        // 3. Heavy #09060E outer ink rails + glowing crimson-gold edges
+        ctx.beginPath();
+        ctx.moveTo(p0x, p0y);
+        ctx.lineTo(p3x, p3y);
+        ctx.moveTo(p1x, p1y);
+        ctx.lineTo(p2x, p2y);
+        ctx.strokeStyle = INK_HEX;
+        ctx.lineWidth = 6.4 * z;
+        ctx.stroke();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3.0 * z;
+        ctx.stroke();
+
+        // 4. Center laser sightline + white-gold filament + emitter/endpoint flares
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(endSx, endSy);
         ctx.strokeStyle = INK_HEX;
         ctx.lineWidth = 5 * z;
         ctx.stroke();
         ctx.strokeStyle = color;
-        ctx.lineWidth = 3 * z;
+        ctx.lineWidth = 2.8 * z;
+        ctx.stroke();
+        ctx.strokeStyle = '#FFF3B8';
+        ctx.lineWidth = 1.4 * z;
+        ctx.stroke();
+
+        // Emitter ring & pillar termination bar/flare
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, Math.max(11, hw * 0.6) * z, Math.max(11, hw * 0.6) * cam.isoScaleY * z, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = theme.telegraphAccent;
+        ctx.lineWidth = 2.6 * z;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(p2x, p2y);
+        ctx.lineTo(p3x, p3y);
+        ctx.strokeStyle = hitPillar ? '#FFF099' : theme.telegraphAccent;
+        ctx.lineWidth = (hitPillar ? 5.2 : 3.2) * z;
         ctx.stroke();
       }
       ctx.restore();
@@ -1436,6 +1527,27 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
         ? Math.max(0.68, (e.radius * 2.5) / 115) * z * (168 / rect.h)
         : Math.max(0.68, (e.radius * 2.5) / 115) * z;
 
+    if (e.invulnerable) {
+      // Sculpted translucent pale-gold & obsidian ward-rune ring keeping boss legible
+      const wRx = (e.radius + (e.isBoss ? 34 : 18)) * z;
+      const wRy = wRx * cam.isoScaleY;
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(sx, sy + 2 * z, wRx, wRy, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(9, 6, 14, 0.72)';
+      ctx.lineWidth = 5.5 * z;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(245, 217, 122, 0.68)';
+      ctx.lineWidth = 2.6 * z;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(sx, sy - (e.isBoss ? 78 : 42) * z, (e.isBoss ? 86 : e.radius + 22) * z, (e.isBoss ? 104 : e.radius + 32) * z, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(245, 220, 138, 0.28)';
+      ctx.lineWidth = 2.6 * z;
+      ctx.stroke();
+      ctx.restore();
+    }
+
     this.drawSprite(ctx, spriteId, sx, sy - (e.isBoss ? Math.sin(timeSec * 4) * 5 * z : 0), scale * flip, scale);
 
     if (settings.hitFlash && e.hitFlashTimer > 0) {
@@ -1591,7 +1703,21 @@ export class Canvas2DInkCelRenderer implements RenderBackend {
     ctx.translate(sx, sy);
     ctx.scale(1, cam.isoScaleY);
 
-    if (rb.kind === 'nova' || rb.kind === 'whip') {
+    if (rb.kind === 'whip') {
+      const rad = rb.radius * (0.42 + 0.72 * Math.pow(prog, 0.46)) * z;
+      const thin = Math.min(20, rb.thickness) * (1 - prog * 0.56) * z;
+      ctx.beginPath();
+      ctx.arc(0, 0, rad, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(9, 6, 14, ${alpha * 0.82})`;
+      ctx.lineWidth = thin + 5 * z;
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(${Math.round(rb.r * 255)}, ${Math.round(rb.g * 255)}, ${Math.round(rb.b * 255)}, ${alpha * 0.76})`;
+      ctx.lineWidth = thin;
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(${Math.round(rb.coreR * 255)}, ${Math.round(rb.coreG * 255)}, ${Math.round(rb.coreB * 255)}, ${alpha * 0.85})`;
+      ctx.lineWidth = thin * 0.28;
+      ctx.stroke();
+    } else if (rb.kind === 'nova') {
       const rad = rb.radius * (0.35 + 0.78 * Math.pow(prog, 0.44)) * z;
       ctx.beginPath();
       ctx.arc(0, 0, rad, 0, Math.PI * 2);

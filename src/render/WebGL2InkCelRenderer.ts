@@ -198,7 +198,7 @@ const BIOME_THEMES: Record<BiomeId, BiomeVisualTheme> = {
     wallTrim: [0.839, 0.941, 1.0], // #D6F0FF
     cliffFallbackTint: [0.76, 0.92, 1.18],
     telegraphPrimary: [1.0, 0.14, 0.26], // Royal Sovereign crimson
-    telegraphAccent: [0.58, 0.08, 0.2],
+    telegraphAccent: [0.98, 0.74, 0.28], // Hammered imperial gold
   },
 };
 
@@ -1624,7 +1624,10 @@ export class WebGL2InkCelRenderer implements RenderBackend {
         }
       }
 
-      // Sanctum Courtyard Royal Crimson-Gold Carpet Runner (laid underneath Central Medallion inlay!)
+      // Central Chamber Mosaic Medallion inlaid directly into the carved stone floor
+      this.renderCentralMosaicMedallion(biome, centerX, centerY, theme, cam);
+
+      // Sanctum Courtyard Royal Crimson-Gold Velvet Carpet Runner laid ON TOP of floor & stone medallion!
       if (biome === 'sanctum_hub') {
         const midSx = this.wxToSx(centerX, cam);
         const rugHalfW = 74 * z;
@@ -1643,7 +1646,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
           INK_R,
           INK_G,
           INK_B,
-          0.62
+          0.66
         );
         // Deep royal crimson velvet runner
         this.pushQuadSolid(
@@ -1658,7 +1661,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
           0.56,
           0.082,
           0.168,
-          0.9
+          0.96
         );
         // Inner woven gold-crimson stripe
         this.pushQuadSolid(
@@ -1673,17 +1676,15 @@ export class WebGL2InkCelRenderer implements RenderBackend {
           0.44,
           0.055,
           0.125,
-          0.5
+          0.55
         );
-        // Hammered gold braided borders
-        this.pushLine(midSx - rugHalfW + 6 * z, rugTop, midSx - rugHalfW + 6 * z, rugBot, 3.8 * z, 0.9, 0.72, 0.3, 0.94, 0.14);
-        this.pushLine(midSx + rugHalfW - 6 * z, rugTop, midSx + rugHalfW - 6 * z, rugBot, 3.8 * z, 0.9, 0.72, 0.3, 0.94, 0.14);
-        this.pushLine(midSx - rugHalfW + 13 * z, rugTop, midSx - rugHalfW + 13 * z, rugBot, 1.6 * z, 0.94, 0.78, 0.36, 0.72);
-        this.pushLine(midSx + rugHalfW - 13 * z, rugTop, midSx + rugHalfW - 13 * z, rugBot, 1.6 * z, 0.94, 0.78, 0.36, 0.72);
+        // Hammered gold braided borders + subtle southern gold fringe
+        this.pushLine(midSx - rugHalfW + 6 * z, rugTop, midSx - rugHalfW + 6 * z, rugBot, 3.8 * z, 0.9, 0.72, 0.3, 0.96, 0.14);
+        this.pushLine(midSx + rugHalfW - 6 * z, rugTop, midSx + rugHalfW - 6 * z, rugBot, 3.8 * z, 0.9, 0.72, 0.3, 0.96, 0.14);
+        this.pushLine(midSx - rugHalfW + 13 * z, rugTop, midSx - rugHalfW + 13 * z, rugBot, 1.6 * z, 0.94, 0.78, 0.36, 0.76);
+        this.pushLine(midSx + rugHalfW - 13 * z, rugTop, midSx + rugHalfW - 13 * z, rugBot, 1.6 * z, 0.94, 0.78, 0.36, 0.76);
+        this.pushLine(midSx - rugHalfW, rugBot, midSx + rugHalfW, rugBot, 3.6 * z, 0.92, 0.74, 0.32, 0.94, 0.15);
       }
-
-      // Central Chamber Mosaic Medallion anchoring arena center cleanly above floor & runner
-      this.renderCentralMosaicMedallion(biome, centerX, centerY, theme, cam);
 
       // Northern wall base contact AO strip & Western parapet SE inner shadow strip
       this.pushQuadGradientV(
@@ -2532,13 +2533,15 @@ export class WebGL2InkCelRenderer implements RenderBackend {
         }
       }
 
-      const hotFlash = prog > 0.8 ? (prog - 0.8) / 0.2 : 0;
-      const r = cr + (1.0 - cr) * hotFlash * 0.6;
-      const g = cg + (0.86 - cg) * hotFlash * 0.68;
-      const b = cb + (0.42 - cb) * hotFlash * 0.45;
+      const hotFlash = prog > 0.78 ? (prog - 0.78) / 0.22 : 0;
+      // Preserve rich jewel chromaticity through 100% progress (never clip RGBA8 FBO to white-silver!)
+      const r = Math.min(1.0, cr + (1.0 - cr) * hotFlash * 0.26);
+      const g = Math.min(1.0, cg + (Math.max(cg, 0.36) - cg) * hotFlash * 0.28);
+      const b = Math.min(1.0, cb * (1.0 - hotFlash * 0.42));
       const sx = this.wxToSx(t.pos.x, cam);
       const sy = this.wyToSy(t.pos.y, 0, cam);
-      const rimEmissive = 0.6 + hotFlash * 0.7 + 0.14 * Math.sin(timeSec * 26);
+      const fillEmissive = 0.14 + hotFlash * 0.18 + 0.04 * Math.sin(timeSec * 26);
+      const rimEmissive = 0.30 + hotFlash * 0.34 + 0.08 * Math.sin(timeSec * 26);
 
       if (t.kind === 'circle' || t.kind === 'ring') {
         const rx = t.radius * z;
@@ -2548,15 +2551,15 @@ export class WebGL2InkCelRenderer implements RenderBackend {
 
         // 1. Translucent dark-ink backed footprint + animated radial countdown fill
         if (t.kind === 'ring' && irx > 2) {
-          this.pushEllipseRing(sx, sy, rx, ry, irx, iry, 28, INK_R, INK_G, INK_B, 0.28);
-          this.pushEllipseRing(sx, sy, rx, ry, irx, iry, 28, cr, cg, cb, 0.2, 0.35);
+          this.pushEllipseRing(sx, sy, rx, ry, irx, iry, 28, INK_R, INK_G, INK_B, 0.34);
+          this.pushEllipseRing(sx, sy, rx, ry, irx, iry, 28, cr, cg, cb, 0.22, 0.16);
           const fillRx = irx + (rx - irx) * prog;
           const fillRy = iry + (ry - iry) * prog;
-          this.pushEllipseRing(sx, sy, fillRx, fillRy, irx, iry, 28, r, g, b, 0.38 + prog * 0.28, rimEmissive);
+          this.pushEllipseRing(sx, sy, fillRx, fillRy, irx, iry, 28, r, g, b, 0.42 + prog * 0.26, fillEmissive);
         } else {
-          this.pushEllipseFill(sx, sy, rx, ry, 28, INK_R, INK_G, INK_B, 0.24);
-          this.pushEllipseFill(sx, sy, rx, ry, 28, cr, cg, cb, 0.16, 0.25);
-          this.pushEllipseFill(sx, sy, rx * prog, ry * prog, 28, r, g, b, 0.36 + prog * 0.26, rimEmissive);
+          this.pushEllipseFill(sx, sy, rx, ry, 28, INK_R, INK_G, INK_B, 0.3);
+          this.pushEllipseFill(sx, sy, rx, ry, 28, cr, cg, cb, 0.18, 0.14);
+          this.pushEllipseFill(sx, sy, rx * prog, ry * prog, 28, r, g, b, 0.4 + prog * 0.26, fillEmissive);
         }
 
         // 2. Heavy #09060E outer ink contour + razor bright danger border
@@ -2581,8 +2584,8 @@ export class WebGL2InkCelRenderer implements RenderBackend {
             isMajor ? ar : r,
             isMajor ? ag : g,
             isMajor ? ab : b,
-            0.9,
-            rimEmissive * 0.8
+            0.94,
+            isMajor ? 0.26 : rimEmissive * 0.7
           );
         }
       } else if (t.kind === 'cone') {
@@ -2594,15 +2597,16 @@ export class WebGL2InkCelRenderer implements RenderBackend {
         for (let s = 0; s < segs; s++) {
           const a0 = t.angle - halfArc + s * step;
           const a1 = a0 + step;
-          this.pushTriSolid(sx, sy, sx + Math.cos(a0) * rx, sy + Math.sin(a0) * ry, sx + Math.cos(a1) * rx, sy + Math.sin(a1) * ry, cr, cg, cb, 0.2, 0.3);
-          this.pushTriSolid(sx, sy, sx + Math.cos(a0) * rx * prog, sy + Math.sin(a0) * ry * prog, sx + Math.cos(a1) * rx * prog, sy + Math.sin(a1) * ry * prog, r, g, b, 0.4 + prog * 0.24, rimEmissive);
-          this.pushLine(sx + Math.cos(a0) * (rx + 3 * z), sy + Math.sin(a0) * (ry + 2 * z), sx + Math.cos(a1) * (rx + 3 * z), sy + Math.sin(a1) * (ry + 2 * z), 5.5 * z, INK_R, INK_G, INK_B, 0.9);
+          this.pushTriSolid(sx, sy, sx + Math.cos(a0) * rx, sy + Math.sin(a0) * ry, sx + Math.cos(a1) * rx, sy + Math.sin(a1) * ry, INK_R, INK_G, INK_B, 0.28);
+          this.pushTriSolid(sx, sy, sx + Math.cos(a0) * rx, sy + Math.sin(a0) * ry, sx + Math.cos(a1) * rx, sy + Math.sin(a1) * ry, cr, cg, cb, 0.2, 0.14);
+          this.pushTriSolid(sx, sy, sx + Math.cos(a0) * rx * prog, sy + Math.sin(a0) * ry * prog, sx + Math.cos(a1) * rx * prog, sy + Math.sin(a1) * ry * prog, r, g, b, 0.42 + prog * 0.24, fillEmissive);
+          this.pushLine(sx + Math.cos(a0) * (rx + 3 * z), sy + Math.sin(a0) * (ry + 2 * z), sx + Math.cos(a1) * (rx + 3 * z), sy + Math.sin(a1) * (ry + 2 * z), 5.5 * z, INK_R, INK_G, INK_B, 0.92);
           this.pushLine(sx + Math.cos(a0) * rx, sy + Math.sin(a0) * ry, sx + Math.cos(a1) * rx, sy + Math.sin(a1) * ry, 3.4 * z, r, g, b, 0.96, rimEmissive);
         }
-        this.pushLine(sx, sy, sx + Math.cos(t.angle - halfArc) * rx, sy + Math.sin(t.angle - halfArc) * ry, 5.2 * z, INK_R, INK_G, INK_B, 0.9);
-        this.pushLine(sx, sy, sx + Math.cos(t.angle + halfArc) * rx, sy + Math.sin(t.angle + halfArc) * ry, 5.2 * z, INK_R, INK_G, INK_B, 0.9);
-        this.pushLine(sx, sy, sx + Math.cos(t.angle - halfArc) * rx, sy + Math.sin(t.angle - halfArc) * ry, 3.0 * z, ar, ag, ab, 0.95, rimEmissive);
-        this.pushLine(sx, sy, sx + Math.cos(t.angle + halfArc) * rx, sy + Math.sin(t.angle + halfArc) * ry, 3.0 * z, ar, ag, ab, 0.95, rimEmissive);
+        this.pushLine(sx, sy, sx + Math.cos(t.angle - halfArc) * rx, sy + Math.sin(t.angle - halfArc) * ry, 5.2 * z, INK_R, INK_G, INK_B, 0.92);
+        this.pushLine(sx, sy, sx + Math.cos(t.angle + halfArc) * rx, sy + Math.sin(t.angle + halfArc) * ry, 5.2 * z, INK_R, INK_G, INK_B, 0.92);
+        this.pushLine(sx, sy, sx + Math.cos(t.angle - halfArc) * rx, sy + Math.sin(t.angle - halfArc) * ry, 3.0 * z, ar, ag, ab, 0.95, 0.28);
+        this.pushLine(sx, sy, sx + Math.cos(t.angle + halfArc) * rx, sy + Math.sin(t.angle + halfArc) * ry, 3.0 * z, ar, ag, ab, 0.95, 0.28);
       } else if (t.kind === 'line' || t.kind === 'rect') {
         const rawLen = t.length ?? t.radius;
         const laneW = t.width ?? 44;
@@ -2613,6 +2617,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
           t.kind === 'line' && laneW <= 96
             ? this.clipRayToObstacles(obstacles, t.pos.x, t.pos.y, c, s, rawLen)
             : rawLen;
+        const hitPillar = len < rawLen - 0.5;
         const px = -s * halfW;
         const py = c * halfW;
 
@@ -2624,23 +2629,70 @@ export class WebGL2InkCelRenderer implements RenderBackend {
         const p2y = this.wyToSy(t.pos.y + s * len - py, 0, cam);
         const p3x = this.wxToSx(t.pos.x + c * len + px, cam);
         const p3y = this.wyToSy(t.pos.y + s * len + py, 0, cam);
+        const endSx = this.wxToSx(t.pos.x + c * len, cam);
+        const endSy = this.wyToSy(t.pos.y + s * len, 0, cam);
 
-        this.pushQuadSolid(p0x, p0y, p1x, p1y, p2x, p2y, p3x, p3y, INK_R, INK_G, INK_B, 0.25);
-        this.pushQuadSolid(p0x, p0y, p1x, p1y, p2x, p2y, p3x, p3y, cr, cg, cb, 0.22, 0.35);
+        // 1. Deep chiaroscuro obsidian backing + rich saturated danger zone fill (zero pink/white washout!)
+        this.pushQuadSolid(p0x, p0y, p1x, p1y, p2x, p2y, p3x, p3y, INK_R, INK_G, INK_B, 0.52);
+        this.pushQuadSolid(p0x, p0y, p1x, p1y, p2x, p2y, p3x, p3y, cr, cg, cb, 0.26, 0.12);
 
+        // 2. Advancing countdown danger fill sweeping along lane (deep saturated crimson)
         const fLen = len * prog;
         const f2x = this.wxToSx(t.pos.x + c * fLen - px, cam);
         const f2y = this.wyToSy(t.pos.y + s * fLen - py, 0, cam);
         const f3x = this.wxToSx(t.pos.x + c * fLen + px, cam);
         const f3y = this.wyToSy(t.pos.y + s * fLen + py, 0, cam);
-        this.pushQuadSolid(p0x, p0y, p1x, p1y, f2x, f2y, f3x, f3y, r, g, b, 0.44 + prog * 0.24, rimEmissive);
+        this.pushQuadSolid(p0x, p0y, p1x, p1y, f2x, f2y, f3x, f3y, r, g, b, 0.48 + prog * 0.24, fillEmissive);
 
+        // 3. Animated directional hammered-gold chevron danger pulses marching along the beam lane
+        const chevSpacing = 92;
+        const scroll = (timeSec * 220) % chevSpacing;
+        const chevSpread = Math.min(halfW * 0.72, 22);
+        const chevBack = Math.min(26, chevSpread * 1.15);
+        for (let d = scroll + 26; d < len - 18; d += chevSpacing) {
+          const tipWx = t.pos.x + c * d;
+          const tipWy = t.pos.y + s * d;
+          const baseWx = tipWx - c * chevBack;
+          const baseWy = tipWy - s * chevBack;
+          const tx = this.wxToSx(tipWx, cam);
+          const ty = this.wyToSy(tipWy, 0, cam);
+          const lx = this.wxToSx(baseWx - s * chevSpread, cam);
+          const ly = this.wyToSy(baseWy + c * chevSpread, 0, cam);
+          const rx2 = this.wxToSx(baseWx + s * chevSpread, cam);
+          const ry2 = this.wyToSy(baseWy - c * chevSpread, 0, cam);
+          const cAlpha = 0.78 + prog * 0.2;
+          this.pushLine(lx, ly, tx, ty, 4.6 * z, INK_R, INK_G, INK_B, cAlpha * 0.9);
+          this.pushLine(rx2, ry2, tx, ty, 4.6 * z, INK_R, INK_G, INK_B, cAlpha * 0.9);
+          this.pushLine(lx, ly, tx, ty, 2.3 * z, ar, ag, ab, cAlpha, 0.28 + hotFlash * 0.16);
+          this.pushLine(rx2, ry2, tx, ty, 2.3 * z, ar, ag, ab, cAlpha, 0.28 + hotFlash * 0.16);
+        }
+
+        // 4. Heavy #09060E outer ink rails + razor-bright crimson inner rails
         const bw = 3.2 * z;
-        this.pushLine(p0x, p0y, p3x, p3y, bw + 2.4 * z, INK_R, INK_G, INK_B, 0.9);
-        this.pushLine(p1x, p1y, p2x, p2y, bw + 2.4 * z, INK_R, INK_G, INK_B, 0.9);
-        this.pushLine(p0x, p0y, p3x, p3y, bw, r, g, b, 0.96, rimEmissive);
-        this.pushLine(p1x, p1y, p2x, p2y, bw, r, g, b, 0.96, rimEmissive);
-        this.pushLine(p2x, p2y, p3x, p3y, len < rawLen - 0.5 ? bw * 1.65 : bw, ar, ag, ab, 0.98, rimEmissive + 0.25);
+        this.pushLine(p0x, p0y, p3x, p3y, bw + 4.2 * z, INK_R, INK_G, INK_B, 0.96);
+        this.pushLine(p1x, p1y, p2x, p2y, bw + 4.2 * z, INK_R, INK_G, INK_B, 0.96);
+        this.pushLine(p0x, p0y, p3x, p3y, bw, r, g, b, 0.98, rimEmissive);
+        this.pushLine(p1x, p1y, p2x, p2y, bw, r, g, b, 0.98, rimEmissive);
+
+        // 5. Glowing crimson-gold center laser sightline + crisp gold filament
+        const sightPulse = 0.85 + 0.15 * Math.sin(timeSec * 34);
+        this.pushLine(sx, sy, endSx, endSy, 5.4 * z, INK_R, INK_G, INK_B, 0.78);
+        this.pushLine(sx, sy, endSx, endSy, 3.0 * z * sightPulse, r, g, b, 0.96, rimEmissive + 0.18);
+        this.pushLine(sx, sy, endSx, endSy, 1.35 * z * sightPulse, 1.0, 0.92, 0.56, 0.96, 0.45);
+
+        // 6. Bright emitter origin ring + reinforced pillar/end termination flare
+        const emR = Math.max(12, halfW * 0.65) * z;
+        this.pushEllipseRing(sx, sy, emR + 3 * z, (emR + 3 * z) * cam.isoScaleY, Math.max(1, emR - 1 * z), Math.max(1, (emR - 1 * z) * cam.isoScaleY), 16, INK_R, INK_G, INK_B, 0.92);
+        this.pushEllipseRing(sx, sy, emR, emR * cam.isoScaleY, Math.max(1, emR - 3 * z), Math.max(1, (emR - 3 * z) * cam.isoScaleY), 16, ar, ag, ab, 0.95, 0.34);
+        this.pushSprite('vfx_glow_soft', sx, sy, 0.42 * z, 0.28 * z, 0, r, g, b, 0.62, 0, 0.45);
+
+        this.pushLine(p2x, p2y, p3x, p3y, (hitPillar ? bw * 2.1 : bw * 1.4) + 3 * z, INK_R, INK_G, INK_B, 0.95);
+        this.pushLine(p2x, p2y, p3x, p3y, hitPillar ? bw * 1.85 : bw * 1.15, ar, ag, ab, 0.98, 0.36);
+        const flareScale = hitPillar ? 0.74 : 0.44;
+        this.pushSprite('vfx_glow_soft', endSx, endSy, flareScale * z, flareScale * 0.72 * z, 0, r, g, b, 0.74, 0, 0.55);
+        const endSpark = this.resolveSprite('vfx_hit_spark', 'vfx_spark_burst');
+        const spSc = this.spriteScaleForMaxDim(endSpark, (hitPillar ? 44 : 26) * z * sightPulse);
+        this.pushSprite(endSpark, endSx, endSy, spSc, spSc, timeSec * 12, 1.0, 0.88, 0.46, 0.92, 0, 0.55);
       }
     }
   }
@@ -3294,7 +3346,36 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     }
 
     if (e.invulnerable) {
-      this.pushEllipseRing(sx, sy - 56 * z, 74 * z, 88 * z, 64 * z, 78 * z, 24, 0.95, 0.35, 1.0, 0.85, 1.8);
+      // Sculpted translucent pale-gold & obsidian ward-rune ring keeping boss silhouette 100% legible!
+      const wPulse = 0.96 + 0.04 * Math.sin(timeSec * 5.2);
+      const wRx = (e.radius + (e.isBoss ? 34 : 18)) * z * wPulse;
+      const wRy = wRx * cam.isoScaleY;
+      // Obsidian ink pedestal framing + hammered pale-gold inner ward ring
+      this.pushEllipseRing(sx, sy + 2 * z, wRx + 4 * z, wRy + 2.5 * z, Math.max(1, wRx - 1 * z), Math.max(1, wRy - 0.8 * z), 28, INK_R, INK_G, INK_B, 0.72);
+      this.pushEllipseRing(sx, sy + 2 * z, wRx, wRy, Math.max(1, wRx - 3.2 * z), Math.max(1, wRy - 2.0 * z), 28, 0.96, 0.85, 0.48, 0.68, 0.72);
+      // 8 rotating gilded ward rune ticks around base
+      const rot = timeSec * 0.75;
+      for (let k = 0; k < 8; k++) {
+        const a = rot + (k / 8) * Math.PI * 2;
+        const ca = Math.cos(a);
+        const sa = Math.sin(a);
+        this.pushLine(
+          sx + ca * (wRx + 2 * z),
+          sy + 2 * z + sa * (wRy + 1.2 * z),
+          sx + ca * (wRx - 9 * z),
+          sy + 2 * z + sa * (wRy - 5.5 * z),
+          2.6 * z,
+          1.0,
+          0.91,
+          0.58,
+          0.72,
+          0.85
+        );
+      }
+      // Subtle translucent vertical outer ward arch behind boss (hairline contour, zero chest washout)
+      const domeRx = (e.isBoss ? 86 : e.radius + 22) * z * wPulse;
+      const domeRy = (e.isBoss ? 104 : e.radius + 32) * z * wPulse;
+      this.pushEllipseRing(sx, sy - (e.isBoss ? 78 : 42) * z, domeRx, domeRy, domeRx - 3.2 * z, domeRy - 3.2 * z, 28, 0.96, 0.86, 0.54, 0.3, 0.55);
     }
 
     if (e.armor > 0) {
@@ -3529,7 +3610,20 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     const sx = this.wxToSx(rb.x, cam);
     const sy = this.wyToSy(rb.y, 26, cam);
 
-    if (rb.kind === 'nova' || rb.kind === 'whip') {
+    if (rb.kind === 'whip') {
+      // Sleek biome/boss-themed crisp phase ring (thin <= 20px, zero blinding pink donut washout!)
+      const grow = 0.42 + 0.72 * Math.pow(progress, 0.46);
+      const rx = rb.radius * grow * z;
+      const ry = rb.radius * grow * cam.isoScaleY * z;
+      const thick = Math.min(20, rb.thickness) * (1 - progress * 0.56) * z;
+
+      this.pushEllipseRing(sx, sy, rx + 4.5 * z, ry + 2.8 * z, Math.max(1, rx - thick - 3.5 * z), Math.max(1, ry - thick * cam.isoScaleY - 2.2 * z), 32, INK_R, INK_G, INK_B, fade * 0.84);
+      this.pushEllipseRing(sx, sy, rx, ry, Math.max(1, rx - thick), Math.max(1, ry - thick * cam.isoScaleY), 32, rb.r, rb.g, rb.b, fade * 0.76, 0.35);
+      this.pushEllipseRing(sx, sy, rx + 0.8 * z, ry + 0.5 * z, Math.max(1, rx - thick * 0.28), Math.max(1, ry - thick * 0.28 * cam.isoScaleY), 32, rb.coreR, rb.coreG, rb.coreB, fade * 0.85, 1.05);
+      return;
+    }
+
+    if (rb.kind === 'nova') {
       const grow = 0.35 + 0.78 * Math.pow(progress, 0.44);
       const rx = rb.radius * grow * z;
       const ry = rb.radius * grow * cam.isoScaleY * z;

@@ -807,10 +807,12 @@ void main() {
     shockRingGlow = ringMask * uShockwave.w;
   }
 
-  // 2. Radial Chromatic Aberration (crits, Greater Calls, boss phases, Death Defiance)
+  // 2. Crisp Edge-Weighted Radial Chromatic Aberration (tight 140-180ms kinetic prism snap, zero blurry double-vision)
   vec3 scene;
   if (uChromaticAmount > 0.0001) {
-    vec2 caDir = (uv - 0.5) * uChromaticAmount;
+    vec2 caDelta = uv - 0.5;
+    float edgeWeight = 0.28 + 1.50 * dot(caDelta, caDelta);
+    vec2 caDir = caDelta * (min(uChromaticAmount, 0.0065) * edgeWeight);
     float rCh = texture(uSceneTex, clamp(uv + caDir, vec2(0.0), vec2(1.0))).r;
     float gCh = texture(uSceneTex, uv).g;
     float bCh = texture(uSceneTex, clamp(uv - caDir, vec2(0.0), vec2(1.0))).b;
