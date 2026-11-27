@@ -942,8 +942,12 @@ export class HudOverlay {
     hpText.appendChild(hpPill);
     hpTrack.appendChild(hpText);
 
-    inner.appendChild(hpTrack);
-    card.append(leftCrown, inner, rightCrown);
+    const trackRow = document.createElement('div');
+    trackRow.className = 'kh-boss-track-row';
+    trackRow.append(leftCrown, hpTrack, rightCrown);
+
+    inner.appendChild(trackRow);
+    card.appendChild(inner);
 
     return {
       card,
