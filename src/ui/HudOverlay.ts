@@ -13,6 +13,10 @@ import {
   type WeaponId,
 } from '../contracts/index.js';
 import {
+  getPaintedPatronSigilUrl,
+  getPaintedWeaponIconUrl,
+} from '../assets/PaintedArtLoader.js';
+import {
   svgBloodstoneSocket,
   svgBossCrownOrnament,
   svgDarknessFlame,
@@ -538,10 +542,19 @@ export class HudOverlay {
       }
     }
 
-    // Hero Weapon SVG Silhouette + Name + God Mode + Death Defiances
+    // Hero Weapon Painted Icon (w/ SVG Fallback) + Name + God Mode + Death Defiances
     if (this.lastWeaponId !== player.weaponId) {
       this.lastWeaponId = player.weaponId;
-      this.weaponIconEl.innerHTML = svgWeaponSilhouette(player.weaponId, 16);
+      this.weaponIconEl.innerHTML = '';
+      const wImg = document.createElement('img');
+      wImg.className = 'kh-hud-weapon-img';
+      wImg.alt = '';
+      wImg.src = getPaintedWeaponIconUrl(player.weaponId);
+      const fallbackWeaponId = player.weaponId;
+      wImg.addEventListener('error', () => {
+        this.weaponIconEl.innerHTML = svgWeaponSilhouette(fallbackWeaponId, 16);
+      });
+      this.weaponIconEl.appendChild(wImg);
       this.weaponTagEl.textContent = WEAPON_CONSTANTS[player.weaponId].displayName;
     }
 
@@ -756,7 +769,15 @@ export class HudOverlay {
 
       const sigilWrap = document.createElement('span');
       sigilWrap.className = 'kh-boon-medallion-sigil';
-      sigilWrap.innerHTML = svgPatronSigil(boon.patronId, 17);
+      const sigImg = document.createElement('img');
+      sigImg.className = 'kh-hud-sigil-img';
+      sigImg.alt = '';
+      sigImg.src = getPaintedPatronSigilUrl(boon.patronId);
+      const fallbackPatronId = boon.patronId;
+      sigImg.addEventListener('error', () => {
+        sigilWrap.innerHTML = svgPatronSigil(fallbackPatronId, 17);
+      });
+      sigilWrap.appendChild(sigImg);
 
       const slotBadge = document.createElement('span');
       slotBadge.className = 'kh-boon-medallion-slot';
@@ -1083,7 +1104,12 @@ export class HudOverlay {
     }
 
     for (const ev of eventsToShow) {
-      if (ev.type === 'ui_toast') {
+      if (ev.type === 'room_entered') {
+        for (const t of this.activeToasts) {
+          t.el.remove();
+        }
+        this.activeToasts = [];
+      } else if (ev.type === 'ui_toast') {
         this.pushToast(ev.text, ev.colorHex ?? '#fff0b8', now);
       } else if (ev.type === 'room_cleared') {
         this.pushToast('CHAMBER CLEARED', '#7cf5be', now);
@@ -1122,7 +1148,7 @@ export class HudOverlay {
 
   private pushToast(text: string, colorHex: string, now: number): void {
     const isCompactViewport = typeof window !== 'undefined' && window.innerHeight <= 500;
-    const maxToasts = isCompactViewport ? 1 : 2;
+    const maxToasts = isCompactViewport || this.bossCards.size > 0 ? 1 : 2;
     while (this.activeToasts.length >= maxToasts) {
       const oldest = this.activeToasts.shift();
       oldest?.el.remove();

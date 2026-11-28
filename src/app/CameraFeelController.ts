@@ -59,10 +59,16 @@ const RECOIL_OMEGA = 28;
 const RECOIL_ZETA = 0.78;
 const RECOIL_MAX_PX = 32;
 
-const ZOOM_MIN = 0.96;
+const ZOOM_MIN = 0.78;
 const ZOOM_MAX = 1.09;
 const ZOOM_DASH_PULLOUT = -0.018;
 const ZOOM_ZETA = 0.88;
+const BOSS_FRAME_BLEND = 0.58;
+const BOSS_FRAME_Y_BIAS = -148;
+const BOSS_FRAME_DUAL_EXTRA_Y = -88;
+const BOSS_FRAME_MAX_X = 220;
+const BOSS_FRAME_MAX_Y = 430;
+const BOSS_FRAME_ZOOM_OUT = -0.14;
 
 const TRAUMA_DECAY_PER_SEC = 2.6;
 const TRAUMA_MAX_AMP_PX = 10;
@@ -84,6 +90,11 @@ export class CameraFeelController {
   // Aim look-ahead state (world px)
   private lookX = 0;
   private lookY = 0;
+
+  // Dynamic Boss Arena Framing offset (keeps both hero & towering boss cleanly in view!)
+  private bossFrameX = 0;
+  private bossFrameY = 0;
+  private bossFrameZoom = 0;
 
   // Directional recoil spring state (world px & px/s)
   private recoilX = 0;
@@ -124,6 +135,9 @@ export class CameraFeelController {
   public reset(): void {
     this.lookX = 0;
     this.lookY = 0;
+    this.bossFrameX = 0;
+    this.bossFrameY = 0;
+    this.bossFrameZoom = 0;
     this.recoilX = 0;
     this.recoilY = 0;
     this.recoilVelX = 0;
@@ -521,10 +535,48 @@ export class CameraFeelController {
       shakeY = amp * (0.68 * Math.cos(t * 53.7) + 0.32 * Math.sin(t * 86.91));
     }
 
+    // 1b. Dynamic Boss Arena Framing (keeps towering boss + hero comfortably framed below top HUD!)
+    let targetBossX = 0;
+    let targetBossY = 0;
+    let targetBossZoom = 0;
+    if (screen === 'playing') {
+      let bossCount = 0;
+      let sumBx = 0;
+      let sumBy = 0;
+      for (let i = 0; i < state.enemies.length; i++) {
+        const e = state.enemies[i];
+        if (!e.isBoss || e.aiState === 'dead') continue;
+        sumBx += e.pos.x;
+        sumBy += e.pos.y;
+        bossCount++;
+      }
+      if (bossCount > 0) {
+        const bx = sumBx / bossCount;
+        const by = sumBy / bossCount;
+        const dx = bx - state.player.pos.x;
+        const dy = by - state.player.pos.y;
+        targetBossX = clamp(dx * BOSS_FRAME_BLEND, -BOSS_FRAME_MAX_X, BOSS_FRAME_MAX_X);
+        // Lift camera north so towering 320px bosses (and Dual Boss stacked HUD bars) stay 100% clear!
+        const yBias = BOSS_FRAME_Y_BIAS + (bossCount >= 2 ? BOSS_FRAME_DUAL_EXTRA_Y : 0);
+        targetBossY = clamp(dy * BOSS_FRAME_BLEND + yBias, -BOSS_FRAME_MAX_Y, 180);
+        const sep = Math.hypot(dx, dy);
+        const dualExtraZoom = bossCount >= 2 ? -0.045 : 0;
+        targetBossZoom = BOSS_FRAME_ZOOM_OUT * clamp(sep / 380, 0.45, 1.0) + dualExtraZoom;
+      }
+    }
+    const bossAlpha = dt > 0 ? 1 - Math.exp(-9.5 * dt) : 1;
+    this.bossFrameX += (targetBossX - this.bossFrameX) * bossAlpha;
+    this.bossFrameY += (targetBossY - this.bossFrameY) * bossAlpha;
+    this.bossFrameZoom += (targetBossZoom - this.bossFrameZoom) * bossAlpha;
+
     // Assemble pre-allocated output struct
-    this.outOffset.offsetX = this.lookX + this.recoilX;
-    this.outOffset.offsetY = this.lookY + this.recoilY;
-    this.outOffset.zoomMult = clamp(1.0 + this.zoomOffset + this.dashZoomOffset, ZOOM_MIN, ZOOM_MAX);
+    this.outOffset.offsetX = this.lookX + this.bossFrameX + this.recoilX;
+    this.outOffset.offsetY = this.lookY + this.bossFrameY + this.recoilY;
+    this.outOffset.zoomMult = clamp(
+      1.0 + this.zoomOffset + this.dashZoomOffset + this.bossFrameZoom,
+      ZOOM_MIN,
+      ZOOM_MAX
+    );
     this.outOffset.shakeX = shakeX;
     this.outOffset.shakeY = shakeY;
     return this.outOffset;

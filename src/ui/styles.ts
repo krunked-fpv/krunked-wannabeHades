@@ -248,20 +248,20 @@ export const MYTHIC_UI_CSS = `
 /* Top-Center Unified Stack (Sculpted Boss Bars + Zero-Truncation Underworld Toasts) */
 .kh-top-center-stack {
   position: fixed;
-  top: max(12px, calc(env(safe-area-inset-top, 0px) + 8px));
+  top: max(8px, calc(env(safe-area-inset-top, 0px) + 6px));
   left: 50%;
   transform: translateX(-50%);
-  width: min(580px, calc(100vw - 600px));
+  width: min(540px, calc(100vw - 600px));
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   pointer-events: none;
   z-index: 14;
 }
 
 .kh-hud.kh-is-hub:not(.kh-touch-active) .kh-top-center-stack {
-  top: max(78px, calc(env(safe-area-inset-top, 0px) + 74px));
+  top: max(74px, calc(env(safe-area-inset-top, 0px) + 70px));
 }
 
 /* Sculpted Boss Health Bars */
@@ -269,7 +269,7 @@ export const MYTHIC_UI_CSS = `
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 5px;
   pointer-events: none;
 }
 
@@ -278,14 +278,14 @@ export const MYTHIC_UI_CSS = `
   display: flex;
   flex-direction: column;
   width: 100%;
-  background: linear-gradient(180deg, rgba(24, 14, 34, 0.94) 0%, rgba(11, 7, 16, 0.94) 100%);
+  background: linear-gradient(180deg, rgba(22, 13, 32, 0.88) 0%, rgba(10, 6, 15, 0.9) 100%);
   border: 1.5px solid var(--kh-gold);
   border-radius: 3px;
-  padding: 7px 11px 8px;
+  padding: 5px 10px 6px;
   box-shadow:
     0 0 0 1px var(--kh-ink),
-    0 10px 30px rgba(0, 0, 0, 0.76),
-    inset 0 1px 0 rgba(255, 240, 184, 0.22);
+    0 8px 24px rgba(0, 0, 0, 0.72),
+    inset 0 1px 0 rgba(255, 240, 184, 0.2);
 }
 
 .kh-boss-bar-card.kh-boss-invulnerable {
@@ -326,7 +326,7 @@ export const MYTHIC_UI_CSS = `
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 5px;
+  margin-bottom: 3px;
 }
 
 .kh-boss-title-group {
@@ -340,31 +340,31 @@ export const MYTHIC_UI_CSS = `
 
 .kh-boss-name {
   font-family: var(--kh-font-display);
-  font-size: 15.5px;
+  font-size: 14.5px;
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--kh-gold-bright);
   text-shadow: 0 2px 6px rgba(9, 6, 14, 0.95);
-  line-height: 1.15;
+  line-height: 1.12;
 }
 
 /* ZERO ellipsis truncation on boss subtitles */
 .kh-boss-subtitle {
   font-family: var(--kh-font-lore);
   font-style: italic;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--kh-text-secondary);
   white-space: normal;
-  line-height: 1.18;
+  line-height: 1.14;
 }
 
 .kh-boss-phase-badge {
   font-family: var(--kh-font-num);
   font-variant-numeric: tabular-nums;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 800;
   color: var(--kh-gold-bright);
   letter-spacing: 0.07em;
@@ -374,11 +374,11 @@ export const MYTHIC_UI_CSS = `
 
 .kh-boss-armor-track {
   position: relative;
-  height: 6px;
+  height: 5px;
   border-radius: 2px;
   background: rgba(255, 224, 120, 0.14);
   border: 1px solid rgba(229, 185, 82, 0.65);
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   overflow: hidden;
 }
 
@@ -392,7 +392,7 @@ export const MYTHIC_UI_CSS = `
   position: relative;
   flex: 1;
   min-width: 0;
-  height: 17px;
+  height: 14px;
   border-radius: 2px;
   background: rgba(18, 6, 12, 0.96);
   border: 1.5px solid var(--kh-bronze);
@@ -616,6 +616,14 @@ export const MYTHIC_UI_CSS = `
   filter: drop-shadow(0 0 4px currentColor);
 }
 
+.kh-hud-sigil-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 1px 3px rgba(9, 6, 14, 0.95));
+}
+
 .kh-boon-medallion-slot {
   position: absolute;
   bottom: -4px;
@@ -714,12 +722,21 @@ export const MYTHIC_UI_CSS = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 2px;
+  background: radial-gradient(circle at 45% 40%, rgba(44, 24, 52, 0.92), rgba(9, 6, 14, 0.94));
+  border: 1px solid rgba(229, 185, 82, 0.64);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.kh-hud-weapon-img {
   width: 22px;
   height: 22px;
-  border-radius: 2px;
-  background: rgba(9, 6, 14, 0.78);
-  border: 1px solid rgba(229, 185, 82, 0.55);
-  flex-shrink: 0;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
 }
 
 /* NEVER truncate weapon name with ellipsis */
@@ -1137,7 +1154,7 @@ export const MYTHIC_UI_CSS = `
 }
 
 /* ============================================================================
-   TITLE SCREEN REDESIGN — CINEMATIC EDITORIAL LEFT PILLAR
+   TITLE SCREEN REDESIGN — PAINTED KEY ART + CINEMATIC EDITORIAL LEFT PILLAR
    ============================================================================ */
 
 .kh-title-overlay {
@@ -1147,22 +1164,69 @@ export const MYTHIC_UI_CSS = `
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  overflow: hidden;
   padding:
     max(18px, calc(env(safe-area-inset-top, 0px) + 14px))
     max(28px, calc(env(safe-area-inset-right, 0px) + 22px))
     max(16px, calc(env(safe-area-inset-bottom, 0px) + 12px))
     max(28px, calc(env(safe-area-inset-left, 0px) + 22px));
+  background: #09060E;
+  pointer-events: auto;
+}
+
+.kh-title-keyart {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.kh-title-keyart-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 64% center;
+  display: block;
+  transform: scale(1.03);
+  filter: contrast(1.06) saturate(1.08);
+  animation: kh-title-breathe 26s ease-in-out infinite alternate;
+}
+
+@keyframes kh-title-breathe {
+  0% { transform: scale(1.02) translate3d(0, 0, 0); }
+  100% { transform: scale(1.065) translate3d(-0.8%, -0.5%, 0); }
+}
+
+.kh-title-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
   background:
     linear-gradient(
       90deg,
-      rgba(9, 6, 14, 0.93) 0%,
-      rgba(13, 8, 20, 0.86) 32%,
-      rgba(13, 8, 20, 0.42) 52%,
-      rgba(9, 6, 14, 0.14) 68%,
-      rgba(9, 6, 14, 0.34) 100%
+      rgba(9, 6, 14, 0.96) 0%,
+      rgba(12, 7, 19, 0.88) 28%,
+      rgba(12, 7, 19, 0.56) 44%,
+      rgba(9, 6, 14, 0.14) 62%,
+      rgba(9, 6, 14, 0.08) 82%,
+      rgba(9, 6, 14, 0.42) 100%
     ),
-    radial-gradient(ellipse at 72% 48%, rgba(255, 140, 54, 0.08) 0%, rgba(9, 6, 14, 0.45) 75%);
-  pointer-events: auto;
+    linear-gradient(
+      180deg,
+      rgba(9, 6, 14, 0.62) 0%,
+      rgba(9, 6, 14, 0.0) 18%,
+      rgba(9, 6, 14, 0.0) 76%,
+      rgba(9, 6, 14, 0.86) 100%
+    );
+}
+
+.kh-title-overlay > .kh-meander-strip,
+.kh-title-content,
+.kh-title-footer {
+  position: relative;
+  z-index: 2;
 }
 
 .kh-title-content {
@@ -1421,13 +1485,13 @@ export const MYTHIC_UI_CSS = `
 }
 
 .kh-boon-shell {
-  width: min(1060px, 95vw);
+  width: min(1140px, 95vw);
   max-height: 92vh;
   display: grid;
-  grid-template-columns: minmax(230px, 310px) 1fr;
-  gap: 20px;
+  grid-template-columns: minmax(300px, 370px) 1fr;
+  gap: 22px;
   align-items: stretch;
-  background: linear-gradient(160deg, rgba(24, 15, 36, 0.98) 0%, rgba(12, 8, 19, 0.99) 100%);
+  background: linear-gradient(160deg, rgba(24, 15, 36, 0.97) 0%, rgba(11, 7, 18, 0.99) 100%);
   border-radius: 4px;
   padding: 20px 22px;
 }
@@ -1440,8 +1504,8 @@ export const MYTHIC_UI_CSS = `
   border-radius: 3px;
   overflow: hidden;
   border: 2px solid var(--kh-patron-accent, var(--kh-gold));
-  background: radial-gradient(circle at 50% 35%, rgba(229, 185, 82, 0.22), rgba(11, 7, 17, 0.97) 75%);
-  min-height: 290px;
+  background: radial-gradient(circle at 50% 35%, rgba(229, 185, 82, 0.24), rgba(11, 7, 17, 0.98) 76%);
+  min-height: 440px;
 }
 
 .kh-portrait-enter {
@@ -1682,8 +1746,8 @@ export const MYTHIC_UI_CSS = `
 }
 
 .kh-boon-card-sigil {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   border: 2px solid var(--kh-gold);
   background: radial-gradient(circle at 42% 35%, rgba(39, 27, 54, 0.96), rgba(9, 6, 14, 0.98));
@@ -1691,7 +1755,16 @@ export const MYTHIC_UI_CSS = `
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6), inset 0 0 10px rgba(255, 240, 184, 0.14);
+  overflow: hidden;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.65), inset 0 0 10px rgba(255, 240, 184, 0.16);
+}
+
+.kh-boon-sigil-img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 2px 6px rgba(9, 6, 14, 0.92));
 }
 
 .kh-boon-card-body {
@@ -2503,6 +2576,14 @@ input[type="range"].kh-slider::-moz-range-thumb {
   justify-content: center;
 }
 
+.kh-weapon-tab-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 1px 3px rgba(9, 6, 14, 0.9));
+}
+
 .kh-tab-btn.kh-active {
   border-color: var(--kh-gold-bright);
   background: linear-gradient(180deg, rgba(148, 22, 42, 0.94) 0%, rgba(62, 11, 24, 0.98) 100%);
@@ -2537,8 +2618,8 @@ input[type="range"].kh-slider::-moz-range-thumb {
 }
 
 .kh-weapon-emblem-medallion {
-  width: 46px;
-  height: 46px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   border: 2px solid var(--kh-gold);
   background: radial-gradient(circle at 40% 35%, rgba(90, 11, 26, 0.72), rgba(9, 6, 14, 0.96));
@@ -2546,7 +2627,16 @@ input[type="range"].kh-slider::-moz-range-thumb {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 0 14px rgba(229, 185, 82, 0.24);
+  overflow: hidden;
+  box-shadow: 0 0 18px rgba(229, 185, 82, 0.28), inset 0 0 14px rgba(0, 0, 0, 0.6);
+}
+
+.kh-weapon-banner-img {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.92));
 }
 
 .kh-weapon-banner-text {
@@ -3461,7 +3551,10 @@ input[type="range"].kh-slider::-moz-range-thumb {
   }
   .kh-boon-portrait-col { min-height: 180px; }
   .kh-boon-card { min-height: 62px; padding: 8px 10px; }
-  .kh-boon-card-sigil { width: 34px; height: 34px; }
+  .kh-boon-card-sigil { width: 36px; height: 36px; }
+  .kh-boon-sigil-img { width: 28px; height: 28px; }
+  .kh-hud-sigil-img { width: 17px; height: 17px; }
+  .kh-hud-weapon-img { width: 14px; height: 14px; }
   .kh-boon-name { font-size: 13.5px; }
   .kh-boon-desc { font-size: 12px; }
   .kh-modal-panel { padding: 10px 14px; gap: 7px; }
@@ -3758,6 +3851,7 @@ input[type="range"].kh-slider::-moz-range-thumb {
 
 @media (prefers-reduced-motion: reduce) {
   .kh-btn,
+  .kh-title-keyart-img,
   .kh-boon-card,
   .kh-boon-card-enter,
   .kh-boon-shimmer,

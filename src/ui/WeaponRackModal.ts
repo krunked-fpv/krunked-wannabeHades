@@ -7,6 +7,7 @@ import {
   type WeaponId,
 } from '../contracts/index.js';
 import type { MenuNavInput } from '../input/InputManager.js';
+import { getPaintedWeaponIconUrl } from '../assets/PaintedArtLoader.js';
 import { attachCornerFiligrees, svgWeaponSilhouette } from './svgArt.js';
 
 export interface WeaponRackCallbacks {
@@ -92,7 +93,7 @@ export class WeaponRackModal {
     const meander = document.createElement('div');
     meander.className = 'kh-meander-strip';
 
-    // 6-Weapon Tab Strip with SVG Weapon Silhouettes
+    // 6-Weapon Tab Strip with Hand-Painted Infernal Arm Icons (SVG fallback)
     this.tabStrip = document.createElement('div');
     this.tabStrip.className = 'kh-tab-strip';
     WEAPON_LIST.forEach((weaponId, idx) => {
@@ -101,7 +102,23 @@ export class WeaponRackModal {
       btn.type = 'button';
       btn.className = 'kh-tab-btn';
       btn.dataset.weaponId = weaponId;
-      btn.innerHTML = `<span class="kh-tab-icon">${svgWeaponSilhouette(weaponId, 18)}</span><span class="kh-tab-label">${def.displayName}</span>`;
+
+      const iconWrap = document.createElement('span');
+      iconWrap.className = 'kh-tab-icon';
+      const iconImg = document.createElement('img');
+      iconImg.className = 'kh-weapon-tab-img';
+      iconImg.alt = '';
+      iconImg.src = getPaintedWeaponIconUrl(weaponId);
+      iconImg.addEventListener('error', () => {
+        iconWrap.innerHTML = svgWeaponSilhouette(weaponId, 18);
+      });
+      iconWrap.appendChild(iconImg);
+
+      const labelEl = document.createElement('span');
+      labelEl.className = 'kh-tab-label';
+      labelEl.textContent = def.displayName;
+      btn.append(iconWrap, labelEl);
+
       btn.addEventListener('click', () => {
         this.selectedWeaponIndex = idx;
         this.focusedAspectIndex = 0;
@@ -261,7 +278,14 @@ export class WeaponRackModal {
 
     const emblem = document.createElement('div');
     emblem.className = 'kh-weapon-emblem-medallion';
-    emblem.innerHTML = svgWeaponSilhouette(weaponId, 34);
+    const bannerImg = document.createElement('img');
+    bannerImg.className = 'kh-weapon-banner-img';
+    bannerImg.alt = weaponDef.displayName;
+    bannerImg.src = getPaintedWeaponIconUrl(weaponId);
+    bannerImg.addEventListener('error', () => {
+      emblem.innerHTML = svgWeaponSilhouette(weaponId, 34);
+    });
+    emblem.appendChild(bannerImg);
 
     const textWrap = document.createElement('div');
     textWrap.className = 'kh-weapon-banner-text';

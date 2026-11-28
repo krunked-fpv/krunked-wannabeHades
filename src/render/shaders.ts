@@ -26,6 +26,123 @@ void main() {
 `;
 
 // ============================================================================
+// Pass 2a: Hand-Painted Seamless Isometric Chamber Floor Shader
+//   Samples a 1024x1024 seamless hand-painted biome stone floor texture in
+//   2:1 isometric world coordinates with painterly macro-variation, recessed
+//   Greco-Roman perimeter border trim, and deep architectural wall/corner AO!
+// ============================================================================
+
+export const FLOOR_VERT = `#version 300 es
+precision highp float;
+
+uniform vec2 uResolution;
+uniform vec4 uScreenRect; // x0, y0, x1, y1 in CSS screen px
+uniform vec4 uWorldRect;  // minX, minY, maxX, maxY in world units
+
+out vec2 vWorldPos;
+out vec2 vRoomUv;
+
+void main() {
+  vec2 c;
+  if (gl_VertexID == 0) c = vec2(0.0, 0.0);
+  else if (gl_VertexID == 1) c = vec2(1.0, 0.0);
+  else if (gl_VertexID == 2) c = vec2(1.0, 1.0);
+  else if (gl_VertexID == 3) c = vec2(0.0, 0.0);
+  else if (gl_VertexID == 4) c = vec2(1.0, 1.0);
+  else c = vec2(0.0, 1.0);
+
+  vec2 screenPos = mix(uScreenRect.xy, uScreenRect.zw, c);
+  vec2 ndc = (screenPos / uResolution) * 2.0 - 1.0;
+  ndc.y = -ndc.y;
+  gl_Position = vec4(ndc, 0.0, 1.0);
+
+  vRoomUv = c;
+  vWorldPos = mix(uWorldRect.xy, uWorldRect.zw, c);
+}
+`;
+
+export const FLOOR_FRAG = `#version 300 es
+precision highp float;
+
+in vec2 vWorldPos;
+in vec2 vRoomUv;
+
+uniform sampler2D uFloorTex;
+uniform vec4 uWorldRect; // minX, minY, maxX, maxY
+uniform vec3 uTrimColor;
+uniform vec3 uDeepColor;
+uniform float uRoomSeed;
+
+out vec4 fragColor;
+
+float hash21f(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+
+float noisef(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(hash21f(i), hash21f(i + vec2(1.0, 0.0)), f.x),
+    mix(hash21f(i + vec2(0.0, 1.0)), hash21f(i + vec2(1.0, 1.0)), f.x),
+    f.y
+  );
+}
+
+void main() {
+  // Sample seamless hand-painted biome stone texture cleanly in isometric space
+  // Scale: 1 repeat = 520 world units horizontally, 520 vertically (already projected 2:1 on screen via isoScaleY!)
+  vec2 tileUv = (vWorldPos + vec2(uRoomSeed * 19.3, uRoomSeed * 11.7)) / 520.0;
+  vec3 texCol = texture(uFloorTex, tileUv).rgb;
+
+  // Secondary subtle large-scale painterly weathering modulation (eliminates wallpaper repetition!)
+  float macroA = noisef(vWorldPos * 0.0028 + vec2(uRoomSeed * 0.71, -uRoomSeed * 0.43));
+  float macroB = noisef(vWorldPos * 0.0068 - vec2(uRoomSeed * 0.37, uRoomSeed * 0.61));
+  float warmShift = (macroA - 0.5) * 0.14;
+  float wearMod = 0.86 + 0.24 * (macroA * 0.62 + macroB * 0.38);
+  vec3 col = texCol * wearMod * vec3(1.0 + warmShift * 0.7, 1.0 + warmShift * 0.15, 1.0 - warmShift * 0.65);
+
+  // Subtle radial chamber focal illumination (warmer center arena, moodier architectural corners)
+  vec2 centered = (vRoomUv - 0.5) * 2.0;
+  float rDist = length(centered * vec2(0.92, 0.96));
+  float arenaVig = 1.06 - 0.26 * pow(clamp(rDist, 0.0, 1.35), 1.65);
+  col *= arenaVig;
+
+  // Recessed Greco-Roman hammered metallic border band inset ~38 world units inside walls!
+  float dLeft = vWorldPos.x - uWorldRect.x;
+  float dRight = uWorldRect.z - vWorldPos.x;
+  float dTop = vWorldPos.y - uWorldRect.y;
+  float dBot = uWorldRect.w - vWorldPos.y;
+  float edgeDist = min(min(dLeft, dRight), min(dTop, dBot));
+
+  float outerGroove = smoothstep(3.5, 0.0, abs(edgeDist - 36.0));
+  float trimBand = smoothstep(4.2, 1.0, abs(edgeDist - 42.0));
+  float innerGroove = smoothstep(3.0, 0.0, abs(edgeDist - 48.0));
+  // Subtle Greek meander notch pattern along the inlaid border band
+  float perimCoord = (min(dLeft, dRight) < min(dTop, dBot)) ? vWorldPos.y : vWorldPos.x;
+  float keyNotch = 0.72 + 0.28 * step(0.42, fract(perimCoord / 28.0));
+
+  col = mix(col, vec3(0.035, 0.024, 0.055), clamp(outerGroove * 0.78 + innerGroove * 0.65, 0.0, 0.88));
+  col = mix(col, uTrimColor * (0.76 * keyNotch), trimBand * 0.52);
+
+  // Deep architectural wall-base Ambient Occlusion (Northern wall drop shadow + West/East parapet AO)
+  float northAO = 1.0 - 0.64 * exp(-max(0.0, dTop) / 42.0);
+  float westAO = 1.0 - 0.42 * exp(-max(0.0, dLeft) / 36.0);
+  float eastAO = 1.0 - 0.28 * exp(-max(0.0, dRight) / 28.0);
+  float southAO = 1.0 - 0.24 * exp(-max(0.0, dBot) / 22.0);
+  col *= northAO * westAO * eastAO * southAO;
+
+  // Subtle dark corner blending into abyssal palette at outer rim
+  col = mix(uDeepColor * 0.6, col, smoothstep(0.0, 12.0, edgeDist));
+
+  fragColor = vec4(col, 1.0);
+}
+`;
+
+// ============================================================================
 // Pass 1: All-Biome Deep Abyssal Chasm Parallax & Atmospheric Spectacle
 //   uBiomeMode:
 //     -1.0 = Sanctum Courtyard (plum-indigo vault, distant temple pillars, golden ash motes)
@@ -824,8 +941,9 @@ void main() {
   vec3 light = texture(uLightTex, uv).rgb;
   vec3 bloom = texture(uBloomTex, uv).rgb;
 
-  // Dramatic chiaroscuro lightmap illumination: warm brazier/sconce pools carving through obsidian stone
-  vec3 lit = scene * (vec3(0.50) + light * 1.18) + light * 0.085;
+  // Dramatic chiaroscuro lightmap illumination: warm brazier/sconce pools carving through painted stone
+  // Preserves crisp hand-painted gouache midtones while deepening mood in unlit corners!
+  vec3 lit = scene * (vec3(0.58) + light * 1.12) + light * 0.065;
   vec3 col = lit + bloom * uBloomStrength;
 
   // Luminous shockwave crest highlight

@@ -21,6 +21,11 @@ import {
 import * as ProceduralFonts from '../assets/ProceduralFonts.js';
 import type { BakedFontAtlas } from '../assets/ProceduralFonts.js';
 import { getPatronPortraitDataUrl as getCachedPatronPortraitDataUrl } from '../assets/ProceduralPortraits.js';
+import {
+  getPaintedPortraitUrl,
+  loadBuiltInPaintedArtPack,
+  type BiomeSurfaceTextures,
+} from '../assets/PaintedArtLoader.js';
 import { ParticlesAndDecals } from './ParticlesAndDecals.js';
 import { WebGL2InkCelRenderer } from './WebGL2InkCelRenderer.js';
 import { Canvas2DInkCelRenderer } from './Canvas2DInkCelRenderer.js';
@@ -104,6 +109,7 @@ export interface RenderBackend {
   readonly kind: 'webgl2' | 'canvas2d';
   resize(width: number, height: number, dpr: number): void;
   setAtlasCanvas?(canvas: HTMLCanvasElement): void;
+  setBiomeSurfaces?(surfaces: Partial<Record<BiomeId, BiomeSurfaceTextures>>): void;
   setFontAtlas?(fontAtlas: BakedFontAtlas): void;
   render(
     state: SimState,
@@ -135,6 +141,9 @@ export class GameRenderer implements GameRendererFeelHooks {
   private canvas: HTMLCanvasElement | null = null;
   private backend: RenderBackend | null = null;
   private baseAtlas: BakedAtlas | null = null;
+  private paintedAtlasCanvas: HTMLCanvasElement | null = null;
+  private biomeSurfaces: Partial<Record<BiomeId, BiomeSurfaceTextures>> | null = null;
+  private paintedArtLoaded = false;
   private customPack: CustomPackProvider | null = null;
   private customCompositeCanvas: HTMLCanvasElement | null = null;
   private activePackMode: 'BUILTIN' | 'CUSTOM_PACK' = 'BUILTIN';
@@ -196,6 +205,25 @@ export class GameRenderer implements GameRendererFeelHooks {
       this.syncAtlasPackMode(this.customPack.getPackMode());
     }
 
+    // Asynchronously load the shipped hand-painted WebP art pack and hot-swap onto GPU!
+    const currentBackend = this.backend;
+    void loadBuiltInPaintedArtPack(atlas).then((pack) => {
+      if (!pack || this.backend !== currentBackend || !this.backend) {
+        return;
+      }
+      this.paintedAtlasCanvas = pack.compositeAtlasCanvas;
+      this.biomeSurfaces = pack.biomeSurfaces;
+      this.paintedArtLoaded = true;
+      this.customCompositeCanvas = null; // Rebuild custom pack over painted base if toggled later
+      this.backend.setBiomeSurfaces?.(pack.biomeSurfaces);
+      if (this.activePackMode === 'BUILTIN') {
+        this.backend.setAtlasCanvas?.(pack.compositeAtlasCanvas);
+      } else {
+        this.customPackDirty = true;
+        this.syncAtlasPackMode(this.activePackMode);
+      }
+    });
+
     const rect = canvas.getBoundingClientRect();
     const initW = rect.width > 0 ? rect.width : window.innerWidth || 1280;
     const initH = rect.height > 0 ? rect.height : window.innerHeight || 720;
@@ -235,12 +263,15 @@ export class GameRenderer implements GameRendererFeelHooks {
 
     if (targetMode === 'CUSTOM_PACK' && this.customPack) {
       if (!this.customCompositeCanvas) {
-        const res = buildCompositeCustomAtlas(this.baseAtlas, this.customPack);
+        const effectiveBase: BakedAtlas = this.paintedAtlasCanvas
+          ? { ...this.baseAtlas, canvas: this.paintedAtlasCanvas }
+          : this.baseAtlas;
+        const res = buildCompositeCustomAtlas(effectiveBase, this.customPack);
         this.customCompositeCanvas = res.canvas;
       }
       this.backend.setAtlasCanvas?.(this.customCompositeCanvas);
     } else {
-      this.backend.setAtlasCanvas?.(this.baseAtlas.canvas);
+      this.backend.setAtlasCanvas?.(this.paintedAtlasCanvas ?? this.baseAtlas.canvas);
     }
   }
 
@@ -260,7 +291,7 @@ export class GameRenderer implements GameRendererFeelHooks {
     this.feelOffset.offsetX = Number.isFinite(offset.offsetX) ? offset.offsetX : 0;
     this.feelOffset.offsetY = Number.isFinite(offset.offsetY) ? offset.offsetY : 0;
     const rawZoom = Number.isFinite(offset.zoomMult) && offset.zoomMult > 0 ? offset.zoomMult : 1;
-    this.feelOffset.zoomMult = Math.max(0.92, Math.min(1.12, rawZoom));
+    this.feelOffset.zoomMult = Math.max(0.78, Math.min(1.12, rawZoom));
     this.feelOffset.shakeX = Number.isFinite(offset.shakeX) ? offset.shakeX : 0;
     this.feelOffset.shakeY = Number.isFinite(offset.shakeY) ? offset.shakeY : 0;
   }
@@ -403,7 +434,14 @@ export class GameRenderer implements GameRendererFeelHooks {
         null;
       if (customUrl) return customUrl;
     }
+    if (typeof window !== 'undefined') {
+      return getPaintedPortraitUrl(patronId);
+    }
     return getCachedPatronPortraitDataUrl(patronId);
+  }
+
+  public isPaintedArtLoaded(): boolean {
+    return this.paintedArtLoaded;
   }
 
   public getStats(): RenderStats {

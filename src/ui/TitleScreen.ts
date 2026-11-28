@@ -1,5 +1,6 @@
 import type { InputSource, MetaSaveState, RenderSettings } from '../contracts/index.js';
 import type { MenuNavInput } from '../input/InputManager.js';
+import { getPaintedTitleKeyArtUrl } from '../assets/PaintedArtLoader.js';
 import { svgDividerFinial, svgTitleCrest } from './svgArt.js';
 
 export interface TitleScreenCallbacks {
@@ -47,6 +48,24 @@ export class TitleScreen {
     this.root = document.createElement('div');
     this.root.className = 'kh-title-overlay kh-hidden';
     this.root.setAttribute('data-screen', 'title');
+
+    // Full-bleed hand-painted mythic comic-ink Key Art backdrop with subtle living vignette
+    const keyArtLayer = document.createElement('div');
+    keyArtLayer.className = 'kh-title-keyart';
+    keyArtLayer.setAttribute('aria-hidden', 'true');
+    const keyArtImg = document.createElement('img');
+    keyArtImg.className = 'kh-title-keyart-img';
+    keyArtImg.alt = '';
+    keyArtImg.decoding = 'async';
+    keyArtImg.src = getPaintedTitleKeyArtUrl();
+    keyArtImg.addEventListener('error', () => {
+      keyArtLayer.classList.add('kh-hidden');
+    });
+    keyArtLayer.appendChild(keyArtImg);
+
+    const keyArtScrim = document.createElement('div');
+    keyArtScrim.className = 'kh-title-scrim';
+    keyArtScrim.setAttribute('aria-hidden', 'true');
 
     const topMeander = document.createElement('div');
     topMeander.className = 'kh-meander-strip';
@@ -167,7 +186,7 @@ export class TitleScreen {
 
     footer.append(leftFooter, this.metaStatsEl);
 
-    this.root.append(topMeander, content, footer);
+    this.root.append(keyArtLayer, keyArtScrim, topMeander, content, footer);
     uiRoot.appendChild(this.root);
 
     this.focusedIndex = 1; // Default focus on BEGIN ESCAPE RUN

@@ -47,6 +47,7 @@ import {
   getDamageNumberStyle,
   hexToRgbaTuple,
 } from '../assets/ProceduralFonts.js';
+import type { BiomeSurfaceTextures } from '../assets/PaintedArtLoader.js';
 import type { ParticlesAndDecals, SlashRibbon } from './ParticlesAndDecals.js';
 import { MAX_DECALS, MAX_PARTICLES, MAX_SLASH_RIBBONS } from './ParticlesAndDecals.js';
 import {
@@ -56,6 +57,8 @@ import {
   BLOOM_BLUR_FRAG,
   BLOOM_EXTRACT_FRAG,
   COMPOSITE_FRAG,
+  FLOOR_FRAG,
+  FLOOR_VERT,
   FULLSCREEN_VERT,
   HAZARD_FRAG,
   HAZARD_VERT,
@@ -257,8 +260,13 @@ export class WebGL2InkCelRenderer implements RenderBackend {
 
   private atlasTex: WebGLTexture;
   private fontTex: WebGLTexture;
+  private readonly biomeTex = new Map<
+    BiomeId,
+    { floor: WebGLTexture; wall: WebGLTexture; cliff: WebGLTexture }
+  >();
 
   private abyssProg: WebGLProgram;
+  private floorProg: WebGLProgram;
   private hazardProg: WebGLProgram;
   private batchProg: WebGLProgram;
   private lightProg: WebGLProgram;
@@ -302,6 +310,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
 
   // Cached uniform locations
   private readonly uAbyss: Record<string, WebGLUniformLocation | null>;
+  private readonly uFloor: Record<string, WebGLUniformLocation | null>;
   private readonly uHazard: Record<string, WebGLUniformLocation | null>;
   private readonly uBatch: Record<string, WebGLUniformLocation | null>;
   private readonly uLight: Record<string, WebGLUniformLocation | null>;
@@ -321,8 +330,9 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     if (!wr) throw new Error('WebGL2InkCelRenderer: white_pixel missing from atlas');
     this.whiteRect = wr;
 
-    // Compile all 7-pass programs
+    // Compile all 7-pass programs + dedicated hand-painted floor shader
     this.abyssProg = this.createProgram(FULLSCREEN_VERT, ABYSS_FRAG);
+    this.floorProg = this.createProgram(FLOOR_VERT, FLOOR_FRAG);
     this.hazardProg = this.createProgram(HAZARD_VERT, HAZARD_FRAG);
     this.batchProg = this.createProgram(BATCH_VERT, BATCH_FRAG);
     this.lightProg = this.createProgram(LIGHT_VERT, LIGHT_FRAG);
@@ -340,6 +350,15 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       uMistColor: gl.getUniformLocation(this.abyssProg, 'uMistColor'),
       uAccentColor: gl.getUniformLocation(this.abyssProg, 'uAccentColor'),
       uBiomeMode: gl.getUniformLocation(this.abyssProg, 'uBiomeMode'),
+    };
+    this.uFloor = {
+      uResolution: gl.getUniformLocation(this.floorProg, 'uResolution'),
+      uScreenRect: gl.getUniformLocation(this.floorProg, 'uScreenRect'),
+      uWorldRect: gl.getUniformLocation(this.floorProg, 'uWorldRect'),
+      uFloorTex: gl.getUniformLocation(this.floorProg, 'uFloorTex'),
+      uTrimColor: gl.getUniformLocation(this.floorProg, 'uTrimColor'),
+      uDeepColor: gl.getUniformLocation(this.floorProg, 'uDeepColor'),
+      uRoomSeed: gl.getUniformLocation(this.floorProg, 'uRoomSeed'),
     };
     this.uHazard = {
       uResolution: gl.getUniformLocation(this.hazardProg, 'uResolution'),
@@ -514,6 +533,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       };
 
       checkPair('abyss', FULLSCREEN_VERT, ABYSS_FRAG);
+      checkPair('floor', FLOOR_VERT, FLOOR_FRAG);
       checkPair('hazard', HAZARD_VERT, HAZARD_FRAG);
       checkPair('batch', BATCH_VERT, BATCH_FRAG);
       checkPair('light', LIGHT_VERT, LIGHT_FRAG);
@@ -635,10 +655,68 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+    gl.generateMipmap(gl.TEXTURE_2D);
     return tex;
+  }
+
+  private uploadSurfaceTexture(img: HTMLImageElement, repeatY: boolean): WebGLTexture {
+    const gl = this.gl;
+    const tex = gl.createTexture();
+    if (!tex) throw new Error('WebGL2: createTexture failed');
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, repeatY ? gl.REPEAT : gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    return tex;
+  }
+
+  public setBiomeSurfaces(surfaces: Partial<Record<BiomeId, BiomeSurfaceTextures>>): void {
+    const gl = this.gl;
+    for (const prev of this.biomeTex.values()) {
+      gl.deleteTexture(prev.floor);
+      gl.deleteTexture(prev.wall);
+      gl.deleteTexture(prev.cliff);
+    }
+    this.biomeTex.clear();
+    for (const [biomeId, surf] of Object.entries(surfaces) as [BiomeId, BiomeSurfaceTextures][]) {
+      if (!surf) continue;
+      this.biomeTex.set(biomeId, {
+        floor: this.uploadSurfaceTexture(surf.floor, true),
+        wall: this.uploadSurfaceTexture(surf.wall, false),
+        cliff: this.uploadSurfaceTexture(surf.cliff, false),
+      });
+    }
+  }
+
+  private drawTexturedStrip(
+    tex: WebGLTexture,
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    repeatX: number,
+    r = 1,
+    g = 1,
+    b = 1,
+    a = 1
+  ): void {
+    this.flushBatch();
+    this.setBatchState(tex, 'alpha');
+    if (this.batchVertCount + 6 > MAX_BATCH_VERTS) this.flushBatch();
+    this.pushVert(x0, y0, 0, 0, r, g, b, a, 0, 0);
+    this.pushVert(x1, y0, repeatX, 0, r, g, b, a, 0, 0);
+    this.pushVert(x1, y1, repeatX, 1, r, g, b, a, 0, 0);
+    this.pushVert(x0, y0, 0, 0, r, g, b, a, 0, 0);
+    this.pushVert(x1, y1, repeatX, 1, r, g, b, a, 0, 0);
+    this.pushVert(x0, y1, 0, 1, r, g, b, a, 0, 0);
+    this.flushBatch();
+    this.setBatchState(this.atlasTex, 'alpha');
   }
 
   private createFbo(w: number, h: number): FboTarget {
@@ -1531,160 +1609,149 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       gl.enable(gl.SCISSOR_TEST);
       gl.scissor(scX, scY, scW, scH);
 
-      // Deep biome-matched stone under-slab (zero subpixel seam gaps)
-      this.pushQuadSolid(
-        x0,
-        y0,
-        x1,
-        y0,
-        x1,
-        y1,
-        x0,
-        y1,
-        theme.floorBase[0] * 0.72,
-        theme.floorBase[1] * 0.72,
-        theme.floorBase[2] * 0.72,
-        1,
-        0
-      );
-
-      // Deterministic 4-variant flagstone distribution with spatial value vignette & stone temperature drift
-      const tileWorldW = 210;
-      const tileWorldH = 210;
-      const halfTileW = tileWorldW * 0.5;
-      const halfTileH = tileWorldH * 0.5;
-      const sampleRect = this.atlas.sprites.get(this.resolveFloorVariantId(biome, 0));
-      const baseTileW = sampleRect ? sampleRect.w : 256;
-      const baseTileH = sampleRect ? sampleRect.h : 128;
-      const tileScaleX = (tileWorldW / (baseTileW * 0.984)) * z;
-      const tileScaleY = ((tileWorldH * cam.isoScaleY) / (baseTileH * 0.968)) * z;
-
       const centerX = (b.minX + b.maxX) * 0.5;
       const centerY = (b.minY + b.maxY) * 0.5;
-      const invHalfW = 1 / Math.max(200, (b.maxX - b.minX) * 0.5);
-      const invHalfH = 1 / Math.max(200, (b.maxY - b.minY) * 0.5);
       const roomSeed = (state.room.roomIndex * 131 + state.room.depth * 37 + state.run.seed) | 0;
+      const surf = this.biomeTex.get(biome);
 
-      const startRow = Math.floor(b.minY / halfTileH) - 1;
-      const endRow = Math.ceil(b.maxY / halfTileH) + 1;
-      const startCol = Math.floor(b.minX / tileWorldW) - 1;
-      const endCol = Math.ceil(b.maxX / tileWorldW) + 1;
+      if (surf?.floor) {
+        // Dedicated Hand-Painted Seamless Isometric Floor Shader (1024x1024 gouache stone + trim + AO!)
+        this.flushBatch();
+        gl.useProgram(this.floorProg);
+        gl.bindVertexArray(this.emptyVao);
+        gl.disable(gl.BLEND);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, surf.floor);
+        gl.uniform1i(this.uFloor.uFloorTex, 0);
+        gl.uniform2f(this.uFloor.uResolution, this.viewW, this.viewH);
+        gl.uniform4f(this.uFloor.uScreenRect, x0, y0, x1, y1);
+        gl.uniform4f(this.uFloor.uWorldRect, b.minX, b.minY, b.maxX, b.maxY);
+        gl.uniform3fv(this.uFloor.uTrimColor, theme.wallTrim);
+        gl.uniform3fv(this.uFloor.uDeepColor, theme.deep);
+        gl.uniform1f(this.uFloor.uRoomSeed, (roomSeed & 255) * 0.13);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        this.drawCalls++;
+        gl.enable(gl.BLEND);
+        this.activeTexture = null;
+        this.currentBlend = 'alpha';
+        this.setBatchState(this.atlasTex, 'alpha');
+      } else {
+        // Fallback 4-variant flagstone tiles while WebP floor textures decode
+        this.pushQuadSolid(
+          x0,
+          y0,
+          x1,
+          y0,
+          x1,
+          y1,
+          x0,
+          y1,
+          theme.floorBase[0] * 0.72,
+          theme.floorBase[1] * 0.72,
+          theme.floorBase[2] * 0.72,
+          1,
+          0
+        );
 
-      for (let row = startRow; row <= endRow; row++) {
-        const wy = row * halfTileH;
-        const xShift = (row & 1) !== 0 ? halfTileW : 0;
-        for (let col = startCol; col <= endCol; col++) {
-          const wx = col * tileWorldW + xShift;
-          if (
-            wx + halfTileW < b.minX ||
-            wx - halfTileW > b.maxX ||
-            wy + halfTileH < b.minY ||
-            wy - halfTileH > b.maxY
-          ) {
-            continue;
+        const tileWorldW = 210;
+        const tileWorldH = 210;
+        const halfTileW = tileWorldW * 0.5;
+        const halfTileH = tileWorldH * 0.5;
+        const sampleRect = this.atlas.sprites.get(this.resolveFloorVariantId(biome, 0));
+        const baseTileW = sampleRect ? sampleRect.w : 256;
+        const baseTileH = sampleRect ? sampleRect.h : 128;
+        const tileScaleX = (tileWorldW / (baseTileW * 0.984)) * z;
+        const tileScaleY = ((tileWorldH * cam.isoScaleY) / (baseTileH * 0.968)) * z;
+
+        const invHalfW = 1 / Math.max(200, (b.maxX - b.minX) * 0.5);
+        const invHalfH = 1 / Math.max(200, (b.maxY - b.minY) * 0.5);
+        const startRow = Math.floor(b.minY / halfTileH) - 1;
+        const endRow = Math.ceil(b.maxY / halfTileH) + 1;
+        const startCol = Math.floor(b.minX / tileWorldW) - 1;
+        const endCol = Math.ceil(b.maxX / tileWorldW) + 1;
+
+        for (let row = startRow; row <= endRow; row++) {
+          const wy = row * halfTileH;
+          const xShift = (row & 1) !== 0 ? halfTileW : 0;
+          for (let col = startCol; col <= endCol; col++) {
+            const wx = col * tileWorldW + xShift;
+            if (
+              wx + halfTileW < b.minX ||
+              wx - halfTileW > b.maxX ||
+              wy + halfTileH < b.minY ||
+              wy - halfTileH > b.maxY
+            ) {
+              continue;
+            }
+            let h = ((col * 73856093) ^ (row * 19349663) ^ (roomSeed * 83492791)) >>> 0;
+            h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+            const bucket = (h >>> 24) % 100;
+            const variantIdx = bucket < 45 ? 0 : bucket < 70 ? 1 : bucket < 88 ? 2 : 3;
+            const tileId = this.resolveFloorVariantId(biome, variantIdx);
+            const nx = (wx - centerX) * invHalfW;
+            const ny = (wy - centerY) * invHalfH;
+            const rNorm = Math.min(1.2, Math.hypot(nx * 0.92, ny * 0.92));
+            const spatialLum = 1.04 - 0.2 * Math.pow(rNorm, 1.55);
+            const tempDrift = (((h >>> 8) & 255) / 255 - 0.5) * 0.1;
+            const lum = Math.max(0.74, Math.min(1.1, spatialLum));
+            this.pushSprite(
+              tileId,
+              this.wxToSx(wx, cam),
+              this.wyToSy(wy, 0, cam),
+              tileScaleX,
+              tileScaleY,
+              0,
+              lum * (1 + tempDrift * 0.9),
+              lum * (1 + tempDrift * 0.2),
+              lum * (1 - tempDrift * 0.85),
+              1,
+              0,
+              0
+            );
           }
+        }
+      }
 
-          // Non-periodic deterministic hash for organic 45%/25%/18%/12% distribution
-          let h = ((col * 73856093) ^ (row * 19349663) ^ (roomSeed * 83492791)) >>> 0;
-          h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
-          const bucket = (h >>> 24) % 100;
-          const variantIdx = bucket < 45 ? 0 : bucket < 70 ? 1 : bucket < 88 ? 2 : 3;
-          const tileId = this.resolveFloorVariantId(biome, variantIdx);
-
-          // World-space spatial value vignette (0.84 edges -> 1.04 center) + painterly stone drift
-          const nx = (wx - centerX) * invHalfW;
-          const ny = (wy - centerY) * invHalfH;
-          const rNorm = Math.min(1.2, Math.hypot(nx * 0.92, ny * 0.92));
-          const spatialLum = 1.04 - 0.2 * Math.pow(rNorm, 1.55);
-          const patchWave =
-            0.036 * Math.sin(wx * 0.0046 + wy * 0.0031 + roomSeed * 0.13) +
-            0.026 * Math.cos(wx * 0.0028 - wy * 0.0053);
-          const tempDrift = (((h >>> 8) & 255) / 255 - 0.5) * 0.1; // ±0.05 warm/cool temperature shift
-          const valDrift = (((h >>> 16) & 255) / 255 - 0.5) * 0.08;
-          const lum = Math.max(0.74, Math.min(1.1, spatialLum + patchWave + valDrift));
-
-          const tr = lum * (1 + tempDrift * 0.9);
-          const tg = lum * (1 + tempDrift * 0.2);
-          const tb = lum * (1 - tempDrift * 0.85);
-
-          this.pushSprite(
-            tileId,
-            this.wxToSx(wx, cam),
-            this.wyToSy(wy, 0, cam),
-            tileScaleX,
-            tileScaleY,
-            0,
-            tr,
-            tg,
-            tb,
-            1,
-            0,
+      // Sanctum Courtyard Hand-Painted Woven Crimson-Gold Tapestry Runner (UNDER central medallion!)
+      if (biome === 'sanctum_hub') {
+        const midSx = this.wxToSx(centerX, cam);
+        const rugW = 148 * z;
+        const rugTop = y0 + 18 * z;
+        const rugBot = y1 - 28 * z;
+        const rugH = Math.max(64 * z, rugBot - rugTop);
+        // Subtle cast shadow beneath woven carpet edge
+        this.pushQuadSolid(
+          midSx - rugW * 0.5 - 5 * z,
+          rugTop + 2 * z,
+          midSx + rugW * 0.5 + 7 * z,
+          rugTop + 2 * z,
+          midSx + rugW * 0.5 + 7 * z,
+          rugBot + 6 * z,
+          midSx - rugW * 0.5 - 5 * z,
+          rugBot + 6 * z,
+          INK_R,
+          INK_G,
+          INK_B,
+          0.52
+        );
+        if (this.hasSprite('prop_sanctum_rug')) {
+          this.pushSpriteSized(
+            'prop_sanctum_rug',
+            midSx - rugW * 0.5,
+            rugTop,
+            rugW,
+            rugH,
+            0.96,
+            0.92,
+            0.94,
+            0.96,
             0
           );
         }
       }
 
-      // Central Chamber Mosaic Medallion inlaid directly into the carved stone floor
+      // Central Chamber Mosaic Medallion inlaid cleanly into the stone floor (on top of runner seam!)
       this.renderCentralMosaicMedallion(biome, centerX, centerY, theme, cam);
-
-      // Sanctum Courtyard Royal Crimson-Gold Velvet Carpet Runner laid ON TOP of floor & stone medallion!
-      if (biome === 'sanctum_hub') {
-        const midSx = this.wxToSx(centerX, cam);
-        const rugHalfW = 74 * z;
-        const rugTop = y0 + 10 * z;
-        const rugBot = y1 - 24 * z;
-        // Carpet drop shadow
-        this.pushQuadSolid(
-          midSx - rugHalfW - 4 * z,
-          rugTop,
-          midSx + rugHalfW + 5 * z,
-          rugTop,
-          midSx + rugHalfW + 5 * z,
-          rugBot + 4 * z,
-          midSx - rugHalfW - 4 * z,
-          rugBot + 4 * z,
-          INK_R,
-          INK_G,
-          INK_B,
-          0.66
-        );
-        // Deep royal crimson velvet runner
-        this.pushQuadSolid(
-          midSx - rugHalfW,
-          rugTop,
-          midSx + rugHalfW,
-          rugTop,
-          midSx + rugHalfW,
-          rugBot,
-          midSx - rugHalfW,
-          rugBot,
-          0.56,
-          0.082,
-          0.168,
-          0.96
-        );
-        // Inner woven gold-crimson stripe
-        this.pushQuadSolid(
-          midSx - rugHalfW * 0.72,
-          rugTop,
-          midSx + rugHalfW * 0.72,
-          rugTop,
-          midSx + rugHalfW * 0.72,
-          rugBot,
-          midSx - rugHalfW * 0.72,
-          rugBot,
-          0.44,
-          0.055,
-          0.125,
-          0.55
-        );
-        // Hammered gold braided borders + subtle southern gold fringe
-        this.pushLine(midSx - rugHalfW + 6 * z, rugTop, midSx - rugHalfW + 6 * z, rugBot, 3.8 * z, 0.9, 0.72, 0.3, 0.96, 0.14);
-        this.pushLine(midSx + rugHalfW - 6 * z, rugTop, midSx + rugHalfW - 6 * z, rugBot, 3.8 * z, 0.9, 0.72, 0.3, 0.96, 0.14);
-        this.pushLine(midSx - rugHalfW + 13 * z, rugTop, midSx - rugHalfW + 13 * z, rugBot, 1.6 * z, 0.94, 0.78, 0.36, 0.76);
-        this.pushLine(midSx + rugHalfW - 13 * z, rugTop, midSx + rugHalfW - 13 * z, rugBot, 1.6 * z, 0.94, 0.78, 0.36, 0.76);
-        this.pushLine(midSx - rugHalfW, rugBot, midSx + rugHalfW, rugBot, 3.6 * z, 0.92, 0.74, 0.32, 0.94, 0.15);
-      }
 
       // Northern wall base contact AO strip & Western parapet SE inner shadow strip
       this.pushQuadGradientV(
@@ -1751,102 +1818,48 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     theme: BiomeVisualTheme,
     z: number
   ): void {
-    const shortName = this.getBiomeShortName(biome);
-    const preferredCliff = `prop_chasm_${shortName}`;
-    const hasCustomBiomeCliff = biome !== 'sanctum_hub' && biome !== 'obsidian_pit' && this.hasSprite(preferredCliff);
-    const cliffId = hasCustomBiomeCliff ? preferredCliff : 'prop_chasm_rim';
-    const [cr, cg, cb] = hasCustomBiomeCliff ? [1, 1, 1] : theme.cliffFallbackTint;
+    const cliffH = 176 * z;
+    const spanX0 = x0 - 30 * z;
+    const spanX1 = x1 + 30 * z;
+    const spanW = Math.max(64, spanX1 - spanX0);
+    const surf = this.biomeTex.get(biome);
 
-    const cliffH = 136 * z;
-    const segW = 240 * z;
-    const segCount = Math.max(1, Math.ceil((x1 - x0 + 52 * z) / segW));
-    const spanX0 = x0 - 26 * z;
-    const stepW = (x1 - x0 + 52 * z) / segCount;
-
-    for (let i = 0; i < segCount; i++) {
-      this.pushSpriteSized(cliffId, spanX0 + i * stepW, y1 - 2 * z, stepW + 1, cliffH, cr, cg, cb, 0.98, 0);
+    if (surf?.cliff) {
+      // Dedicated full-resolution seamless painted chasm cliff with jagged alpha overhangs!
+      const repeatX = spanW / Math.max(120, 480 * z);
+      this.drawTexturedStrip(surf.cliff, spanX0, y1 + 4 * z, spanX1, y1 + 4 * z + cliffH, repeatX, 1, 1, 1, 1);
+    } else {
+      const shortName = this.getBiomeShortName(biome);
+      const preferredCliff = `prop_chasm_${shortName}`;
+      const cliffId = this.hasSprite(preferredCliff) ? preferredCliff : 'prop_chasm_rim';
+      const segW = 380 * z;
+      const segCount = Math.max(1, Math.ceil(spanW / segW));
+      const stepW = spanW / segCount;
+      for (let i = 0; i < segCount; i++) {
+        this.pushSpriteSized(cliffId, spanX0 + i * stepW, y1 + 4 * z, stepW + 1, cliffH, 1, 1, 1, 0.98, 0);
+      }
     }
 
     // Crisp dark #09060E overhang AO shadow immediately beneath southern platform kerb
     this.pushQuadGradientV(
       spanX0,
-      y1,
-      spanX0 + segCount * stepW,
-      y1,
-      spanX0 + segCount * stepW,
-      y1 + 26 * z,
+      y1 + 6 * z,
+      spanX1,
+      y1 + 6 * z,
+      spanX1,
+      y1 + 34 * z,
       spanX0,
-      y1 + 26 * z,
+      y1 + 34 * z,
       INK_R,
       INK_G,
       INK_B,
-      0.86,
+      0.82,
       INK_R,
       INK_G,
       INK_B,
       0.0
     );
-
-    // Smooth atmospheric fade at bottom of cliff into abyssal depth
-    this.pushQuadGradientV(
-      spanX0,
-      y1 + cliffH * 0.58,
-      spanX0 + segCount * stepW,
-      y1 + cliffH * 0.58,
-      spanX0 + segCount * stepW,
-      y1 + cliffH + 4 * z,
-      spanX0,
-      y1 + cliffH + 4 * z,
-      theme.deep[0],
-      theme.deep[1],
-      theme.deep[2],
-      0.0,
-      theme.deep[0],
-      theme.deep[1],
-      theme.deep[2],
-      0.92
-    );
-
-    // Organic biome-specific cliff strata fractures & facets when falling back pre-merge
-    if (!hasCustomBiomeCliff) {
-      if (biome === 'cinder_mire') {
-        for (let i = 0; i < segCount; i++) {
-          const lx = spanX0 + (i + 0.32 + (i % 2) * 0.16) * stepW;
-          const m1x = lx + 14 * z;
-          const m1y = y1 + 38 * z;
-          const m2x = lx + 4 * z;
-          const m2y = y1 + 66 * z;
-          const eX = lx + 20 * z;
-          const eY = y1 + 96 * z;
-          this.pushLine(lx, y1 + 14 * z, m1x, m1y, 4.6 * z, INK_R, INK_G, INK_B, 0.75);
-          this.pushLine(m1x, m1y, m2x, m2y, 4.0 * z, INK_R, INK_G, INK_B, 0.7);
-          this.pushLine(m2x, m2y, eX, eY, 3.2 * z, INK_R, INK_G, INK_B, 0.62);
-          this.pushLine(lx, y1 + 14 * z, m1x, m1y, 2.2 * z, 1.0, 0.38, 0.08, 0.85, 1.25);
-          this.pushLine(m1x, m1y, m2x, m2y, 1.8 * z, 1.0, 0.56, 0.14, 0.78, 1.15);
-          this.pushLine(m2x, m2y, eX, eY, 1.3 * z, 0.92, 0.28, 0.05, 0.62, 0.85);
-        }
-      } else if (biome === 'frozen_summit') {
-        for (let i = 0; i < segCount * 2; i++) {
-          const ix = spanX0 + (i + 0.3 + (i % 3) * 0.12) * (stepW * 0.5);
-          const ih = (22 + ((i * 19) % 28)) * z;
-          const iw = (6 + (i % 3) * 3) * z;
-          this.pushTriSolid(ix - iw - 1.5 * z, y1 + 12 * z, ix + iw + 1.5 * z, y1 + 12 * z, ix, y1 + 12 * z + ih + 2 * z, INK_R, INK_G, INK_B, 0.78);
-          this.pushTriSolid(ix - iw, y1 + 12 * z, ix, y1 + 12 * z, ix, y1 + 12 * z + ih, 0.76, 0.94, 1.0, 0.82, 0.35);
-          this.pushTriSolid(ix, y1 + 12 * z, ix + iw, y1 + 12 * z, ix, y1 + 12 * z + ih, 0.36, 0.66, 0.88, 0.8, 0.12);
-        }
-      } else if (biome === 'crypt_of_bile') {
-        for (let i = 0; i < segCount; i++) {
-          const vx = spanX0 + (i + 0.42 + (i % 2) * 0.18) * stepW;
-          const m1x = vx - 5 * z;
-          const m1y = y1 + 42 * z;
-          const eX = vx + 3 * z;
-          const eY = y1 + 88 * z;
-          this.pushLine(vx, y1 + 14 * z, m1x, m1y, 4.2 * z, INK_R, INK_G, INK_B, 0.6);
-          this.pushLine(vx, y1 + 14 * z, m1x, m1y, 2.0 * z, 0.48, 0.86, 0.14, 0.58, 0.55);
-          this.pushLine(m1x, m1y, eX, eY, 1.5 * z, 0.42, 0.78, 0.12, 0.42, 0.4);
-        }
-      }
-    }
+    void theme;
   }
 
   private renderNorthernRetainingWall(
@@ -1860,210 +1873,80 @@ export class WebGL2InkCelRenderer implements RenderBackend {
   ): void {
     const z = cam.zoom;
     const b = state.room.bounds;
-    const wallH = 98 * z;
-    const parapetPad = 26 * z;
+    const wallH = 138 * z;
+    const parapetPad = 28 * z;
     const wx0 = x0 - parapetPad;
     const wx1 = x1 + parapetPad;
     const topY = y0 - wallH;
 
-    const shortName = this.getBiomeShortName(state.room.biome);
-    const wallSpriteId = `prop_wall_${shortName}_n`;
-    const hasWallSprite = this.hasSprite(wallSpriteId);
-
     // 1. Solid obsidian ink outer silhouette backing behind retaining wall
     this.pushQuadSolid(wx0 - 4 * z, topY - 4 * z, wx1 + 4 * z, topY - 4 * z, wx1 + 4 * z, y0 + 2 * z, wx0 - 4 * z, y0 + 2 * z, INK_R, INK_G, INK_B, 0.98);
 
-    if (hasWallSprite) {
-      const segW = 240 * z;
-      const segCount = Math.max(1, Math.ceil((wx1 - wx0) / segW));
-      const stepW = (wx1 - wx0) / segCount;
-      for (let i = 0; i < segCount; i++) {
-        this.pushSpriteSized(wallSpriteId, wx0 + i * stepW, topY, stepW + 1, wallH + 4 * z, 1, 1, 1, 1, 0);
-      }
+    const surf = this.biomeTex.get(state.room.biome);
+    if (surf?.wall) {
+      // Dedicated full-resolution horizontally-seamless hand-painted temple wall!
+      const repeatX = Math.max(1, (wx1 - wx0) / Math.max(140, 480 * z));
+      this.drawTexturedStrip(surf.wall, wx0, topY, wx1, y0 + 2 * z, repeatX, 1, 1, 1, 1);
     } else {
-      // High-craft beveled 3D Greco-Roman ashlar retaining wall masonry fallback
-      // Deep vertical stone face with NW->SE chiaroscuro darkening
-      this.pushQuadGradientV(
-        wx0,
-        topY + 18 * z,
-        wx1,
-        topY + 18 * z,
-        wx1,
-        y0,
-        wx0,
-        y0,
-        theme.wallLit[0] * 0.88,
-        theme.wallLit[1] * 0.88,
-        theme.wallLit[2] * 0.88,
-        1,
-        theme.wallDark[0] * 0.82,
-        theme.wallDark[1] * 0.82,
-        theme.wallDark[2] * 0.82,
-        1
-      );
-
-      // Horizontal ashlar masonry course lines
-      const course1Y = topY + 46 * z;
-      const course2Y = topY + 72 * z;
-      this.pushLine(wx0, course1Y, wx1, course1Y, 2.2 * z, INK_R, INK_G, INK_B, 0.72);
-      this.pushLine(wx0, course1Y + 2 * z, wx1, course1Y + 2 * z, 1.4 * z, theme.wallLit[0] * 1.12, theme.wallLit[1] * 1.12, theme.wallLit[2] * 1.12, 0.42);
-      this.pushLine(wx0, course2Y, wx1, course2Y, 2.2 * z, INK_R, INK_G, INK_B, 0.74);
-
-      // Staggered vertical stone block joints
-      const blockW = 86 * z;
-      const blocks = Math.ceil((wx1 - wx0) / blockW);
-      for (let i = 1; i < blocks; i++) {
-        const bx = wx0 + i * blockW;
-        if (i % 2 === 0) {
-          this.pushLine(bx, topY + 18 * z, bx, course1Y, 1.8 * z, INK_R, INK_G, INK_B, 0.65);
-          this.pushLine(bx, course2Y, bx, y0, 1.8 * z, INK_R, INK_G, INK_B, 0.65);
-        } else {
-          this.pushLine(bx, course1Y, bx, course2Y, 1.8 * z, INK_R, INK_G, INK_B, 0.65);
+      const shortName = this.getBiomeShortName(state.room.biome);
+      const wallSpriteId = `prop_wall_${shortName}_n`;
+      if (this.hasSprite(wallSpriteId)) {
+        const segW = 360 * z;
+        const segCount = Math.max(1, Math.ceil((wx1 - wx0) / segW));
+        const stepW = (wx1 - wx0) / segCount;
+        for (let i = 0; i < segCount; i++) {
+          this.pushSpriteSized(wallSpriteId, wx0 + i * stepW, topY, stepW + 1, wallH + 4 * z, 1, 1, 1, 1, 0);
         }
       }
-
-      // Stepped beveled top cornice cap (catches NW key light!)
-      this.pushQuadSolid(wx0 - 3 * z, topY, wx1 + 3 * z, topY, wx1 + 3 * z, topY + 15 * z, wx0 - 3 * z, topY + 15 * z, theme.wallLit[0] * 1.18, theme.wallLit[1] * 1.18, theme.wallLit[2] * 1.18, 1);
-      // Cornice metallic accent inlay & crisp overhang ink shadow
-      this.pushLine(wx0 - 2 * z, topY + 15 * z, wx1 + 2 * z, topY + 15 * z, 3.6 * z, INK_R, INK_G, INK_B, 0.95);
-      this.pushLine(wx0, topY + 11 * z, wx1, topY + 11 * z, 2.4 * z, theme.wallTrim[0], theme.wallTrim[1], theme.wallTrim[2], 0.84, 0.16);
-      this.pushQuadGradientV(
-        wx0,
-        topY + 16 * z,
-        wx1,
-        topY + 16 * z,
-        wx1,
-        topY + 30 * z,
-        wx0,
-        topY + 30 * z,
-        INK_R,
-        INK_G,
-        INK_B,
-        0.65,
-        INK_R,
-        INK_G,
-        INK_B,
-        0.0
-      );
-      // Base plinth moulding along wall foot
-      this.pushQuadSolid(wx0, y0 - 11 * z, wx1, y0 - 11 * z, wx1, y0, wx0, y0, theme.wallDark[0] * 0.72, theme.wallDark[1] * 0.72, theme.wallDark[2] * 0.72, 1);
-      this.pushLine(wx0, y0 - 11 * z, wx1, y0 - 11 * z, 2.0 * z, theme.wallTrim[0] * 0.72, theme.wallTrim[1] * 0.72, theme.wallTrim[2] * 0.72, 0.55);
     }
 
-    // 2. Seamless Recessed Arched Portal Frames behind Northern Exit Doors
-    for (let i = 0; i < state.room.doors.length; i++) {
-      const door = state.room.doors[i];
-      if (door.direction !== 'north') continue;
-      const dx = this.wxToSx(door.pos.x, cam);
-      const archHalfW = 74 * z;
-      // Recessed stone arch jambs + deep shadow niche integrating door seamlessly into north wall
-      this.pushQuadSolid(
-        dx - archHalfW - 8 * z,
-        topY + 8 * z,
-        dx + archHalfW + 8 * z,
-        topY + 8 * z,
-        dx + archHalfW + 8 * z,
-        y0 + 2 * z,
-        dx - archHalfW - 8 * z,
-        y0 + 2 * z,
-        INK_R,
-        INK_G,
-        INK_B,
-        0.92
-      );
-      this.pushQuadSolid(
-        dx - archHalfW - 16 * z,
-        topY + 4 * z,
-        dx - archHalfW,
-        topY + 4 * z,
-        dx - archHalfW,
-        y0 + 2 * z,
-        dx - archHalfW - 16 * z,
-        y0 + 2 * z,
-        theme.wallLit[0] * 1.1,
-        theme.wallLit[1] * 1.1,
-        theme.wallLit[2] * 1.1,
-        1
-      );
-      this.pushQuadSolid(
-        dx + archHalfW,
-        topY + 4 * z,
-        dx + archHalfW + 16 * z,
-        topY + 4 * z,
-        dx + archHalfW + 16 * z,
-        y0 + 2 * z,
-        dx + archHalfW,
-        y0 + 2 * z,
-        theme.wallDark[0] * 0.9,
-        theme.wallDark[1] * 0.9,
-        theme.wallDark[2] * 0.9,
-        1
-      );
-      this.pushLine(dx - archHalfW - 16 * z, topY + 6 * z, dx + archHalfW + 16 * z, topY + 6 * z, 4.0 * z, theme.wallTrim[0], theme.wallTrim[1], theme.wallTrim[2], 0.9, 0.25);
-    }
-
-    // 3. Fluted Pilasters + Wall-Mounted Burning Sconces along Northern Retaining Wall
+    // 2. Wall-Mounted Hand-Painted Ram-Horn Sconces + Animated Flickering Flame along North Wall
     const hasSconceSprite = this.hasSprite('prop_wall_sconce');
     for (let i = 0; i < this.wallSconces.length; i++) {
       const sc = this.wallSconces[i];
       const px = this.wxToSx(sc.x, cam);
-      const pilW = 24 * z;
-
-      // Carved pilaster rib with lit NW face & Mignola SE shadow face
-      this.pushQuadSolid(px - pilW * 0.5 - 2 * z, topY + 6 * z, px + pilW * 0.5 + 3 * z, topY + 6 * z, px + pilW * 0.5 + 3 * z, y0 + 2 * z, px - pilW * 0.5 - 2 * z, y0 + 2 * z, INK_R, INK_G, INK_B, 0.95);
-      this.pushQuadSolid(px - pilW * 0.5, topY + 10 * z, px + 2 * z, topY + 10 * z, px + 2 * z, y0, px - pilW * 0.5, y0, theme.wallLit[0] * 1.14, theme.wallLit[1] * 1.14, theme.wallLit[2] * 1.14, 1);
-      this.pushQuadSolid(px + 2 * z, topY + 10 * z, px + pilW * 0.5, topY + 10 * z, px + pilW * 0.5, y0, px + 2 * z, y0, theme.wallDark[0] * 0.72, theme.wallDark[1] * 0.72, theme.wallDark[2] * 0.72, 1);
-      // Pilaster capital
-      this.pushQuadSolid(px - pilW * 0.68, topY + 8 * z, px + pilW * 0.68, topY + 8 * z, px + pilW * 0.68, topY + 20 * z, px - pilW * 0.68, topY + 20 * z, theme.wallTrim[0], theme.wallTrim[1], theme.wallTrim[2], 0.92, 0.14);
-
-      // Wall-mounted burning sconce
-      const sconceY = y0 - 38 * z;
+      const sconceY = y0 - 46 * z;
       if (hasSconceSprite) {
-        const sScale = this.spriteScaleForHeight('prop_wall_sconce', 66 * z);
-        this.pushSprite('prop_wall_sconce', px, sconceY + 14 * z, sScale, sScale, 0, 1, 1, 1, 1, 0, 0.25);
-      } else {
-        // Sculpted cast-bronze wall bracket + coal cup
-        this.pushQuadSolid(px - 10 * z, sconceY - 4 * z, px + 10 * z, sconceY - 4 * z, px + 6 * z, sconceY + 10 * z, px - 6 * z, sconceY + 10 * z, INK_R, INK_G, INK_B, 0.96);
-        this.pushQuadSolid(px - 8 * z, sconceY - 2 * z, px + 8 * z, sconceY - 2 * z, px + 5 * z, sconceY + 7 * z, px - 5 * z, sconceY + 7 * z, 0.68, 0.45, 0.2, 1);
-        this.pushLine(px, sconceY + 7 * z, px, sconceY + 20 * z, 3.6 * z, 0.42, 0.28, 0.14, 0.96);
+        const sScale = this.spriteScaleForHeight('prop_wall_sconce', 74 * z);
+        this.pushSprite('prop_wall_sconce', px, sconceY + 12 * z, sScale, sScale, 0, 1, 1, 1, 1, 0, 0.2);
       }
 
-      // Animated 2-frequency flickering flame tongue on every wall sconce
       const flick = 0.88 + 0.12 * Math.sin(timeSec * 11.3 + i * 2.1) + 0.06 * Math.sin(timeSec * 27.1 + i * 3.7);
       const sway = Math.sin(timeSec * 7.8 + i * 1.7) * 0.14;
-      const flameSc = this.spriteScaleForHeight('vfx_flame_tongue', 44 * z);
+      const flameSc = this.spriteScaleForHeight('vfx_flame_tongue', 34 * z);
+      this.pushSprite('vfx_glow_soft', px, sconceY - 10 * z, 0.62 * z * flick, 0.62 * z * flick, 0, theme.brazierColor[0], theme.brazierColor[1], theme.brazierColor[2], 0.42, 0, 1.35);
       this.pushSprite(
         'vfx_flame_tongue',
         px,
-        sconceY - 4 * z,
-        flameSc * 0.85 * flick,
+        sconceY - 12 * z,
+        flameSc * 0.8 * flick,
         flameSc * flick,
         sway,
-        theme.brazierColor[0],
-        theme.brazierColor[1],
-        theme.brazierColor[2],
-        0.95,
+        1.0,
+        0.52,
+        0.14,
+        0.64,
         0,
-        1.7
+        1.45
       );
       this.pushSprite(
         'vfx_flame_tongue',
-        px + 1.5 * z,
-        sconceY - 6 * z,
-        flameSc * 0.48 * flick,
-        flameSc * 0.62 * flick,
+        px + 1.2 * z,
+        sconceY - 14 * z,
+        flameSc * 0.44 * flick,
+        flameSc * 0.56 * flick,
         -sway * 1.1,
         1.0,
-        0.96,
-        0.74,
-        0.94,
+        0.88,
+        0.48,
+        0.58,
         0,
-        2.15
+        1.8
       );
     }
 
-    // Crisp wall-to-floor seam line
-    this.pushLine(wx0, y0, wx1, y0, 3.4 * z, INK_R, INK_G, INK_B, 0.95);
+    // Crisp wall-to-floor seam shadow line
+    this.pushLine(wx0, y0, wx1, y0, 3.6 * z, INK_R, INK_G, INK_B, 0.96);
     void b;
   }
 
@@ -2198,8 +2081,8 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     const medId = `prop_medallion_${shortName}`;
 
     if (this.hasSprite(medId)) {
-      const sc = this.spriteScaleForHeight(medId, 212 * z);
-      this.pushSprite(medId, sx, sy, sc, sc, 0, 1, 1, 1, 0.86, 0, 0.06);
+      const sc = this.spriteScaleForHeight(medId, 248 * z);
+      this.pushSprite(medId, sx, sy, sc, sc, 0, 1, 1, 1, 0.92, 0, 0.08);
       return;
     }
 
@@ -2281,41 +2164,83 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       const p6x = cx - hw, p6y = cy + hh - cyOff;
       const p7x = cx - hw, p7y = cy - hh + cyOff;
 
-      // Recessed abyssal void interior
-      const vr = theme.deep[0] * 0.45;
-      const vg = theme.deep[1] * 0.52;
-      const vb = theme.deep[2] * 0.58;
-      this.pushTriSolid(cx, cy, p0x, p0y, p1x, p1y, vr, vg, vb, 0.98);
-      this.pushTriSolid(cx, cy, p1x, p1y, p2x, p2y, vr, vg, vb, 0.98);
-      this.pushTriSolid(cx, cy, p2x, p2y, p3x, p3y, vr, vg, vb, 0.98);
-      this.pushTriSolid(cx, cy, p3x, p3y, p4x, p4y, vr, vg, vb, 0.98);
-      this.pushTriSolid(cx, cy, p4x, p4y, p5x, p5y, vr, vg, vb, 0.98);
-      this.pushTriSolid(cx, cy, p5x, p5y, p6x, p6y, vr, vg, vb, 0.98);
-      this.pushTriSolid(cx, cy, p6x, p6y, p7x, p7y, vr, vg, vb, 0.98);
-      this.pushTriSolid(cx, cy, p7x, p7y, p0x, p0y, vr, vg, vb, 0.98);
+      // Outer carved recessed stone bevel coping collar framing the sunken chasm
+      const pad = 11 * z;
+      const o0x = p0x - pad * 0.35, o0y = p0y - pad * 0.65;
+      const o1x = p1x + pad * 0.35, o1y = p1y - pad * 0.65;
+      const o2x = p2x + pad, o2y = p2y - pad * 0.25;
+      const o3x = p3x + pad, o3y = p3y + pad * 0.25;
+      const o4x = p4x + pad * 0.35, o4y = p4y + pad * 0.65;
+      const o5x = p5x - pad * 0.35, o5y = p5y + pad * 0.65;
+      const o6x = p6x - pad, o6y = p6y + pad * 0.25;
+      const o7x = p7x - pad, o7y = p7y - pad * 0.25;
 
-      // Inner sunken basalt cliff face descending from north lip
-      const dropH = Math.min(hh * 1.15, 36 * z);
-      this.pushQuadSolid(p0x, p0y, p1x, p1y, p1x, p1y + dropH, p0x, p0y + dropH, theme.wallDark[0] * 0.65, theme.wallDark[1] * 0.65, theme.wallDark[2] * 0.65, 0.96);
-      this.pushQuadSolid(p7x, p7y, p0x, p0y, p0x, p0y + dropH, p7x, p7y + dropH * 0.85, theme.wallDark[0] * 0.52, theme.wallDark[1] * 0.52, theme.wallDark[2] * 0.52, 0.96);
-      this.pushQuadSolid(p1x, p1y, p2x, p2y, p2x, p2y + dropH * 0.85, p1x, p1y + dropH, theme.wallDark[0] * 0.42, theme.wallDark[1] * 0.42, theme.wallDark[2] * 0.42, 0.96);
+      // Lit stone collar bevel (NW warm edge, SE deep shadow edge) + carved outer masonry mortar lip
+      this.pushQuadSolid(o0x, o0y, o1x, o1y, p1x, p1y, p0x, p0y, theme.wallDark[0] * 0.84, theme.wallDark[1] * 0.84, theme.wallDark[2] * 0.84, 0.96);
+      this.pushQuadSolid(o7x, o7y, o0x, o0y, p0x, p0y, p7x, p7y, theme.wallDark[0] * 0.74, theme.wallDark[1] * 0.74, theme.wallDark[2] * 0.74, 0.96);
+      this.pushQuadSolid(o1x, o1y, o2x, o2y, p2x, p2y, p1x, p1y, theme.wallDark[0] * 0.64, theme.wallDark[1] * 0.64, theme.wallDark[2] * 0.64, 0.96);
+      this.pushQuadSolid(p2x, p2y, o2x, o2y, o3x, o3y, p3x, p3y, theme.wallDark[0] * 0.76, theme.wallDark[1] * 0.76, theme.wallDark[2] * 0.76, 0.96);
+      this.pushQuadSolid(p6x, p6y, p7x, p7y, o7x, o7y, o6x, o6y, theme.wallLit[0] * 0.84, theme.wallLit[1] * 0.84, theme.wallLit[2] * 0.84, 0.96);
+      this.pushQuadSolid(p3x, p3y, p4x, p4y, o4x, o4y, o3x, o3y, theme.wallLit[0] * 0.94, theme.wallLit[1] * 0.94, theme.wallLit[2] * 0.94, 0.97);
+      this.pushQuadSolid(p4x, p4y, p5x, p5y, o5x, o5y, o4x, o4y, theme.wallLit[0] * 1.04, theme.wallLit[1] * 1.04, theme.wallLit[2] * 1.04, 0.97);
+      this.pushQuadSolid(p5x, p5y, p6x, p6y, o6x, o6y, o5x, o5y, theme.wallLit[0] * 0.9, theme.wallLit[1] * 0.9, theme.wallLit[2] * 0.9, 0.97);
 
-      // Rising under-mist glow
-      this.pushSprite('vfx_glow_soft', cx, cy + hh * 0.18, (hw * 1.3) / 64, (hh * 1.1) / 64, 0, theme.rimGlow[0], theme.rimGlow[1], theme.rimGlow[2], 0.25, 0, 0.48);
+      // Outer carved stone coping perimeter ink outline (integrates coping naturally into flagstones)
+      this.pushLine(o0x, o0y, o1x, o1y, 2.8 * z, INK_R, INK_G, INK_B, 0.86);
+      this.pushLine(o1x, o1y, o2x, o2y, 2.8 * z, INK_R, INK_G, INK_B, 0.86);
+      this.pushLine(o2x, o2y, o3x, o3y, 2.8 * z, INK_R, INK_G, INK_B, 0.86);
+      this.pushLine(o3x, o3y, o4x, o4y, 2.8 * z, INK_R, INK_G, INK_B, 0.86);
+      this.pushLine(o4x, o4y, o5x, o5y, 2.8 * z, INK_R, INK_G, INK_B, 0.86);
+      this.pushLine(o5x, o5y, o6x, o6y, 2.8 * z, INK_R, INK_G, INK_B, 0.86);
+      this.pushLine(o6x, o6y, o7x, o7y, 2.8 * z, INK_R, INK_G, INK_B, 0.86);
+      this.pushLine(o7x, o7y, o0x, o0y, 2.8 * z, INK_R, INK_G, INK_B, 0.86);
+      // Coping corner stone slab miter joints
+      this.pushLine(p0x, p0y, o0x, o0y, 2.0 * z, INK_R, INK_G, INK_B, 0.72);
+      this.pushLine(p1x, p1y, o1x, o1y, 2.0 * z, INK_R, INK_G, INK_B, 0.72);
+      this.pushLine(p4x, p4y, o4x, o4y, 2.0 * z, INK_R, INK_G, INK_B, 0.72);
+      this.pushLine(p5x, p5y, o5x, o5y, 2.0 * z, INK_R, INK_G, INK_B, 0.72);
 
-      // Crisp jet-black comic ink ledge + subtle NW/SE lit rim
-      this.pushLine(p0x, p0y, p1x, p1y, 4.4 * z, INK_R, INK_G, INK_B, 0.96);
-      this.pushLine(p1x, p1y, p2x, p2y, 4.4 * z, INK_R, INK_G, INK_B, 0.96);
-      this.pushLine(p2x, p2y, p3x, p3y, 4.4 * z, INK_R, INK_G, INK_B, 0.96);
-      this.pushLine(p3x, p3y, p4x, p4y, 4.4 * z, INK_R, INK_G, INK_B, 0.96);
-      this.pushLine(p4x, p4y, p5x, p5y, 4.4 * z, INK_R, INK_G, INK_B, 0.96);
-      this.pushLine(p5x, p5y, p6x, p6y, 4.4 * z, INK_R, INK_G, INK_B, 0.96);
-      this.pushLine(p6x, p6y, p7x, p7y, 4.4 * z, INK_R, INK_G, INK_B, 0.96);
-      this.pushLine(p7x, p7y, p0x, p0y, 4.4 * z, INK_R, INK_G, INK_B, 0.96);
+      // Deep pitch-black abyssal pit interior
+      const vr = INK_R * 0.6;
+      const vg = INK_G * 0.7;
+      const vb = INK_B * 0.85;
+      this.pushTriSolid(cx, cy, p0x, p0y, p1x, p1y, vr, vg, vb, 0.99);
+      this.pushTriSolid(cx, cy, p1x, p1y, p2x, p2y, vr, vg, vb, 0.99);
+      this.pushTriSolid(cx, cy, p2x, p2y, p3x, p3y, vr, vg, vb, 0.99);
+      this.pushTriSolid(cx, cy, p3x, p3y, p4x, p4y, vr, vg, vb, 0.99);
+      this.pushTriSolid(cx, cy, p4x, p4y, p5x, p5y, vr, vg, vb, 0.99);
+      this.pushTriSolid(cx, cy, p5x, p5y, p6x, p6y, vr, vg, vb, 0.99);
+      this.pushTriSolid(cx, cy, p6x, p6y, p7x, p7y, vr, vg, vb, 0.99);
+      this.pushTriSolid(cx, cy, p7x, p7y, p0x, p0y, vr, vg, vb, 0.99);
 
-      this.pushLine(p3x, p3y, p4x, p4y, 1.8 * z, theme.wallTrim[0] * 0.72, theme.wallTrim[1] * 0.72, theme.wallTrim[2] * 0.72, 0.75, 0.16);
-      this.pushLine(p4x, p4y, p5x, p5y, 1.8 * z, theme.wallTrim[0] * 0.72, theme.wallTrim[1] * 0.72, theme.wallTrim[2] * 0.72, 0.75, 0.16);
-      this.pushLine(p5x, p5y, p6x, p6y, 1.8 * z, theme.wallTrim[0] * 0.72, theme.wallTrim[1] * 0.72, theme.wallTrim[2] * 0.72, 0.75, 0.16);
+      // Tiered 3D inner carved masonry wall dropping downward into abyssal shadow
+      const dropH = Math.min(hh * 1.28, 48 * z);
+      this.pushQuadGradientV(p0x, p0y, p1x, p1y, p1x, p1y + dropH, p0x, p0y + dropH, theme.wallLit[0] * 0.78, theme.wallLit[1] * 0.78, theme.wallLit[2] * 0.78, 0.98, INK_R, INK_G, INK_B, 0.98);
+      this.pushQuadGradientV(p7x, p7y, p0x, p0y, p0x, p0y + dropH, p7x, p7y + dropH * 0.88, theme.wallDark[0] * 0.72, theme.wallDark[1] * 0.72, theme.wallDark[2] * 0.72, 0.98, INK_R, INK_G, INK_B, 0.98);
+      this.pushQuadGradientV(p1x, p1y, p2x, p2y, p2x, p2y + dropH * 0.88, p1x, p1y + dropH, theme.wallDark[0] * 0.56, theme.wallDark[1] * 0.56, theme.wallDark[2] * 0.56, 0.98, INK_R, INK_G, INK_B, 0.98);
+      // Stone masonry courses carved across inner north cliff face
+      this.pushLine(p0x, p0y + dropH * 0.42, p1x, p1y + dropH * 0.42, 2.0 * z, INK_R, INK_G, INK_B, 0.78);
+      const midTopX = (p0x + p1x) * 0.5;
+      this.pushLine(midTopX, p0y, midTopX, p0y + dropH * 0.42, 1.8 * z, INK_R, INK_G, INK_B, 0.72);
+      this.pushLine(p0x + (p1x - p0x) * 0.28, p0y + dropH * 0.42, p0x + (p1x - p0x) * 0.28, p0y + dropH * 0.85, 1.6 * z, INK_R, INK_G, INK_B, 0.65);
+      this.pushLine(p0x + (p1x - p0x) * 0.72, p0y + dropH * 0.42, p0x + (p1x - p0x) * 0.72, p0y + dropH * 0.85, 1.6 * z, INK_R, INK_G, INK_B, 0.65);
+
+      // Rising spectral abyssal mist swirling deep inside the chasm
+      this.pushSprite('vfx_glow_soft', cx, cy + hh * 0.28, (hw * 1.15) / 64, (hh * 0.88) / 64, 0, theme.rimGlow[0], theme.rimGlow[1], theme.rimGlow[2], 0.34, 0, 0.75);
+
+      // Crisp jet-black comic ink lip + metallic highlight edge on south/inner bevel
+      this.pushLine(p0x, p0y, p1x, p1y, 4.4 * z, INK_R, INK_G, INK_B, 0.98);
+      this.pushLine(p1x, p1y, p2x, p2y, 4.4 * z, INK_R, INK_G, INK_B, 0.98);
+      this.pushLine(p2x, p2y, p3x, p3y, 4.4 * z, INK_R, INK_G, INK_B, 0.98);
+      this.pushLine(p3x, p3y, p4x, p4y, 4.4 * z, INK_R, INK_G, INK_B, 0.98);
+      this.pushLine(p4x, p4y, p5x, p5y, 4.4 * z, INK_R, INK_G, INK_B, 0.98);
+      this.pushLine(p5x, p5y, p6x, p6y, 4.4 * z, INK_R, INK_G, INK_B, 0.98);
+      this.pushLine(p6x, p6y, p7x, p7y, 4.4 * z, INK_R, INK_G, INK_B, 0.98);
+      this.pushLine(p7x, p7y, p0x, p0y, 4.4 * z, INK_R, INK_G, INK_B, 0.98);
+
+      this.pushLine(p3x, p3y, p4x, p4y, 2.0 * z, theme.wallTrim[0] * 0.82, theme.wallTrim[1] * 0.82, theme.wallTrim[2] * 0.82, 0.78, 0.22);
+      this.pushLine(p4x, p4y, p5x, p5y, 2.2 * z, theme.wallTrim[0] * 0.88, theme.wallTrim[1] * 0.88, theme.wallTrim[2] * 0.88, 0.84, 0.26);
+      this.pushLine(p5x, p5y, p6x, p6y, 2.0 * z, theme.wallTrim[0] * 0.82, theme.wallTrim[1] * 0.82, theme.wallTrim[2] * 0.82, 0.78, 0.22);
     }
   }
 
@@ -2739,32 +2664,13 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     const sLen = Math.hypot(sdx, sdy);
     if (sLen < 2) return;
 
-    const nx = -sdy / sLen;
-    const ny = sdx / sLen;
-    const baseHalf = baseRadiusW * z;
-    const tipHalf = baseHalf * 0.62;
-
-    // Skewed cast shadow body fading softly from dark base to cast tip
-    this.pushQuadGradientV(
-      bx + nx * baseHalf,
-      by + ny * baseHalf,
-      bx - nx * baseHalf,
-      by - ny * baseHalf,
-      tx - nx * tipHalf,
-      ty - ny * tipHalf,
-      tx + nx * tipHalf,
-      ty + ny * tipHalf,
-      INK_R,
-      INK_G,
-      INK_B,
-      modAlpha,
-      INK_R,
-      INK_G,
-      INK_B,
-      modAlpha * 0.55
-    );
-    // Soft rounded tip cap
-    this.pushEllipseFill(tx, ty, tipHalf, tipHalf * cam.isoScaleY, 10, INK_R, INK_G, INK_B, modAlpha * 0.55);
+    // Soft feathered painterly directional shadow using radial gradient sprite (zero hard geometric edges!)
+    const midX = (bx + tx) * 0.5;
+    const midY = (by + ty) * 0.5;
+    const ang = Math.atan2(sdy, sdx);
+    const scaleX = (sLen * 0.72 + baseRadiusW * z * 0.65) / 64;
+    const scaleY = (baseRadiusW * z * 1.08) / 64;
+    this.pushSprite('vfx_glow_soft', midX, midY, scaleX, scaleY, ang, INK_R, INK_G, INK_B, modAlpha * 0.88, 0, 0);
   }
 
   /**
@@ -2815,39 +2721,33 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       this.pushDirectionalCastShadow(ep.x, ep.y, Math.max(20, e.radius * 0.85), castH, e.isBoss ? 0.54 : 0.45, cam);
     }
 
-    // 2. Tight Dark `#09060E` Contact AO Skirts (0.72 alpha)
-    const aoHeroRx = 34 * z;
-    this.pushEllipseFill(this.wxToSx(heroPos.x, cam), this.wyToSy(heroPos.y, 0, cam), aoHeroRx, aoHeroRx * cam.isoScaleY, 16, INK_R, INK_G, INK_B, 0.72);
+    // 2. Soft Feathered Dark `#09060E` Contact AO Skirts (zero hard oval cutouts!)
+    const drawSoftContactAo = (sx: number, sy: number, rx: number, alpha: number) => {
+      const ry = rx * cam.isoScaleY;
+      this.pushSprite('vfx_glow_soft', sx, sy, (rx * 1.45) / 64, (ry * 1.45) / 64, 0, INK_R, INK_G, INK_B, alpha, 0, 0);
+      this.pushSprite('vfx_glow_soft', sx, sy, (rx * 0.88) / 64, (ry * 0.88) / 64, 0, INK_R, INK_G, INK_B, alpha * 0.72, 0, 0);
+    };
+
+    drawSoftContactAo(this.wxToSx(heroPos.x, cam), this.wyToSy(heroPos.y, 0, cam), 36 * z, 0.74);
 
     for (let i = 0; i < state.enemies.length; i++) {
       const e = state.enemies[i];
       if (e.aiState === 'dead') continue;
       const ep = this.interpEnemyPos(e, prevState, cam.interpAlpha);
-      const rx = Math.max(24, e.radius * 1.12) * z;
-      this.pushEllipseFill(this.wxToSx(ep.x, cam), this.wyToSy(ep.y, 0, cam), rx, rx * cam.isoScaleY, 16, INK_R, INK_G, INK_B, 0.72);
+      const rx = Math.max(26, e.radius * (e.isBoss ? 1.32 : 1.16)) * z;
+      drawSoftContactAo(this.wxToSx(ep.x, cam), this.wyToSy(ep.y, 0, cam), rx, 0.76);
     }
 
     for (let i = 0; i < state.room.obstacles.length; i++) {
       const obs = state.room.obstacles[i];
       if (obs.kind === 'pit') continue;
-      const rx = Math.max(26, obs.halfW * 1.24) * z;
-      this.pushEllipseFill(
-        this.wxToSx(obs.pos.x, cam),
-        this.wyToSy(obs.pos.y + obs.halfH * 0.35, 0, cam),
-        rx,
-        rx * cam.isoScaleY,
-        16,
-        INK_R,
-        INK_G,
-        INK_B,
-        0.74
-      );
+      const rx = Math.max(28, obs.halfW * 1.32) * z;
+      drawSoftContactAo(this.wxToSx(obs.pos.x, cam), this.wyToSy(obs.pos.y + obs.halfH * 0.35, 0, cam), rx, 0.78);
     }
 
     for (let i = 0; i < this.braziers.length; i++) {
       const br = this.braziers[i];
-      const rx = 28 * z;
-      this.pushEllipseFill(this.wxToSx(br.x, cam), this.wyToSy(br.y, 0, cam), rx, rx * cam.isoScaleY, 14, INK_R, INK_G, INK_B, 0.7);
+      drawSoftContactAo(this.wxToSx(br.x, cam), this.wyToSy(br.y, 0, cam), 30 * z, 0.72);
     }
   }
 
@@ -2986,13 +2886,13 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     const z = cam.zoom;
 
     if (obs.kind === 'destructible_urn') {
-      const scale = this.spriteScaleForHeight('prop_urn', Math.max(72, obs.halfW * 3.4) * z);
+      const scale = this.spriteScaleForHeight('prop_urn', Math.max(82, obs.halfW * 3.6) * z);
       this.pushSprite('prop_urn', sx, sy, scale, scale, 0, 1, 1, 1, 1);
       return;
     }
 
     if (obs.kind === 'statue') {
-      const scale = this.spriteScaleForHeight('prop_statue', Math.max(198, obs.halfW * 4.5) * z);
+      const scale = this.spriteScaleForHeight('prop_statue', Math.max(236, obs.halfW * 4.8) * z);
       this.pushSprite('prop_statue', sx, sy, scale, scale, 0, 1, 1, 1, 1);
       return;
     }
@@ -3011,9 +2911,9 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       return;
     }
 
-    // Biome-specific carved architectural pillar (resolution-independent across 2048 & 4096 atlases!)
+    // Biome-specific carved architectural pillar (monumental painted column!)
     const pillarId = getBiomePillarSpriteId(biome);
-    const scale = this.spriteScaleForHeight(pillarId, Math.max(226, obs.halfW * 5.25) * z);
+    const scale = this.spriteScaleForHeight(pillarId, Math.max(264, obs.halfW * 5.6) * z);
     this.pushSprite(pillarId, sx, sy, scale, scale, 0, 1, 1, 1, 1);
   }
 
@@ -3028,40 +2928,54 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     const sx = this.wxToSx(wx, cam);
     const sy = this.wyToSy(wy, 0, cam);
     const z = cam.zoom;
-    const s = this.spriteScaleForHeight('prop_brazier', 94 * z);
+    const s = this.spriteScaleForHeight('prop_brazier', 106 * z);
     this.pushSprite('prop_brazier', sx, sy, s, s, 0, 1, 1, 1, 1);
 
-    // 2-frequency flickering stylized cel flame
+    // Painterly volumetric ember glow + delicate translucent flickering fire licking above painted coals
     const flick = 0.88 + 0.14 * Math.sin(timeSec * 11.3 + idx * 1.9) + 0.06 * Math.sin(timeSec * 27.1 + idx * 3.1);
-    const sway = Math.sin(timeSec * 8.2 + idx * 2.7) * 0.16;
-    const fSc = this.spriteScaleForHeight('vfx_flame_tongue', 64 * z);
+    const sway = Math.sin(timeSec * 8.2 + idx * 2.7) * 0.14;
     this.pushSprite(
-      'vfx_flame_tongue',
+      'vfx_glow_soft',
       sx,
-      sy - 32 * z,
-      fSc * 0.88 * flick,
-      fSc * flick,
-      sway,
+      sy - 48 * z,
+      0.95 * z * flick,
+      0.72 * z * flick,
+      0,
       theme.brazierColor[0],
       theme.brazierColor[1],
       theme.brazierColor[2],
-      0.96,
+      0.46,
       0,
-      1.75
+      1.35
+    );
+    const fSc = this.spriteScaleForHeight('vfx_flame_tongue', 44 * z);
+    this.pushSprite(
+      'vfx_flame_tongue',
+      sx,
+      sy - 46 * z,
+      fSc * 0.92 * flick,
+      fSc * flick,
+      sway,
+      1.0,
+      0.48,
+      0.12,
+      0.66,
+      0,
+      1.45
     );
     this.pushSprite(
       'vfx_flame_tongue',
-      sx + 2.5 * z,
-      sy - 34 * z,
+      sx + 2.0 * z,
+      sy - 48 * z,
       fSc * 0.52 * flick,
-      fSc * 0.66 * flick,
-      -sway * 1.2,
+      fSc * 0.62 * flick,
+      -sway * 1.15,
       1.0,
-      0.96,
-      0.74,
-      0.94,
+      0.9,
+      0.52,
+      0.56,
       0,
-      2.2
+      1.85
     );
   }
 
@@ -3076,22 +2990,22 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       const [rr, rg, rb] = door.reward.patronId
         ? hexToRgbaTuple(PATRON_CONSTANTS[door.reward.patronId].colorHex)
         : [0.35, 0.96, 0.72];
-      this.pushSprite('vfx_glow_soft', sx, sy - 18 * z, 1.8 * z * pulse, 1.15 * z * pulse, 0, rr, rg, rb, 0.58, 0, 1.45);
+      this.pushSprite('vfx_glow_soft', sx, sy - 24 * z, 2.1 * z * pulse, 1.35 * z * pulse, 0, rr, rg, rb, 0.58, 0, 1.45);
     }
 
     const doorId = isOpen ? 'prop_exit_door_open' : 'prop_exit_door_locked';
-    const scale = this.spriteScaleForHeight(doorId, 204 * z);
+    const scale = this.spriteScaleForHeight(doorId, 238 * z);
     this.pushSprite(doorId, sx, sy, scale, scale, 0, 1, 1, 1, 1, 0, isOpen ? 0.25 : 0);
 
     const bob = Math.sin(timeSec * 3.4 + door.pos.x * 0.01) * 7 * z;
-    const sigilY = sy - 118 * z + bob;
+    const sigilY = sy - 134 * z + bob;
     const sigilId = door.reward.isBoss
       ? 'vfx_skull_badge'
       : door.reward.patronId
         ? getPatronSigilSpriteId(door.reward.patronId)
         : getPickupSpriteId(door.reward.kind);
-    const sigilScale = this.spriteScaleForMaxDim(sigilId, (isOpen ? 68 : 54) * z);
-    this.pushSprite(sigilId, sx, sigilY, sigilScale, sigilScale, 0, 1, 1, 1, isOpen ? 1.0 : 0.72, 0, isOpen ? 1.15 : 0.2);
+    const sigilScale = this.spriteScaleForMaxDim(sigilId, (isOpen ? 76 : 62) * z);
+    this.pushSprite(sigilId, sx, sigilY, sigilScale, sigilScale, 0, 1, 1, 1, isOpen ? 1.0 : 0.78, 0, isOpen ? 0.42 : 0.14);
   }
 
   private renderPickup(pk: PickupItem, cam: CameraView, timeSec: number): void {
@@ -3118,8 +3032,8 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     }
 
     const spriteId = getPickupSpriteId(pk.kind, pk.patronId);
-    const sc = this.spriteScaleForMaxDim(spriteId, 72 * z);
-    this.pushSprite(spriteId, sx, sy - 30 * z + bob, sc, sc, 0, 1, 1, 1, 1, 0, 0.9);
+    const sc = this.spriteScaleForMaxDim(spriteId, 74 * z);
+    this.pushSprite(spriteId, sx, sy - 30 * z + bob, sc, sc, 0, 1, 1, 1, 1, 0, 0.34);
   }
 
   private renderBloodstone(bs: BloodstoneDrop, cam: CameraView, timeSec: number): void {
@@ -3176,7 +3090,8 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     const speed = Math.hypot(p.vel.x, p.vel.y);
     const runBob = speed > 40 ? Math.abs(Math.sin(timeSec * 15.5)) * 6.5 * z : Math.sin(timeSec * 3.2) * 1.8 * z;
 
-    this.pushSprite('vfx_glow_soft', sx, sy + 2 * z, 0.88 * z, 0.54 * z, 0, 1.0, 0.42, 0.14, 0.48, 0, 1.25);
+    // Subtle warm ember shimmer under Prince Pyreus's blazing boots (no muddy yellow puddle!)
+    this.pushSprite('vfx_glow_soft', sx, sy + 2 * z, 0.72 * z, 0.42 * z, 0, 1.0, 0.34, 0.14, 0.18, 0, 0.45);
 
     if (p.godCallActiveTimer > 0 && p.godCallPatron) {
       const [cr, cg, cb] = hexToRgbaTuple(PATRON_CONSTANTS[p.godCallPatron].colorHex);
@@ -3184,23 +3099,22 @@ export class WebGL2InkCelRenderer implements RenderBackend {
       this.pushEllipseRing(sx, sy, 66 * z * pulse, 38 * z * pulse, 56 * z * pulse, 32 * z * pulse, 24, cr, cg, cb, 0.9, 2.2);
     }
 
-    this.renderFlowingHeroCloak(sx, sy - runBob, p.vel.x, p.vel.y, p.facingAngle, cam, timeSec);
-
+    // Hand-painted Prince Pyreus sprites carry an integrated crimson-gold meander cloak!
     const pose = this.selectHeroPose(p.facingAngle);
     const flip = Math.cos(p.facingAngle) < -0.12 ? -1 : 1;
-    const scale = this.spriteScaleForHeight(pose, 146 * z);
+    const scale = this.spriteScaleForHeight(pose, 162 * z);
     const flash = settings.hitFlash && p.iframeTimer > 1.12 ? 0.82 : 0;
     const iframeBlink = p.iframeTimer > 0 && Math.floor(timeSec * 22) % 2 === 0 ? 0.72 : 1.0;
 
-    const stretchX = p.dashTimer > 0 ? 1.16 : p.attackTimer > 0 ? 1.08 : 1.0;
-    const stretchY = p.dashTimer > 0 ? 0.9 : p.attackTimer > 0 ? 0.95 : 1.0;
-
-    this.pushSprite(pose, sx, sy - runBob, scale * stretchX * flip, scale * stretchY, 0, 1, 1, 1, iframeBlink, flash, 0.08);
+    const stretchX = p.dashTimer > 0 ? 1.15 : p.attackTimer > 0 ? 1.08 : 1.0;
+    const stretchY = p.dashTimer > 0 ? 0.91 : p.attackTimer > 0 ? 0.95 : 1.0;
+    const leanRot = speed > 60 ? (p.vel.x / 540) * 0.06 : 0;
 
     const wepId = getWeaponSpriteId(p.weaponId);
     const isSwinging = p.attackTimer > 0;
     const isCharging = p.attackChargeTimer > 0.12;
     const facingLeft = Math.cos(p.facingAngle) < -0.12;
+    const sideSign = facingLeft ? -1 : 1;
     let wepAngle: number;
     let handX: number;
     let handY: number;
@@ -3208,28 +3122,52 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     if (isSwinging || isCharging) {
       const swingOffset = isSwinging ? (p.attackComboStep % 2 === 1 ? -1.1 : 1.1) : 0;
       wepAngle = p.facingAngle + swingOffset;
-      handX = sx + Math.cos(p.facingAngle) * 20 * z;
-      handY = sy - 44 * z - runBob + Math.sin(p.facingAngle) * 10 * z;
+      handX = sx + Math.cos(p.facingAngle) * 24 * z;
+      handY = sy - 54 * z - runBob + Math.sin(p.facingAngle) * 12 * z;
     } else {
-      const sideSign = facingLeft ? -1 : 1;
-      const idleSway = Math.sin(timeSec * 4.4) * 0.06;
-      wepAngle = facingLeft ? Math.PI - 0.38 + idleSway : 0.38 + idleSway;
-      handX = sx + sideSign * 22 * z;
-      handY = sy - 36 * z - runBob;
+      const idleSway = Math.sin(timeSec * 4.4) * 0.045;
+      if (pose === 'hero_up') {
+        wepAngle = (facingLeft ? Math.PI + 0.45 : -0.45) + idleSway;
+        handX = sx + sideSign * 22 * z;
+        handY = sy - 66 * z - runBob;
+      } else if (pose === 'hero_diag_up') {
+        wepAngle = (facingLeft ? Math.PI + 0.28 : -0.28) + idleSway;
+        handX = sx + sideSign * 24 * z;
+        handY = sy - 62 * z - runBob;
+      } else if (pose === 'hero_down') {
+        wepAngle = (facingLeft ? Math.PI - 0.46 : 0.46) + idleSway;
+        handX = sx + sideSign * 20 * z;
+        handY = sy - 48 * z - runBob;
+      } else {
+        wepAngle = (facingLeft ? Math.PI - 0.28 : 0.28) + idleSway;
+        handX = sx + sideSign * 23 * z;
+        handY = sy - 52 * z - runBob;
+      }
     }
 
     const targetWepSize =
       p.weaponId === 'eternal_spear'
-        ? 132
+        ? 138
         : p.weaponId === 'adamant_rail'
-          ? 110
+          ? 108
           : p.weaponId === 'stygian_blade'
             ? 104
-            : 74;
+            : p.weaponId === 'heart_seeking_bow'
+              ? 84
+              : 74;
     const wepScale = this.spriteScaleForMaxDim(wepId, targetWepSize * z);
-    const wepEmissive = isSwinging || isCharging ? 0.55 : 0.12;
+    const wepEmissive = isSwinging || isCharging ? 0.55 : 0.1;
 
-    this.pushSprite(wepId, handX, handY, wepScale, wepScale * (Math.cos(wepAngle) < 0 ? -1 : 1), wepAngle, 1, 1, 1, 1, 0, wepEmissive);
+    const drawWeaponBehindHero = !isSwinging && !isCharging && pose === 'hero_up';
+    if (drawWeaponBehindHero) {
+      this.pushSprite(wepId, handX, handY, wepScale, wepScale * (Math.cos(wepAngle) < 0 ? -1 : 1), wepAngle, 1, 1, 1, 1, 0, wepEmissive);
+    }
+
+    this.pushSprite(pose, sx, sy - runBob, scale * stretchX * flip, scale * stretchY, leanRot, 1, 1, 1, iframeBlink, flash, 0.06);
+
+    if (!drawWeaponBehindHero) {
+      this.pushSprite(wepId, handX, handY, wepScale, wepScale * (Math.cos(wepAngle) < 0 ? -1 : 1), wepAngle, 1, 1, 1, 1, 0, wepEmissive);
+    }
 
     if (p.weaponId === 'shield_of_chaos' && (p.isBlocking || p.attackChargeTimer > 0.08)) {
       const sc = this.spriteScaleForMaxDim('vfx_shield_block', 112 * z);
@@ -3333,54 +3271,52 @@ export class WebGL2InkCelRenderer implements RenderBackend {
         ? (12 + Math.sin(timeSec * 4.5 + e.pos.y * 0.04) * 6) * z
         : 0;
 
-    // Resolution-independent heroic scale across both 2048 & 4096 atlases
-    const rect = this.atlas.sprites.get(spriteId);
+    // Resolution-independent heroic scale across painted 4096 atlas
     let baseScale: number;
     if (e.isBoss) {
-      baseScale = this.spriteScaleForHeight(spriteId, 286 * z);
+      const bossH =
+        e.bossId === 'sovereign_lord'
+          ? 348
+          : e.bossId === 'bone_leviathan'
+            ? 340
+            : e.bossId === 'colosseum_bull'
+              ? 330
+              : e.bossId === 'the_ferryman'
+                ? 326
+                : e.bossId === 'colosseum_spearlord'
+                  ? 312
+                  : 304;
+      baseScale = this.spriteScaleForHeight(spriteId, bossH * z);
     } else if (e.archetype === 'rattlebones_dummy') {
-      baseScale = this.spriteScaleForHeight(spriteId, 160 * z);
+      baseScale = this.spriteScaleForHeight(spriteId, 170 * z);
+    } else if (e.archetype === 'numbskull' || e.archetype === 'soul_orb') {
+      baseScale = this.spriteScaleForHeight(spriteId, 108 * z);
+    } else if (
+      e.archetype === 'wretched_husk' ||
+      e.archetype === 'ember_lout' ||
+      e.archetype === 'heavy_brawler' ||
+      e.archetype === 'bone_hydra_head'
+    ) {
+      baseScale = this.spriteScaleForHeight(spriteId, 184 * z);
     } else {
-      const legacyScale = Math.max(0.68, (e.radius * 2.6) / 115) * z;
-      baseScale = rect && rect.h > 210 ? legacyScale * (168 / rect.h) : legacyScale;
+      const targetH = Math.max(134, Math.min(174, e.radius * 3.85));
+      baseScale = this.spriteScaleForHeight(spriteId, targetH * z);
     }
 
     if (e.invulnerable) {
-      // Sculpted translucent pale-gold & obsidian ward-rune ring keeping boss silhouette 100% legible!
-      const wPulse = 0.96 + 0.04 * Math.sin(timeSec * 5.2);
-      const wRx = (e.radius + (e.isBoss ? 34 : 18)) * z * wPulse;
-      const wRy = wRx * cam.isoScaleY;
-      // Obsidian ink pedestal framing + hammered pale-gold inner ward ring
-      this.pushEllipseRing(sx, sy + 2 * z, wRx + 4 * z, wRy + 2.5 * z, Math.max(1, wRx - 1 * z), Math.max(1, wRy - 0.8 * z), 28, INK_R, INK_G, INK_B, 0.72);
-      this.pushEllipseRing(sx, sy + 2 * z, wRx, wRy, Math.max(1, wRx - 3.2 * z), Math.max(1, wRy - 2.0 * z), 28, 0.96, 0.85, 0.48, 0.68, 0.72);
-      // 8 rotating gilded ward rune ticks around base
-      const rot = timeSec * 0.75;
-      for (let k = 0; k < 8; k++) {
-        const a = rot + (k / 8) * Math.PI * 2;
-        const ca = Math.cos(a);
-        const sa = Math.sin(a);
-        this.pushLine(
-          sx + ca * (wRx + 2 * z),
-          sy + 2 * z + sa * (wRy + 1.2 * z),
-          sx + ca * (wRx - 9 * z),
-          sy + 2 * z + sa * (wRy - 5.5 * z),
-          2.6 * z,
-          1.0,
-          0.91,
-          0.58,
-          0.72,
-          0.85
-        );
-      }
-      // Subtle translucent vertical outer ward arch behind boss (hairline contour, zero chest washout)
-      const domeRx = (e.isBoss ? 86 : e.radius + 22) * z * wPulse;
-      const domeRy = (e.isBoss ? 104 : e.radius + 32) * z * wPulse;
-      this.pushEllipseRing(sx, sy - (e.isBoss ? 78 : 42) * z, domeRx, domeRy, domeRx - 3.2 * z, domeRy - 3.2 * z, 28, 0.96, 0.86, 0.54, 0.3, 0.55);
+      // Silky-smooth anti-aliased gilded ward halo at entity feet (zero jagged pixel circles!)
+      const wPulse = 0.96 + 0.05 * Math.sin(timeSec * 5.2);
+      const wDiam = (e.radius * 2 + (e.isBoss ? 86 : 36)) * z * wPulse;
+      const ringSc = this.spriteScaleForMaxDim('vfx_ring_soft', wDiam);
+      this.pushSprite('vfx_glow_soft', sx, sy + 2 * z, (wDiam * 0.55) / 64, (wDiam * 0.36) / 64, 0, 1.0, 0.86, 0.44, 0.22, 0, 0.6);
+      this.pushSprite('vfx_ring_soft', sx, sy + 2 * z, ringSc, ringSc * cam.isoScaleY, 0, 1.0, 0.88, 0.52, 0.56, 0, 0.85);
     }
 
     if (e.armor > 0) {
-      const pulse = 0.94 + 0.08 * Math.sin(timeSec * 7.5);
-      this.pushEllipseRing(sx, sy, (e.radius + 12) * z * pulse, (e.radius + 12) * cam.isoScaleY * z * pulse, (e.radius + 6) * z * pulse, (e.radius + 6) * cam.isoScaleY * z * pulse, 22, 1.0, 0.78, 0.24, 0.9, 1.5);
+      const pulse = 0.95 + 0.06 * Math.sin(timeSec * 7.5);
+      const aDiam = (e.radius * 2 + 30) * z * pulse;
+      const aSc = this.spriteScaleForMaxDim('vfx_ring_soft', aDiam);
+      this.pushSprite('vfx_ring_soft', sx, sy + 1 * z, aSc, aSc * cam.isoScaleY, 0, 1.0, 0.78, 0.24, 0.74, 0, 1.15);
     }
 
     const flash = settings.hitFlash && e.hitFlashTimer > 0 ? Math.min(1, e.hitFlashTimer * 12) : 0;
@@ -4275,11 +4211,12 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     }
   }
 
-  /** Hot-swaps the GPU atlas texture ONCE when toggling BUILTIN <-> CUSTOM_PACK. */
+  /** Hot-swaps the GPU atlas texture ONCE when painted art loads or toggling BUILTIN <-> CUSTOM_PACK. */
   public setAtlasCanvas(canvas: HTMLCanvasElement): void {
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.atlasTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+    gl.generateMipmap(gl.TEXTURE_2D);
   }
 
   /** Re-uploads the baked combat font glyph texture once self-hosted WOFF2 fonts load. */
@@ -4288,6 +4225,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.fontTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, fontAtlas.canvas);
+    gl.generateMipmap(gl.TEXTURE_2D);
   }
 
   public dispose(): void {
@@ -4300,6 +4238,12 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     this.lightFbo = null;
     this.bloomFboA = null;
     this.bloomFboB = null;
+    for (const surf of this.biomeTex.values()) {
+      gl.deleteTexture(surf.floor);
+      gl.deleteTexture(surf.wall);
+      gl.deleteTexture(surf.cliff);
+    }
+    this.biomeTex.clear();
     gl.deleteTexture(this.atlasTex);
     gl.deleteTexture(this.fontTex);
     gl.deleteBuffer(this.batchVbo);
@@ -4308,6 +4252,7 @@ export class WebGL2InkCelRenderer implements RenderBackend {
     gl.deleteVertexArray(this.lightVao);
     gl.deleteVertexArray(this.emptyVao);
     gl.deleteProgram(this.abyssProg);
+    gl.deleteProgram(this.floorProg);
     gl.deleteProgram(this.hazardProg);
     gl.deleteProgram(this.batchProg);
     gl.deleteProgram(this.lightProg);

@@ -6,6 +6,7 @@ import {
   type PatronId,
 } from '../contracts/index.js';
 import type { MenuNavInput } from '../input/InputManager.js';
+import { getPaintedPatronSigilUrl } from '../assets/PaintedArtLoader.js';
 import { attachCornerFiligrees, svgPatronSigil, svgSourceEmblem } from './svgArt.js';
 
 export interface BoonSelectCallbacks {
@@ -301,8 +302,14 @@ export class BoonSelectModal {
     if (patronId) {
       const url = this.callbacks.getPortraitUrl(patronId);
       if (url) {
-        this.portraitImg.src = url;
         this.portraitImg.alt = `${patronDef?.displayName ?? patronId} Portrait`;
+        if (this.portraitImg.getAttribute('src') !== url) {
+          this.portraitImg.src = url;
+        }
+        if (this.portraitImg.complete && this.portraitImg.naturalWidth > 0) {
+          this.portraitImg.classList.remove('kh-hidden');
+          this.portraitFallback.classList.add('kh-hidden');
+        }
       } else {
         this.portraitImg.removeAttribute('src');
         this.portraitImg.classList.add('kh-hidden');
@@ -339,14 +346,23 @@ export class BoonSelectModal {
       const layout = document.createElement('div');
       layout.className = 'kh-boon-card-layout';
 
-      // Left sculpted Patron Sigil Medallion
+      // Left sculpted Patron Sigil Medallion (hand-painted hammered-gold enamel crest w/ SVG fallback)
       const sigilBadge = document.createElement('div');
       sigilBadge.className = 'kh-boon-card-sigil';
       sigilBadge.style.color = optAccent;
       sigilBadge.style.borderColor = rarityInfo.color;
-      sigilBadge.innerHTML = optPatronId
-        ? svgPatronSigil(optPatronId, 26)
-        : svgSourceEmblem(offer.source, 26);
+      if (optPatronId) {
+        const sigImg = document.createElement('img');
+        sigImg.className = 'kh-boon-sigil-img';
+        sigImg.alt = '';
+        sigImg.src = getPaintedPatronSigilUrl(optPatronId);
+        sigImg.addEventListener('error', () => {
+          sigilBadge.innerHTML = svgPatronSigil(optPatronId, 28);
+        });
+        sigilBadge.appendChild(sigImg);
+      } else {
+        sigilBadge.innerHTML = svgSourceEmblem(offer.source, 28);
+      }
 
       const body = document.createElement('div');
       body.className = 'kh-boon-card-body';
